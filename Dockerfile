@@ -8,7 +8,7 @@ RUN npm install
 COPY . .
 
 # Argument for backend API URL injected at build-time
-ARG EXPO_PUBLIC_API_URL=https://api.luanna.shop/api
+ARG EXPO_PUBLIC_API_URL=https://luanna.shop/api
 ENV EXPO_PUBLIC_API_URL=$EXPO_PUBLIC_API_URL
 
 RUN npx expo export -p web
