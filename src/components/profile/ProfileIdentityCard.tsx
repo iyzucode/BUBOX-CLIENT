@@ -12,14 +12,14 @@ export const ProfileIdentityCard: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
-  // If authenticated use user data, otherwise fallback to reference design name
-  const displayName = isAuthenticated && user?.fullName ? user.fullName : 'Faixvey Ivena Ivy';
+  // If authenticated use user data, otherwise fallback to 'No Name' and '@noname'
+  const displayName = isAuthenticated && user?.fullName ? user.fullName : 'No Name';
   const displayHandle =
     isAuthenticated && user?.username
       ? `@${user.username}`
       : isAuthenticated && user?.email
       ? `@${user.email.split('@')[0]}`
-      : '@ivy';
+      : '@noname';
 
   return (
     <View style={styles.wrapper}>
