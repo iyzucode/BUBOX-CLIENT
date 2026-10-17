@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    overflow: 'hidden',
+    overflow: 'visible',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -294,19 +294,21 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     paddingTop: 16,
+    overflow: 'visible',
   },
   avatarCircle: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     borderWidth: 3,
     overflow: 'hidden',
-    marginTop: -44, // Subtly overlaps the top curve
+    marginTop: -45, // Half of avatar sits cleanly above card without being clipped
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 20,
   },
   avatarImage: {
     width: '100%',
