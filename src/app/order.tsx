@@ -39,10 +39,12 @@ export default function OrderScreen() {
   const {
     selectedDateKeys,
     orderDates,
+    categoryQuantities,
     activeCategories,
     cart,
     grandTotal,
     totalItemsCount,
+    handleSetCategoryQuantity,
     handleToggleCategory,
     handleUpdateSelectedDates,
     handleRemoveDate,
@@ -171,7 +173,8 @@ export default function OrderScreen() {
 
             {/* Card 2: Kategori Menu */}
             <OrderCategoryCard
-              activeCategories={activeCategories}
+              categoryQuantities={categoryQuantities}
+              onSetCategoryQuantity={handleSetCategoryQuantity}
               onToggleCategory={handleToggleCategory}
             />
           </View>

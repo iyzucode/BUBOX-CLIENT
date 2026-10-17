@@ -28,8 +28,13 @@ export function useOrderCart(weeklyData?: WeeklyMenuScheduleResponse, categories
   // 1. Single source of truth for ordered dates (default: empty array, user selects freely)
   const [selectedDateKeys, setSelectedDateKeys] = useState<string[]>([]);
 
-  // 2. Active categories (multi-select: Bubur, Nasi Tim, Sup)
-  const [activeCategories, setActiveCategories] = useState<CategoryId[]>([]);
+  // 2. Custom portion quantities per category (e.g. { "34e8efb8-...": 2 })
+  const [categoryQuantities, setCategoryQuantities] = useState<Record<string, number>>({});
+
+  // Active category keys (where qty > 0)
+  const activeCategories = useMemo(() => {
+    return Object.keys(categoryQuantities).filter((k) => (categoryQuantities[k] || 0) > 0);
+  }, [categoryQuantities]);
 
   // 3. Cart: dateKey -> menuId -> quantity
   const [cart, setCart] = useState<Record<string, Record<string, number>>>({});
@@ -98,14 +103,19 @@ export function useOrderCart(weeklyData?: WeeklyMenuScheduleResponse, categories
     });
   };
 
-  // Toggle Category multi-select with instant effect on all active days
-  const handleToggleCategory = (catId: CategoryId) => {
-    const isCurrentlyActive = activeCategories.includes(catId);
-    const newCategories = isCurrentlyActive
-      ? activeCategories.filter((id) => id !== catId)
-      : [...activeCategories, catId];
+  // Set custom portion quantity for a specific category across all active days
+  const handleSetCategoryQuantity = (catId: CategoryId, rawQty: number) => {
+    const qty = Math.max(0, Math.min(20, Math.floor(rawQty)));
 
-    setActiveCategories(newCategories);
+    setCategoryQuantities((prev) => {
+      const next = { ...prev };
+      if (qty <= 0) {
+        delete next[catId];
+      } else {
+        next[catId] = qty;
+      }
+      return next;
+    });
 
     if (!weeklyData?.days) return;
 
@@ -116,17 +126,15 @@ export function useOrderCart(weeklyData?: WeeklyMenuScheduleResponse, categories
         const dayCart = { ...(nextCart[entry.key] || {}) };
         const matchingMenus = getMatchingMenusForCategory(entry.dayOfWeek, catId);
 
-        if (isCurrentlyActive) {
-          // REMOVED category: delete items from cart
+        if (qty <= 0) {
+          // REMOVED / 0 portion: delete items from cart
           matchingMenus.forEach((m) => {
             delete dayCart[m.id];
           });
         } else {
-          // ADDED category: add items with 1 portion (only if not already in cart)
+          // SET custom portion: update each matching dish to `qty`
           matchingMenus.forEach((m) => {
-            if (!dayCart[m.id]) {
-              dayCart[m.id] = 1;
-            }
+            dayCart[m.id] = qty;
           });
         }
 
@@ -139,6 +147,26 @@ export function useOrderCart(weeklyData?: WeeklyMenuScheduleResponse, categories
 
       return nextCart;
     });
+  };
+
+  // Toggle Category: if active -> 0 (remove), if inactive -> 1 portion
+  const handleToggleCategory = (catId: CategoryId) => {
+    const currentQty = categoryQuantities[catId] || 0;
+    if (currentQty > 0) {
+      handleSetCategoryQuantity(catId, 0);
+    } else {
+      handleSetCategoryQuantity(catId, 1);
+    }
+  };
+
+  const handleIncrementCategory = (catId: CategoryId) => {
+    const currentQty = categoryQuantities[catId] || 0;
+    handleSetCategoryQuantity(catId, Math.min(20, currentQty + 1));
+  };
+
+  const handleDecrementCategory = (catId: CategoryId) => {
+    const currentQty = categoryQuantities[catId] || 0;
+    handleSetCategoryQuantity(catId, Math.max(0, currentQty - 1));
   };
 
   // Set multiple dates from Calendar modal
@@ -159,7 +187,7 @@ export function useOrderCart(weeklyData?: WeeklyMenuScheduleResponse, categories
       return;
     }
 
-    // Auto-fill active categories for newly added dates
+    // Auto-fill active category portions for newly added dates
     setCart((prevCart) => {
       const nextCart = { ...prevCart };
       const newKeySet = new Set(newDateKeys);
@@ -169,20 +197,20 @@ export function useOrderCart(weeklyData?: WeeklyMenuScheduleResponse, categories
         if (!newKeySet.has(k)) delete nextCart[k];
       });
 
-      // Apply active categories to brand new dates
+      // Apply active categories with custom quantities to brand new dates
       newDateKeys.forEach((key) => {
         if (!prevKeySet.has(key)) {
           const d = parseDateKey(key);
           const dayOfWeek = getDayOfWeekNumber(d);
           const dayCart = { ...(nextCart[key] || {}) };
 
-          activeCategories.forEach((catId) => {
-            const matches = getMatchingMenusForCategory(dayOfWeek, catId);
-            matches.forEach((m) => {
-              if (!dayCart[m.id]) {
-                dayCart[m.id] = 1;
-              }
-            });
+          Object.entries(categoryQuantities).forEach(([catId, catQty]) => {
+            if (catQty > 0) {
+              const matches = getMatchingMenusForCategory(dayOfWeek, catId);
+              matches.forEach((m) => {
+                dayCart[m.id] = catQty;
+              });
+            }
           });
 
           if (Object.keys(dayCart).length > 0) {
@@ -275,11 +303,15 @@ export function useOrderCart(weeklyData?: WeeklyMenuScheduleResponse, categories
   return {
     selectedDateKeys,
     orderDates,
+    categoryQuantities,
     activeCategories,
     cart,
     allMenusMap,
     grandTotal,
     totalItemsCount,
+    handleSetCategoryQuantity,
+    handleIncrementCategory,
+    handleDecrementCategory,
     handleToggleCategory,
     handleUpdateSelectedDates,
     handleRemoveDate,
