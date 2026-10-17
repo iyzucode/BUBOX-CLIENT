@@ -1,5 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Dimensions,
+  Easing,
   Image,
   Modal,
   Platform,
@@ -14,6 +17,7 @@ import { Menu } from '@/types/menu';
 import { useOrderPalette } from './orderPalette';
 
 const FALLBACK_IMAGE = require('@/assets/images/baby-puree-fallback.jpg');
+const SCREEN_HEIGHT = Dimensions.get('window').height || 700;
 
 interface MenuDetailModalProps {
   menu: Menu | null;
@@ -25,30 +29,83 @@ export const MenuDetailModal: React.FC<MenuDetailModalProps> = ({
   onClose,
 }) => {
   const palette = useOrderPalette();
+  const [internalMenu, setInternalMenu] = useState<Menu | null>(menu);
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const isClosingRef = useRef(false);
 
-  if (!menu) return null;
+  useEffect(() => {
+    if (menu) {
+      isClosingRef.current = false;
+      setInternalMenu(menu);
+      translateY.setValue(SCREEN_HEIGHT);
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    } else if (internalMenu && !isClosingRef.current) {
+      isClosingRef.current = true;
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }).start(() => {
+        isClosingRef.current = false;
+        setInternalMenu(null);
+      });
+    }
+  }, [menu]);
+
+  const handleClose = () => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start(() => {
+      isClosingRef.current = false;
+      setInternalMenu(null);
+      onClose();
+    });
+  };
+
+  const activeMenu = internalMenu || menu;
+  if (!activeMenu) return null;
 
   return (
     <Modal
-      visible={Boolean(menu)}
+      visible={Boolean(activeMenu)}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
-        {/* Backdrop pressable: tap outside to dismiss */}
+        {/* Backdrop pressable: instantly in place, tap outside to dismiss */}
         <Pressable
           style={styles.backdropPressable}
-          onPress={onClose}
+          onPress={handleClose}
           accessibilityRole="button"
           accessibilityLabel="Tutup rincian menu"
         />
 
-        {/* Bottom Sheet Card */}
-        <View style={[styles.sheetCard, { backgroundColor: palette.cardBg }]}>
+        {/* Bottom Sheet Card - Only this slides up */}
+        <Animated.View
+          style={[
+            styles.sheetCard,
+            {
+              backgroundColor: palette.cardBg,
+              transform: [{ translateY }],
+            },
+          ]}
+        >
           {/* 1. Drag Handle Indicator */}
           <Pressable
-            onPress={onClose}
+            onPress={handleClose}
             style={styles.dragHandleContainer}
             accessibilityRole="button"
             accessibilityLabel="Tutup rincian menu"
@@ -60,7 +117,9 @@ export const MenuDetailModal: React.FC<MenuDetailModalProps> = ({
           {/* 2. Inset Rounded Image Banner (Matching Gambar 2) */}
           <View style={styles.imageWrapper}>
             <Image
-              source={menu.imageUrl ? { uri: menu.imageUrl } : FALLBACK_IMAGE}
+              source={
+                activeMenu.imageUrl ? { uri: activeMenu.imageUrl } : FALLBACK_IMAGE
+              }
               style={styles.image}
               resizeMode="cover"
             />
@@ -74,7 +133,7 @@ export const MenuDetailModal: React.FC<MenuDetailModalProps> = ({
           >
             {/* Category Badge & Menu Title */}
             <View style={styles.titleSection}>
-              {Boolean(menu.category) && (
+              {Boolean(activeMenu.category) && (
                 <View
                   style={[
                     styles.categoryBadge,
@@ -87,24 +146,24 @@ export const MenuDetailModal: React.FC<MenuDetailModalProps> = ({
                       { color: palette.buttonText },
                     ]}
                   >
-                    {menu.category}
+                    {activeMenu.category}
                   </ThemedText>
                 </View>
               )}
 
               <ThemedText style={[styles.menuTitle, { color: palette.cardTitle }]}>
-                {menu.name}
+                {activeMenu.name}
               </ThemedText>
 
               <ThemedText
                 style={[styles.priceTag, { color: palette.buttonActiveBg }]}
               >
-                Rp {menu.price.toLocaleString('id-ID')}
+                Rp {activeMenu.price.toLocaleString('id-ID')}
               </ThemedText>
             </View>
 
             {/* Section: Deskripsi Menu */}
-            {Boolean(menu.description) && (
+            {Boolean(activeMenu.description) && (
               <View style={styles.sectionBlock}>
                 <ThemedText
                   style={[styles.sectionHeading, { color: palette.cardTitle }]}
@@ -114,13 +173,13 @@ export const MenuDetailModal: React.FC<MenuDetailModalProps> = ({
                 <ThemedText
                   style={[styles.sectionBody, { color: palette.dayMenuText }]}
                 >
-                  {menu.description}
+                  {activeMenu.description}
                 </ThemedText>
               </View>
             )}
 
             {/* Section: Komposisi & Bahan */}
-            {Boolean(menu.ingredients) && (
+            {Boolean(activeMenu.ingredients) && (
               <View style={styles.sectionBlock}>
                 <ThemedText
                   style={[styles.sectionHeading, { color: palette.cardTitle }]}
@@ -130,13 +189,13 @@ export const MenuDetailModal: React.FC<MenuDetailModalProps> = ({
                 <ThemedText
                   style={[styles.sectionBody, { color: palette.dayMenuText }]}
                 >
-                  {menu.ingredients}
+                  {activeMenu.ingredients}
                 </ThemedText>
               </View>
             )}
 
             {/* Section: Informasi Nilai Gizi */}
-            {Boolean(menu.nutritionInfo) && (
+            {Boolean(activeMenu.nutritionInfo) && (
               <View style={styles.sectionBlock}>
                 <ThemedText
                   style={[styles.sectionHeading, { color: palette.cardTitle }]}
@@ -146,12 +205,12 @@ export const MenuDetailModal: React.FC<MenuDetailModalProps> = ({
                 <ThemedText
                   style={[styles.sectionBody, { color: palette.dayMenuText }]}
                 >
-                  {menu.nutritionInfo}
+                  {activeMenu.nutritionInfo}
                 </ThemedText>
               </View>
             )}
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
