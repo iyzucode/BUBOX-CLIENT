@@ -1,372 +1,237 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
+  Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Navbar } from '@/components/ui/Navbar';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { BottomTabInset } from '@/constants/theme';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useLogout } from '@/features/auth/useLogout';
-import { useAddresses } from '@/features/biodata/useAddresses';
+import { useProfilePalette } from '@/components/profile/profilePalette';
+import { ProfileHeroHeader } from '@/components/profile/ProfileHeroHeader';
+import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
+import { ProfileOrderStatusBar } from '@/components/profile/ProfileOrderStatusBar';
+import {
+  ProfileMenuGroup,
+  ProfileMenuItemProps,
+} from '@/components/profile/ProfileMenuGroup';
+import { ProfileThemeSwitch } from '@/components/profile/ProfileThemeSwitch';
+import { ProfileLogoutButton } from '@/components/profile/ProfileLogoutButton';
+import {
+  MenuIconDetailProfile,
+  MenuIconPassword,
+  MenuIconAddress,
+  MenuIconTheme,
+  MenuIconHelp,
+  MenuIconReport,
+  MenuIconAbout,
+  MenuIconLanguage,
+} from '@/components/profile/ProfileIcons';
 
 export default function ProfileScreen() {
-  const theme = useTheme();
+  const palette = useProfilePalette();
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const logoutMutation = useLogout();
-  const { data: addresses } = useAddresses();
-  const primaryAddress = addresses?.find((a) => a.isPrimary) ?? addresses?.[0];
+
+  // Simple state for info / about dialogs
+  const [activeDialog, setActiveDialog] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
+
+  // Menu Group 1: Akun & Tema
+  const accountMenuItems: ProfileMenuItemProps[] = [
+    {
+      id: 'detail-profile',
+      label: 'Detail Profile',
+      icon: (color) => <MenuIconDetailProfile size={20} color={color} />,
+      onPress: () => {
+        if (isAuthenticated && user) {
+          setActiveDialog({
+            title: 'Detail Profil',
+            message: `Nama: ${user.fullName || '-'}\nUsername: @${user.username || '-'}\nEmail: ${user.email || '-'}\nStatus: ${user.isEmailVerified ? 'Email Terverifikasi' : 'Belum Diverifikasi'}`,
+          });
+        } else {
+          router.push('/login');
+        }
+      },
+    },
+    {
+      id: 'kata-sandi',
+      label: 'Kata Sandi',
+      icon: (color) => <MenuIconPassword size={20} color={color} />,
+      onPress: () => router.push('/forgot-password'),
+    },
+    {
+      id: 'alamat',
+      label: 'Alamat',
+      icon: (color) => <MenuIconAddress size={20} color={color} />,
+      onPress: () => router.push('/addresses'),
+    },
+    {
+      id: 'tema',
+      label: 'Tema',
+      icon: (color) => <MenuIconTheme size={20} color={color} />,
+      rightElement: <ProfileThemeSwitch />,
+    },
+  ];
+
+  // Menu Group 2: Bantuan & Informasi
+  const supportMenuItems: ProfileMenuItemProps[] = [
+    {
+      id: 'bantuan',
+      label: 'Bantuan',
+      icon: (color) => <MenuIconHelp size={20} color={color} />,
+      onPress: () => {
+        setActiveDialog({
+          title: 'Pusat Bantuan Luanna',
+          message:
+            'Ada pertanyaan seputar paket katering atau jadwal pengantaran? Hubungi layanan pelanggan kami via WhatsApp di 0812-3456-7890.',
+        });
+      },
+    },
+    {
+      id: 'laporkan-masalah',
+      label: 'Laporkan Masalah',
+      icon: (color) => <MenuIconReport size={20} color={color} />,
+      onPress: () => {
+        setActiveDialog({
+          title: 'Laporkan Masalah',
+          message:
+            'Jika Anda menemukan kendala teknis atau pengiriman, silakan kirim email ke support@bubox.id atau hubungi Customer Care.',
+        });
+      },
+    },
+    {
+      id: 'tentang-luanna',
+      label: 'Tentang Luanna',
+      icon: (color) => <MenuIconAbout size={20} color={color} />,
+      onPress: () => {
+        setActiveDialog({
+          title: 'Tentang Luanna',
+          message:
+            'Luanna adalah layanan katering MPASI premium harian yang menyediakan nutrisi seimbang dari bahan organik pilihan tanpa bahan pengawet & non-MSG untuk tumbuh kembang optimal si kecil.',
+        });
+      },
+    },
+    {
+      id: 'bahasa',
+      label: 'Bahasa',
+      icon: (color) => <MenuIconLanguage size={20} color={color} />,
+      onPress: () => {
+        setActiveDialog({
+          title: 'Pilihan Bahasa',
+          message: 'Saat ini aplikasi menggunakan Bahasa Indonesia (ID) secara default.',
+        });
+      },
+    },
+  ];
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        {/* Modern Minimalist Navbar */}
-        <Navbar />
+    <ThemedView style={[styles.container, { backgroundColor: palette.screenBg }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* 1. Artistic Top Cover Hero with Close (X) & PROFIL title */}
+        <ProfileHeroHeader />
 
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+        {/* 2. Main Content Card Area (Constrained to 500px phone/modal width) */}
+        <View style={styles.bodyWrapper}>
+          {/* Overlapping Baby Avatar + Name + @handle */}
+          <ProfileIdentityCard />
+
+          {/* Section: Pesanan Saya (4 Status Action Buttons) */}
+          <ProfileOrderStatusBar />
+
+          {/* Section: Group Menu 1 (Detail Profile, Kata Sandi, Alamat, Tema) */}
+          <ProfileMenuGroup items={accountMenuItems} />
+
+          {/* Section: Group Menu 2 (Bantuan, Laporkan Masalah, Tentang Luanna, Bahasa) */}
+          <ProfileMenuGroup items={supportMenuItems} />
+
+          {/* Section: Standalone Log out Button or Guest Login */}
+          {isAuthenticated ? (
+            <ProfileLogoutButton />
+          ) : (
+            <View style={styles.guestRow}>
+              <Pressable
+                onPress={() => router.push('/login')}
+                style={({ pressed }) => [
+                  styles.guestBtn,
+                  styles.guestLoginBtn,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <ThemedText style={styles.guestLoginText}>Masuk ke Akun</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push('/register')}
+                style={({ pressed }) => [
+                  styles.guestBtn,
+                  styles.guestRegisterBtn,
+                  { borderColor: palette.cardBorder, backgroundColor: palette.cardBg },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <ThemedText style={[styles.guestRegisterText, { color: palette.cardTitle }]}>
+                  Daftar
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Info / About Popup Dialog */}
+      {activeDialog && (
+        <Modal
+          visible={Boolean(activeDialog)}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveDialog(null)}
         >
-          {/* Header */}
-          <View style={styles.headerSection}>
+          <View style={styles.dialogOverlay}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setActiveDialog(null)}
+            />
             <View
               style={[
-                styles.badge,
-                {
-                  backgroundColor: theme.primary + '15',
-                  borderColor: theme.primary + '30',
-                },
+                styles.dialogCard,
+                { backgroundColor: palette.cardBg, borderColor: palette.cardBorder },
               ]}
             >
               <ThemedText
-                type="code"
-                style={[styles.badgeText, { color: theme.primary }]}
+                style={[styles.dialogTitle, { color: palette.cardTitle }]}
               >
-                AKUN PENGGUNA
+                {activeDialog.title}
               </ThemedText>
+              <ThemedText
+                style={[styles.dialogMessage, { color: palette.cardSubtext }]}
+              >
+                {activeDialog.message}
+              </ThemedText>
+              <Pressable
+                onPress={() => setActiveDialog(null)}
+                style={styles.dialogOkBtn}
+              >
+                <ThemedText style={styles.dialogOkBtnText}>Tutup</ThemedText>
+              </Pressable>
             </View>
-
-            <ThemedText type="title" style={styles.title}>
-              Profil & Pengaturan
-            </ThemedText>
-
-            <ThemedText type="default" style={styles.subtitle}>
-              Kelola informasi pribadi, preferensi katering, dan keamanan akun Anda
-            </ThemedText>
           </View>
-
-          {/* User Profile Card */}
-          {isAuthenticated && user ? (
-            <>
-              <View
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: theme.card,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <View style={styles.profileHeader}>
-                  <View
-                    style={[
-                      styles.avatarLarge,
-                      {
-                        backgroundColor: theme.primary + '20',
-                        borderColor: theme.primary,
-                      },
-                    ]}
-                  >
-                    <ThemedText
-                      type="title"
-                      style={[styles.avatarText, { color: theme.primary }]}
-                    >
-                      {user.fullName ? user.fullName[0].toUpperCase() : 'U'}
-                    </ThemedText>
-                  </View>
-
-                  <View style={styles.profileInfo}>
-                    <ThemedText type="subtitle" style={styles.profileName}>
-                      {user.fullName}
-                    </ThemedText>
-                    {user.username ? (
-                      <ThemedText type="smallBold" style={{ color: theme.primary, fontSize: 13 }}>
-                        @{user.username}
-                      </ThemedText>
-                    ) : null}
-                    <ThemedText type="small" style={styles.profileEmail}>
-                      {user.email}
-                    </ThemedText>
-
-                    <View style={styles.statusPillRow}>
-                      <View
-                        style={[
-                          styles.statusPill,
-                          user.isEmailVerified
-                            ? styles.pillSuccess
-                            : styles.pillWarning,
-                        ]}
-                      >
-                        <ThemedText
-                          type="code"
-                          style={[
-                            styles.pillText,
-                            {
-                              color: user.isEmailVerified
-                                ? '#10B981'
-                                : '#D97706',
-                            },
-                          ]}
-                        >
-                          {user.isEmailVerified
-                            ? '✓ EMAIL TERVERIFIKASI'
-                            : '⚠ EMAIL BELUM DIVERIFIKASI'}
-                        </ThemedText>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-
-                {!user.isEmailVerified && (
-                  <View style={styles.unverifiedBox}>
-                    <ThemedText type="small" style={styles.unverifiedText}>
-                      Verifikasi email Anda sekarang agar dapat melakukan pemesanan katering dengan lancar.
-                    </ThemedText>
-                    <Pressable
-                      onPress={() =>
-                        router.push({
-                          pathname: '/verify-email',
-                          params: { email: user.email },
-                        })
-                      }
-                      style={styles.verifyBtn}
-                    >
-                      <ThemedText type="smallBold" style={styles.verifyBtnText}>
-                        Verifikasi Kode OTP Sekarang →
-                      </ThemedText>
-                    </Pressable>
-                  </View>
-                )}
-
-                <View
-                  style={[
-                    styles.metaBox,
-                    { backgroundColor: theme.backgroundElement },
-                  ]}
-                >
-                  {user.username ? (
-                    <View style={styles.metaRow}>
-                      <ThemedText type="small" style={styles.metaKey}>
-                        Username:
-                      </ThemedText>
-                      <ThemedText type="smallBold" style={{ color: theme.primary, fontSize: 13 }}>
-                        @{user.username}
-                      </ThemedText>
-                    </View>
-                  ) : null}
-
-                  <View style={styles.metaRow}>
-                    <ThemedText type="small" style={styles.metaKey}>
-                      UUID (Internal):
-                    </ThemedText>
-                    <ThemedText type="code" style={styles.metaVal}>
-                      {user.id}
-                    </ThemedText>
-                  </View>
-
-                  <View style={styles.metaRow}>
-                    <ThemedText type="small" style={styles.metaKey}>
-                      Peran Sistem:
-                    </ThemedText>
-                    <ThemedText type="smallBold" style={styles.metaVal}>
-                      Member Pelanggan
-                    </ThemedText>
-                  </View>
-                </View>
-              </View>
-
-              {/* Preferences / Settings Card */}
-              <View
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: theme.card,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <ThemedText type="smallBold" style={styles.sectionHeading}>
-                  PENGATURAN & KEAMANAN
-                </ThemedText>
-
-                <View style={styles.menuList}>
-                  <Pressable
-                    onPress={() => router.push('/forgot-password')}
-                    style={({ pressed }) => [
-                      styles.menuItem,
-                      { borderColor: theme.border },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <View style={styles.menuLeft}>
-                      <ThemedText style={{ fontSize: 18 }}>🔐</ThemedText>
-                      <View>
-                        <ThemedText type="smallBold">Ganti Kata Sandi</ThemedText>
-                        <ThemedText type="small" style={styles.menuDesc}>
-                          Perbarui kata sandi untuk keamanan akun
-                        </ThemedText>
-                      </View>
-                    </View>
-                    <ThemedText type="small" style={styles.arrowText}>
-                      →
-                    </ThemedText>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => router.push('/addresses')}
-                    style={({ pressed }) => [
-                      styles.menuItem,
-                      { borderColor: theme.border },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <View style={styles.menuLeft}>
-                      <ThemedText style={{ fontSize: 18 }}>📍</ThemedText>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <ThemedText type="smallBold">Alamat Pengiriman</ThemedText>
-                          {primaryAddress ? (
-                            <View
-                              style={{
-                                backgroundColor: '#10B98118',
-                                paddingHorizontal: 6,
-                                paddingVertical: 2,
-                                borderRadius: 4,
-                              }}
-                            >
-                              <ThemedText type="code" style={{ color: '#10B981', fontSize: 9 }}>
-                                ★ {primaryAddress.label}
-                              </ThemedText>
-                            </View>
-                          ) : null}
-                        </View>
-                        <ThemedText type="small" style={styles.menuDesc} numberOfLines={1}>
-                          {primaryAddress
-                            ? `${primaryAddress.fullAddress}, ${primaryAddress.city}`
-                            : 'Kelola alamat rumah dan lokasi antar katering'}
-                        </ThemedText>
-                      </View>
-                    </View>
-                    <ThemedText type="small" style={styles.arrowText}>
-                      →
-                    </ThemedText>
-                  </Pressable>
-                </View>
-
-                {/* Logout Button */}
-                <Pressable
-                  onPress={() => logoutMutation.mutate()}
-                  disabled={logoutMutation.isPending}
-                  style={({ pressed }) => [
-                    styles.logoutBtn,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <ThemedText type="smallBold" style={styles.logoutBtnText}>
-                    {logoutMutation.isPending
-                      ? 'Mengeluarkan Akun...'
-                      : 'Keluar dari Akun (Logout)'}
-                  </ThemedText>
-                </Pressable>
-              </View>
-            </>
-          ) : (
-            /* Guest View */
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <View style={styles.guestCenter}>
-                <View
-                  style={[
-                    styles.guestIconCircle,
-                    {
-                      backgroundColor: theme.primary + '15',
-                      borderColor: theme.primary + '30',
-                    },
-                  ]}
-                >
-                  <ThemedText style={{ fontSize: 32 }}>👤</ThemedText>
-                </View>
-
-                <ThemedText type="subtitle" style={styles.guestTitle}>
-                  Belum Masuk Akun
-                </ThemedText>
-
-                <ThemedText type="small" style={styles.guestDesc}>
-                  Masuk atau buat akun baru untuk mengelola profil, melihat pesanan aktif, dan mengatur langganan MPASI si kecil.
-                </ThemedText>
-
-                <View style={styles.guestBtnGroup}>
-                  <Pressable
-                    onPress={() => router.push('/login')}
-                    style={({ pressed }) => [
-                      styles.guestPrimaryBtn,
-                      { backgroundColor: theme.primary },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <ThemedText
-                      type="smallBold"
-                      style={styles.guestPrimaryBtnText}
-                    >
-                      Masuk ke Akun
-                    </ThemedText>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => router.push('/register')}
-                    style={({ pressed }) => [
-                      styles.guestSecondaryBtn,
-                      {
-                        backgroundColor: theme.backgroundElement,
-                        borderColor: theme.border,
-                      },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <ThemedText
-                      type="smallBold"
-                      style={styles.guestSecondaryBtnText}
-                    >
-                      Daftar Akun Baru
-                    </ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {Platform.OS === 'web' && <WebBadge />}
-        </ScrollView>
-      </SafeAreaView>
+        </Modal>
+      )}
     </ThemedView>
   );
 }
@@ -375,249 +240,106 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  safeArea: {
+  scrollView: {
     flex: 1,
   },
   scrollContent: {
-    maxWidth: MaxContentWidth,
+    paddingBottom: BottomTabInset + 40,
+    alignItems: 'center',
+  },
+  bodyWrapper: {
     width: '100%',
-    alignSelf: 'center',
-    paddingHorizontal: 8,
-    paddingTop: 12,
-    paddingBottom: BottomTabInset + 16,
-    gap: 12,
-  },
-  headerSection: {
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    textAlign: 'center',
-    lineHeight: 36,
-  },
-  subtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    opacity: 0.75,
-    maxWidth: 520,
-    lineHeight: 20,
-  },
-  card: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-    gap: 12,
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    flexWrap: 'wrap',
-  },
-  avatarLarge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 28,
-    lineHeight: 36,
-  },
-  profileInfo: {
-    flex: 1,
-    minWidth: 180,
-    gap: 2,
-  },
-  profileName: {
-    fontSize: 20,
-    fontWeight: '700',
-    lineHeight: 26,
-  },
-  profileEmail: {
-    fontSize: 13,
-    opacity: 0.7,
-  },
-  statusPillRow: {
-    marginTop: 6,
-  },
-  statusPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  pillSuccess: {
-    backgroundColor: '#10B98115',
-  },
-  pillWarning: {
-    backgroundColor: '#F59E0B15',
-  },
-  pillText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  unverifiedBox: {
-    backgroundColor: '#F59E0B10',
-    borderColor: '#F59E0B35',
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    gap: 6,
-  },
-  unverifiedText: {
-    fontSize: 13,
-    color: '#D97706',
-    lineHeight: 18,
-  },
-  verifyBtn: {
-    cursor: 'pointer' as any,
-  },
-  verifyBtnText: {
-    fontSize: 13,
-    color: '#D97706',
-  },
-  metaBox: {
-    padding: 12,
-    borderRadius: 10,
-    gap: 8,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  metaKey: {
-    fontSize: 12,
-    opacity: 0.6,
-  },
-  metaVal: {
-    fontSize: 11,
-    opacity: 0.9,
-  },
-  sectionHeading: {
-    fontSize: 12,
-    letterSpacing: 0.8,
-    opacity: 0.6,
-  },
-  menuList: {
-    gap: 8,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    cursor: 'pointer' as any,
-  },
-  menuLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  menuDesc: {
-    fontSize: 12,
-    opacity: 0.6,
-    marginTop: 1,
-  },
-  arrowText: {
-    fontSize: 14,
-    opacity: 0.4,
-  },
-  logoutBtn: {
-    borderWidth: 1,
-    borderColor: '#EF444435',
-    backgroundColor: '#EF444410',
-    paddingVertical: 12,
+    maxWidth: 500,
     paddingHorizontal: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    cursor: 'pointer' as any,
+    gap: 14,
+    marginTop: 0,
+  },
+  guestRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginTop: 4,
   },
-  logoutBtnText: {
-    color: '#EF4444',
-    fontSize: 14,
-  },
-  guestCenter: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    gap: 12,
-  },
-  guestIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  guestTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  guestDesc: {
-    fontSize: 14,
-    textAlign: 'center',
-    opacity: 0.7,
-    maxWidth: 380,
-    lineHeight: 20,
-  },
-  guestBtnGroup: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    width: '100%',
-    maxWidth: 360,
-  },
-  guestPrimaryBtn: {
+  guestBtn: {
     flex: 1,
-    minWidth: 140,
-    height: 44,
-    borderRadius: 10,
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer' as any,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
   },
-  guestPrimaryBtnText: {
+  guestLoginBtn: {
+    backgroundColor: '#F36F21',
+  },
+  guestLoginText: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontWeight: '700',
   },
-  guestSecondaryBtn: {
-    flex: 1,
-    minWidth: 140,
-    height: 44,
-    borderRadius: 10,
+  guestRegisterBtn: {
     borderWidth: 1,
+  },
+  guestRegisterText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer' as any,
+    padding: 24,
   },
-  guestSecondaryBtnText: {
-    fontSize: 14,
+  dialogCard: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 22,
+    gap: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.25)',
+      } as any,
+    }),
+  },
+  dialogTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  dialogMessage: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  dialogOkBtn: {
+    marginTop: 6,
+    alignSelf: 'flex-end',
+    backgroundColor: '#F36F21',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
+  },
+  dialogOkBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
 });
