@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 
 import { AppThemeProvider, useThemeContext } from '@/context/ThemeContext';
-import { BottomFooter } from '@/components/ui/BottomFooter';
 import { AppSidebar } from '@/components/ui/AppSidebar';
 
 function RootLayoutContent() {
@@ -35,7 +34,6 @@ function RootLayoutContent() {
           >
             <Stack.Screen name="index" />
             <Stack.Screen name="order" />
-            <Stack.Screen name="order-menu" />
             <Stack.Screen name="profile" />
             <Stack.Screen name="addresses" />
             <Stack.Screen name="address-form" />
@@ -46,8 +44,6 @@ function RootLayoutContent() {
             <Stack.Screen name="admin/menu-form" />
           </Stack>
         </View>
-
-        {!isDesktop && <BottomFooter />}
       </View>
     </ThemeProvider>
   );
