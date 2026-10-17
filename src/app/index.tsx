@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useThemeContext } from '@/context/ThemeContext';
+import { ProfileBottomSheetModal } from '@/components/profile/ProfileBottomSheetModal';
 
 // Asset Hero Image
 const babyHeroImage = require('@/assets/images/baby-hero.jpg');
@@ -28,6 +29,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { width, height: windowHeight } = useWindowDimensions();
   const isDesktop = width > 768;
+
+  const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
 
   // Hero banner takes ~80-84% of viewport height on mobile, creating a tall immersive hero section
   const HEADER_MAX_HEIGHT = isDesktop
@@ -111,14 +114,14 @@ export default function HomeScreen() {
             )}
           </Pressable>
 
-          {/* User Profile Button */}
+          {/* User Profile Button - Opens Bottom Sheet Overlay */}
           <Pressable
-            onPress={() => router.push('/profile')}
+            onPress={() => setIsProfileSheetOpen(true)}
             style={({ pressed }) => [
               styles.circleButton,
               pressed && styles.buttonPressed,
             ]}
-            accessibilityLabel="Profil Saya"
+            accessibilityLabel="Menu Profil"
             accessibilityRole="button"
           >
             {Platform.OS === 'web' ? (
@@ -228,6 +231,12 @@ export default function HomeScreen() {
           />
         </View>
       </ScrollView>
+
+      {/* Profile Bottom Sheet Modal */}
+      <ProfileBottomSheetModal
+        visible={isProfileSheetOpen}
+        onClose={() => setIsProfileSheetOpen(false)}
+      />
     </ThemedView>
   );
 }
