@@ -99,15 +99,10 @@ export const ProfileHeroHeader: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    maxWidth: 500,
-    alignSelf: 'center',
     height: 290,
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: '#000000',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: Platform.OS === 'web' ? 16 : 0,
   },
   heroImage: {
     width: '100%',
@@ -121,10 +116,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    paddingHorizontal: 20,
+    alignItems: 'center',
   },
   topBar: {
     width: '100%',
+    maxWidth: 500,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
