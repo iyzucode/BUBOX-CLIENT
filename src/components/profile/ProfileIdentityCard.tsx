@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     position: 'relative',
-    marginTop: -50, // Pushes avatar to overlap onto hero image
+    marginTop: -130, // Half of card height sits on top of the banner!
     zIndex: 5,
   },
   avatarContainer: {
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     overflow: 'hidden',
     zIndex: 10,
-    marginBottom: -38, // Overlaps top half of the card
+    marginBottom: -44, // Half of avatar above card
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -96,10 +96,10 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    borderRadius: 28,
-    borderWidth: 1,
-    paddingTop: 48, // Space for the overlapping avatar
-    paddingBottom: 20,
+    borderRadius: 36,
+    borderWidth: 0,
+    paddingTop: 56, // Space for the overlapping avatar
+    paddingBottom: 22,
     paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',

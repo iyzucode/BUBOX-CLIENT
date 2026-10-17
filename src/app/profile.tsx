@@ -146,11 +146,13 @@ export default function ProfileScreen() {
         {/* 1. Artistic Top Cover Hero with Close (X) & PROFIL title */}
         <ProfileHeroHeader />
 
-        {/* 2. Main Content Card Area (Constrained to 500px phone/modal width) */}
-        <View style={styles.bodyWrapper}>
-          {/* Overlapping Baby Avatar + Name + @handle */}
+        {/* 2. Overlapping Baby Avatar + Name + @handle: NO margin width, half height on banner */}
+        <View style={styles.identityWrapper}>
           <ProfileIdentityCard />
+        </View>
 
+        {/* 3. Main Content Cards (Pesanan Saya, Menu Groups, Logout): WITH margin width */}
+        <View style={styles.bodyWrapper}>
           {/* Section: Pesanan Saya (4 Status Action Buttons) */}
           <ProfileOrderStatusBar />
 
@@ -247,12 +249,18 @@ const styles = StyleSheet.create({
     paddingBottom: BottomTabInset + 40,
     alignItems: 'center',
   },
+  identityWrapper: {
+    width: '100%',
+    paddingHorizontal: 0, // NO margin width! Full width edge-to-edge
+    alignItems: 'center',
+    zIndex: 5,
+  },
   bodyWrapper: {
     width: '100%',
     maxWidth: 500,
-    paddingHorizontal: 16,
+    paddingHorizontal: 16, // Inset with margin width for lower cards!
     gap: 14,
-    marginTop: 0,
+    marginTop: 18,
   },
   guestRow: {
     flexDirection: 'row',
