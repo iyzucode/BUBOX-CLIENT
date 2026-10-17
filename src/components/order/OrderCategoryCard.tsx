@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   StyleSheet,
@@ -7,19 +8,9 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useGetMainCategories } from '@/features/menu/useMenu';
 import { CategoryId } from '@/features/order/useOrderCart';
 import { useOrderPalette } from './orderPalette';
-
-interface CategoryOption {
-  id: CategoryId;
-  label: string;
-}
-
-const CATEGORY_OPTIONS: CategoryOption[] = [
-  { id: 'BUBUR', label: 'Bubur' },
-  { id: 'NASI_TIM', label: 'Nasi Tim' },
-  { id: 'SUP', label: 'Sup' },
-];
 
 interface OrderCategoryCardProps {
   activeCategories: CategoryId[];
@@ -31,6 +22,7 @@ export const OrderCategoryCard: React.FC<OrderCategoryCardProps> = ({
   onToggleCategory,
 }) => {
   const palette = useOrderPalette();
+  const { data: mainCategories, isLoading } = useGetMainCategories();
 
   return (
     <View style={[styles.card, { backgroundColor: palette.cardBg }]}>
@@ -62,44 +54,50 @@ export const OrderCategoryCard: React.FC<OrderCategoryCardProps> = ({
         </ThemedText>
       </View>
 
-      {/* Vertical Stack of Category Options (Bubur, Nasi Tim, Sup) */}
-      <View style={styles.categoryList}>
-        {CATEGORY_OPTIONS.map((item) => {
-          const isSelected = activeCategories.includes(item.id);
+      {/* Dynamic Stack of Category Options */}
+      {isLoading ? (
+        <View style={styles.loadingWrapper}>
+          <ActivityIndicator size="small" color={palette.buttonActiveBg} />
+        </View>
+      ) : (
+        <View style={styles.categoryList}>
+          {mainCategories?.map((item) => {
+            const isSelected = activeCategories.includes(item.id) || activeCategories.includes(item.code);
 
-          return (
-            <Pressable
-              key={item.id}
-              onPress={() => onToggleCategory(item.id)}
-              style={({ pressed }) => [
-                styles.categoryBtn,
-                {
-                  backgroundColor: isSelected
-                    ? palette.buttonActiveBg
-                    : palette.buttonBg,
-                },
-                pressed && styles.pressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={`Pilih kategori ${item.label}`}
-              accessibilityState={{ selected: isSelected }}
-            >
-              <ThemedText
-                style={[
-                  styles.categoryBtnText,
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => onToggleCategory(item.id)}
+                style={({ pressed }) => [
+                  styles.categoryBtn,
                   {
-                    color: isSelected
-                      ? palette.buttonActiveText
-                      : palette.buttonText,
+                    backgroundColor: isSelected
+                      ? palette.buttonActiveBg
+                      : palette.buttonBg,
                   },
+                  pressed && styles.pressed,
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Pilih kategori ${item.name}`}
+                accessibilityState={{ selected: isSelected }}
               >
-                {item.label}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
-      </View>
+                <ThemedText
+                  style={[
+                    styles.categoryBtnText,
+                    {
+                      color: isSelected
+                        ? palette.buttonActiveText
+                        : palette.buttonText,
+                    },
+                  ]}
+                >
+                  {item.name}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 };
@@ -129,6 +127,11 @@ const styles = StyleSheet.create({
   },
   categoryList: {
     gap: 10,
+  },
+  loadingWrapper: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryBtn: {
     width: '100%',

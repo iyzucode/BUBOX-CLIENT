@@ -18,47 +18,31 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
-  useCreateMenu,
-  useGetDetailMenu,
-  useUpdateMenu,
+  useCreateMasterMenu,
+  useGetDetailMasterMenu,
+  useGetMenuCategories,
+  useUpdateMasterMenu,
 } from '@/features/menu/useMenu';
-import { CreateMenuRequest, MenuType, UpdateMenuRequest } from '@/types/menu';
-
-const DAYS = [
-  { id: 1, name: 'Senin' },
-  { id: 2, name: 'Selasa' },
-  { id: 3, name: 'Rabu' },
-  { id: 4, name: 'Kamis' },
-  { id: 5, name: 'Jumat' },
-  { id: 6, name: 'Sabtu' },
-  { id: 7, name: 'Minggu' },
-];
-
-const PRESET_CATEGORIES = ['Bubur', 'Nasi Tim', 'Sup', 'Snack', 'Pelengkap'];
+import { CreateMasterMenuRequest, UpdateMasterMenuRequest } from '@/types/menu';
 
 export default function AdminMenuFormScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string; day?: string; type?: string }>();
+  const params = useLocalSearchParams<{ id?: string; categoryId?: string }>();
 
   const isEditMode = Boolean(params.id);
   const menuId = params.id;
 
   // Detail query for edit mode
-  const { data: menuDetail, isLoading: isLoadingDetail } = useGetDetailMenu(menuId);
+  const { data: menuDetail, isLoading: isLoadingDetail } = useGetDetailMasterMenu(menuId);
+  const { data: categories, isLoading: isLoadingCategories } = useGetMenuCategories();
 
   // Mutations
-  const createMenuMutation = useCreateMenu();
-  const updateMenuMutation = useUpdateMenu();
+  const createMasterMenuMutation = useCreateMasterMenu();
+  const updateMasterMenuMutation = useUpdateMasterMenu();
 
   // Form states
-  const [formDayOfWeek, setFormDayOfWeek] = useState<number>(
-    params.day ? parseInt(params.day, 10) || 1 : 1
-  );
-  const [formMenuType, setFormMenuType] = useState<MenuType>(
-    params.type === 'SEKUNDER' ? 'SEKUNDER' : 'UTAMA'
-  );
-  const [formCategory, setFormCategory] = useState<string>('Bubur');
+  const [formCategoryId, setFormCategoryId] = useState<string>(params.categoryId || '');
   const [formName, setFormName] = useState<string>('');
   const [formPrice, setFormPrice] = useState<string>('');
   const [formDescription, setFormDescription] = useState<string>('');
@@ -68,12 +52,17 @@ export default function AdminMenuFormScreen() {
   const [formIsActive, setFormIsActive] = useState<boolean>(true);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Set default category when categories load
+  useEffect(() => {
+    if (!formCategoryId && categories && categories.length > 0) {
+      setFormCategoryId(categories[0].id);
+    }
+  }, [categories, formCategoryId]);
+
   // Populate data when editing
   useEffect(() => {
     if (menuDetail) {
-      setFormDayOfWeek(menuDetail.dayOfWeek);
-      setFormMenuType(menuDetail.menuType);
-      setFormCategory(menuDetail.category);
+      setFormCategoryId(menuDetail.categoryId);
       setFormName(menuDetail.name);
       setFormPrice(menuDetail.price.toString());
       setFormDescription(menuDetail.description || '');
@@ -83,6 +72,8 @@ export default function AdminMenuFormScreen() {
       setFormIsActive(menuDetail.isActive);
     }
   }, [menuDetail]);
+
+  const selectedCategory = categories?.find((c) => c.id === formCategoryId);
 
   const handlePickImage = () => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -118,6 +109,11 @@ export default function AdminMenuFormScreen() {
   };
 
   const handleSave = async () => {
+    if (!formCategoryId) {
+      setFormError('Kategori hidangan wajib dipilih.');
+      return;
+    }
+
     if (!formName.trim()) {
       setFormError('Nama hidangan wajib diisi.');
       return;
@@ -133,10 +129,8 @@ export default function AdminMenuFormScreen() {
 
     try {
       if (isEditMode && menuId) {
-        const updateData: UpdateMenuRequest = {
-          dayOfWeek: formDayOfWeek,
-          menuType: formMenuType,
-          category: formCategory.trim(),
+        const updateData: UpdateMasterMenuRequest = {
+          categoryId: formCategoryId,
           name: formName.trim(),
           price: parsedPrice,
           description: formDescription.trim() || undefined,
@@ -146,15 +140,13 @@ export default function AdminMenuFormScreen() {
           isActive: formIsActive,
         };
 
-        await updateMenuMutation.mutateAsync({
+        await updateMasterMenuMutation.mutateAsync({
           id: menuId,
           data: updateData,
         });
       } else {
-        const createData: CreateMenuRequest = {
-          dayOfWeek: formDayOfWeek,
-          menuType: formMenuType,
-          category: formCategory.trim(),
+        const createData: CreateMasterMenuRequest = {
+          categoryId: formCategoryId,
           name: formName.trim(),
           price: parsedPrice,
           description: formDescription.trim() || undefined,
@@ -164,16 +156,16 @@ export default function AdminMenuFormScreen() {
           isActive: formIsActive,
         };
 
-        await createMenuMutation.mutateAsync(createData);
+        await createMasterMenuMutation.mutateAsync(createData);
       }
 
       router.back();
     } catch (err: any) {
-      setFormError(err.response?.data?.message || err.message || 'Gagal menyimpan menu.');
+      setFormError(err.response?.data?.message || err.message || 'Gagal menyimpan master menu.');
     }
   };
 
-  const isSubmitting = createMenuMutation.isPending || updateMenuMutation.isPending;
+  const isSubmitting = createMasterMenuMutation.isPending || updateMasterMenuMutation.isPending;
 
   return (
     <ThemedView style={styles.container}>
@@ -226,16 +218,16 @@ export default function AdminMenuFormScreen() {
                       { color: isEditMode ? '#0284C7' : theme.primary },
                     ]}
                   >
-                    {isEditMode ? 'EDIT MODE' : 'TAMBAH MENU'}
+                    {isEditMode ? 'EDIT MASTER MENU' : 'TAMBAH MASTER MENU'}
                   </ThemedText>
                 </View>
               </View>
 
               <ThemedText style={[styles.pageTitle, { color: theme.secondary }]}>
-                {isEditMode ? 'Ubah Hidangan MPASI' : 'Tambah Hidangan Baru'}
+                {isEditMode ? 'Ubah Master Menu' : 'Tambah Master Menu Baru'}
               </ThemedText>
               <ThemedText style={styles.pageSubtitle}>
-                Lengkapi rincian menu harian MPASI Bubox untuk siklus rotasi nutrisi si kecil.
+                Daftarkan hidangan ke dalam katalog master. Penugasan ke hari (Senin - Minggu) dilakukan di jadwal harian.
               </ThemedText>
             </View>
 
@@ -316,128 +308,73 @@ export default function AdminMenuFormScreen() {
                   )}
                 </View>
 
-                {/* 2. Hari Penyajian */}
+                {/* 2. Pilihan Kategori Makanan (rf_menu_categories) */}
                 <View style={styles.formGroup}>
-                  <ThemedText style={styles.inputLabel}>Hari Penyajian *</ThemedText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <ThemedText style={styles.inputLabel}>Kategori Hidangan *</ThemedText>
+                    {selectedCategory && (
+                      <View
+                        style={[
+                          styles.typeBadge,
+                          {
+                            backgroundColor: selectedCategory.categoryType === 'UTAMA' ? '#E0F2FE' : '#DCFCE7',
+                          },
+                        ]}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.typeBadgeText,
+                            {
+                              color: selectedCategory.categoryType === 'UTAMA' ? '#0369A1' : '#15803D',
+                            },
+                          ]}
+                        >
+                          {selectedCategory.categoryType === 'UTAMA' ? '🍲 Menu Utama' : '🥗 Menu Sekunder'}
+                        </ThemedText>
+                      </View>
+                    )}
+                  </View>
                   <ThemedText style={styles.fieldHint}>
-                    Pilih hari saat menu ini disajikan dalam rotasi mingguan.
+                    Tipe menu (Utama / Sekunder) otomatis ditentukan oleh kategori yang dipilih.
                   </ThemedText>
-                  <View style={styles.pillRow}>
-                    {DAYS.map((d) => {
-                      const isSelected = formDayOfWeek === d.id;
-                      return (
-                        <Pressable
-                          key={d.id}
-                          onPress={() => setFormDayOfWeek(d.id)}
-                          style={[
-                            styles.formPill,
-                            isSelected
-                              ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                              : { backgroundColor: '#F8FAFC', borderColor: theme.border },
-                          ]}
-                        >
-                          <ThemedText
+
+                  {isLoadingCategories ? (
+                    <ActivityIndicator size="small" color={theme.primary} />
+                  ) : (
+                    <View style={styles.presetCategoryRow}>
+                      {categories?.map((cat) => {
+                        const isSelected = formCategoryId === cat.id;
+                        return (
+                          <Pressable
+                            key={cat.id}
+                            onPress={() => setFormCategoryId(cat.id)}
                             style={[
-                              styles.formPillText,
-                              { color: isSelected ? '#FFFFFF' : '#475569' },
-                              isSelected && { fontWeight: '700' },
+                              styles.catPill,
+                              isSelected
+                                ? {
+                                    backgroundColor: theme.primaryLight || '#FFF0E8',
+                                    borderColor: theme.primary,
+                                  }
+                                : { backgroundColor: '#FFFFFF', borderColor: theme.border },
                             ]}
                           >
-                            {d.name}
-                          </ThemedText>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                            <ThemedText
+                              style={[
+                                styles.catPillText,
+                                { color: isSelected ? theme.primary : '#64748B' },
+                                isSelected && { fontWeight: '700' },
+                              ]}
+                            >
+                              {cat.name}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
 
-                {/* 3. Klasifikasi Menu */}
-                <View style={styles.formGroup}>
-                  <ThemedText style={styles.inputLabel}>Klasifikasi Menu *</ThemedText>
-                  <View style={styles.typeToggleRow}>
-                    <Pressable
-                      onPress={() => setFormMenuType('UTAMA')}
-                      style={[
-                        styles.typeToggleBtn,
-                        formMenuType === 'UTAMA'
-                          ? { backgroundColor: '#0284C7', borderColor: '#0284C7' }
-                          : { backgroundColor: '#F8FAFC', borderColor: theme.border },
-                      ]}
-                    >
-                      <ThemedText
-                        style={[
-                          styles.typeToggleText,
-                          { color: formMenuType === 'UTAMA' ? '#FFFFFF' : '#64748B' },
-                        ]}
-                      >
-                        🍲 Menu Utama (Rotasi Harian)
-                      </ThemedText>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={() => setFormMenuType('SEKUNDER')}
-                      style={[
-                        styles.typeToggleBtn,
-                        formMenuType === 'SEKUNDER'
-                          ? { backgroundColor: '#16A34A', borderColor: '#16A34A' }
-                          : { backgroundColor: '#F8FAFC', borderColor: theme.border },
-                      ]}
-                    >
-                      <ThemedText
-                        style={[
-                          styles.typeToggleText,
-                          { color: formMenuType === 'SEKUNDER' ? '#FFFFFF' : '#64748B' },
-                        ]}
-                      >
-                        🥗 Menu Sekunder (Lauk / Snack)
-                      </ThemedText>
-                    </Pressable>
-                  </View>
-                </View>
-
-                {/* 4. Kategori Makanan */}
-                <View style={styles.formGroup}>
-                  <ThemedText style={styles.inputLabel}>Kategori Makanan *</ThemedText>
-                  <View style={styles.presetCategoryRow}>
-                    {PRESET_CATEGORIES.map((cat) => {
-                      const isSelected = formCategory === cat;
-                      return (
-                        <Pressable
-                          key={cat}
-                          onPress={() => setFormCategory(cat)}
-                          style={[
-                            styles.catPill,
-                            isSelected
-                              ? {
-                                  backgroundColor: theme.primaryLight || '#FFF0E8',
-                                  borderColor: theme.primary,
-                                }
-                              : { backgroundColor: '#FFFFFF', borderColor: theme.border },
-                          ]}
-                        >
-                          <ThemedText
-                            style={[
-                              styles.catPillText,
-                              { color: isSelected ? theme.primary : '#64748B' },
-                              isSelected && { fontWeight: '700' },
-                            ]}
-                          >
-                            {cat}
-                          </ThemedText>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  <TextInput
-                    style={[styles.inputField, { borderColor: theme.border }]}
-                    placeholder="Atau ketik kategori kustom..."
-                    placeholderTextColor="#94A3B8"
-                    value={formCategory}
-                    onChangeText={setFormCategory}
-                  />
-                </View>
-
-                {/* 5. Nama Hidangan */}
+                {/* 3. Nama Hidangan */}
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.inputLabel}>Nama Hidangan *</ThemedText>
                   <TextInput
@@ -449,7 +386,7 @@ export default function AdminMenuFormScreen() {
                   />
                 </View>
 
-                {/* 6. Harga Satuan */}
+                {/* 4. Harga Satuan */}
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.inputLabel}>Harga Satuan (Rp) *</ThemedText>
                   <TextInput
@@ -462,7 +399,7 @@ export default function AdminMenuFormScreen() {
                   />
                 </View>
 
-                {/* 7. Bahan Pangan */}
+                {/* 5. Bahan Pangan */}
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.inputLabel}>Bahan Pangan (Ingredients)</ThemedText>
                   <TextInput
@@ -474,7 +411,7 @@ export default function AdminMenuFormScreen() {
                   />
                 </View>
 
-                {/* 8. Informasi Gizi */}
+                {/* 6. Informasi Gizi */}
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.inputLabel}>Informasi Nutrisi & Gizi</ThemedText>
                   <TextInput
@@ -486,7 +423,7 @@ export default function AdminMenuFormScreen() {
                   />
                 </View>
 
-                {/* 9. Deskripsi Singkat */}
+                {/* 7. Deskripsi Lengkap */}
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.inputLabel}>Deskripsi Lengkap</ThemedText>
                   <TextInput
@@ -500,7 +437,7 @@ export default function AdminMenuFormScreen() {
                   />
                 </View>
 
-                {/* 10. Status Aktif */}
+                {/* 8. Status Aktif */}
                 <View style={styles.statusToggleRow}>
                   <Pressable
                     onPress={() => setFormIsActive(!formIsActive)}
@@ -521,7 +458,7 @@ export default function AdminMenuFormScreen() {
                       Status Menu Aktif
                     </ThemedText>
                     <ThemedText style={{ fontSize: 12, color: '#64748B' }}>
-                      Menu aktif akan tampil di katalog pemesanan pelanggan
+                      Menu aktif dapat ditugaskan ke jadwal hari dan tampil di katalog
                     </ThemedText>
                   </View>
                 </View>
@@ -551,7 +488,7 @@ export default function AdminMenuFormScreen() {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <ThemedText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>
-                        {isEditMode ? 'Simpan Perubahan' : 'Tambah Menu'}
+                        {isEditMode ? 'Simpan Perubahan' : 'Tambah Master Menu'}
                       </ThemedText>
                     )}
                   </Pressable>
@@ -593,36 +530,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 12,
     borderWidth: 1,
-    cursor: 'pointer' as any,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
   },
   backBtnText: {
     fontSize: 13,
     fontWeight: '700',
   },
   headerCard: {
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 20,
-    gap: 8,
+    padding: 18,
+    gap: 6,
   },
   headerTagRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   tagBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   tagBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   pageTitle: {
     fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: -0.4,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   pageSubtitle: {
     fontSize: 13,
@@ -630,22 +569,22 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   loadingContainer: {
-    paddingVertical: 40,
+    padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   formCard: {
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 24,
+    padding: 20,
     gap: 20,
   },
   errorBanner: {
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FCA5A5',
-    padding: 12,
     borderRadius: 12,
+    padding: 12,
   },
   errorBannerText: {
     color: '#DC2626',
@@ -656,101 +595,40 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   inputLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#334155',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
   },
   fieldHint: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#94A3B8',
+    lineHeight: 16,
   },
-  imagePreviewContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  imagePreview: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-  },
-  imagePreviewActions: {
-    gap: 8,
-  },
-  imgActionBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer' as any,
-  },
-  uploadBox: {
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderRadius: 14,
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#FAFAFA',
-    cursor: 'pointer' as any,
-  },
-  pillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  formPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    cursor: 'pointer' as any,
-  },
-  formPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  typeToggleRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  typeToggleBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    cursor: 'pointer' as any,
-  },
-  typeToggleText: {
-    fontSize: 13,
+  typeBadgeText: {
+    fontSize: 12,
     fontWeight: '700',
   },
   presetCategoryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 4,
   },
   catPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 10,
     borderWidth: 1,
-    cursor: 'pointer' as any,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
   },
   catPillText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
   },
   inputField: {
     borderWidth: 1,
@@ -758,53 +636,94 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: '#1E293B',
-    backgroundColor: '#FFFFFF',
+    color: '#0F172A',
+    backgroundColor: '#F8FAFC',
   },
   inputArea: {
-    height: 90,
+    minHeight: 90,
     textAlignVertical: 'top',
+  },
+  uploadBox: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F8FAFC',
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
+  },
+  imagePreviewContainer: {
+    gap: 10,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 180,
+    borderRadius: 14,
+  },
+  imagePreviewActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  imgActionBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    backgroundColor: '#FFFFFF',
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
   },
   statusToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 6,
+    paddingTop: 6,
   },
   checkboxBox: {
-    width: 24,
-    height: 24,
-    borderRadius: 7,
-    borderWidth: 1.5,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
     borderColor: '#CBD5E1',
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer' as any,
+    backgroundColor: '#FFFFFF',
   },
   formActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 12,
+    paddingTop: 16,
     borderTopWidth: 1,
-    paddingTop: 18,
-    marginTop: 6,
   },
   cancelBtn: {
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
     borderWidth: 1,
-    cursor: 'pointer' as any,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
   },
   saveBtn: {
     paddingVertical: 12,
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
     borderRadius: 12,
-    cursor: 'pointer' as any,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 140,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
   },
   pressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.8,
   },
 });

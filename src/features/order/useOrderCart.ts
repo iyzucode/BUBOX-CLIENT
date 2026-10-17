@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Menu, WeeklyMenuScheduleResponse } from '@/types/menu';
+import { Menu, MenuCategory, WeeklyMenuScheduleResponse } from '@/types/menu';
 import {
   formatChipDate,
   formatIndonesianDate,
@@ -8,7 +8,7 @@ import {
   parseDateKey,
 } from './dateUtils';
 
-export type CategoryId = 'BUBUR' | 'NASI_TIM' | 'SUP';
+export type CategoryId = string;
 
 export interface DateEntry {
   key: string;
@@ -18,13 +18,13 @@ export interface DateEntry {
   formattedChip: string;
 }
 
-const CATEGORY_KEYWORDS: Record<CategoryId, string[]> = {
+export const CATEGORY_KEYWORDS: Record<string, string[]> = {
   BUBUR: ['bubur', 'porridge'],
   NASI_TIM: ['nasi tim', 'tim'],
   SUP: ['sup', 'soup', 'kuah'],
 };
 
-export function useOrderCart(weeklyData?: WeeklyMenuScheduleResponse) {
+export function useOrderCart(weeklyData?: WeeklyMenuScheduleResponse, categories?: MenuCategory[]) {
   // 1. Single source of truth for ordered dates (default: empty array, user selects freely)
   const [selectedDateKeys, setSelectedDateKeys] = useState<string[]>([]);
 
@@ -68,12 +68,32 @@ export function useOrderCart(weeklyData?: WeeklyMenuScheduleResponse) {
     const daySchedule = weeklyData.days.find((d) => d.dayOfWeek === dayOfWeek);
     if (!daySchedule) return [];
 
-    const keywords = CATEGORY_KEYWORDS[categoryId] || [];
     const allDayMenus = [...daySchedule.mainMenus, ...daySchedule.secondaryMenus];
+    const target = categoryId.toLowerCase();
+    const catObj = categories?.find((c) => c.id.toLowerCase() === target || c.code.toLowerCase() === target);
 
     return allDayMenus.filter((m) => {
-      const catLower = m.category.toLowerCase();
-      const nameLower = m.name.toLowerCase();
+      // 1. Direct match on CategoryId (UUID)
+      if (m.categoryId && m.categoryId.toLowerCase() === target) {
+        return true;
+      }
+      if (catObj && m.categoryId && m.categoryId.toLowerCase() === catObj.id.toLowerCase()) {
+        return true;
+      }
+      // 2. Direct match or substring on category name/code
+      const catLower = (m.category || '').toLowerCase();
+      if (catObj && catObj.name) {
+        if (catLower === catObj.name.toLowerCase() || catLower.includes(catObj.name.toLowerCase())) {
+          return true;
+        }
+      }
+      if (catLower && (catLower === target || target.includes(catLower) || catLower.includes(target))) {
+        return true;
+      }
+      // 3. Fallback keywords
+      const codeOrTarget = (catObj?.code || categoryId).toUpperCase();
+      const keywords = CATEGORY_KEYWORDS[codeOrTarget] || [];
+      const nameLower = (m.name || '').toLowerCase();
       return keywords.some((kw) => catLower.includes(kw) || nameLower.includes(kw));
     });
   };

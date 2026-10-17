@@ -21,8 +21,8 @@ import { OrderDateCard } from '@/components/order/OrderDateCard';
 import { OrderHeroHeader } from '@/components/order/OrderHeroHeader';
 import { useOrderPalette } from '@/components/order/orderPalette';
 import { MaxContentWidth } from '@/constants/theme';
-import { useGetWeeklyMenu } from '@/features/menu/useMenu';
-import { CategoryId, useOrderCart } from '@/features/order/useOrderCart';
+import { useGetMainCategories, useGetWeeklyMenu } from '@/features/menu/useMenu';
+import { CategoryId, CATEGORY_KEYWORDS, useOrderCart } from '@/features/order/useOrderCart';
 import { Menu } from '@/types/menu';
 
 export default function OrderScreen() {
@@ -31,8 +31,9 @@ export default function OrderScreen() {
   const insets = useSafeAreaInsets();
   const stickyTop = insets.top > 0 ? insets.top : 0;
 
-  // 1. Fetch weekly menu from API
+  // 1. Fetch weekly menu and main categories from API
   const { data: weeklyData, isLoading, isError, refetch } = useGetWeeklyMenu();
+  const { data: mainCategories } = useGetMainCategories();
 
   // 2. Cart & Selection Logic (default: empty dates)
   const {
@@ -47,7 +48,7 @@ export default function OrderScreen() {
     handleRemoveDate,
     updateItemQty,
     calculateDaySubtotal,
-  } = useOrderCart(weeklyData);
+  } = useOrderCart(weeklyData, mainCategories);
 
   // 3. UI States: Expanded Accordion, Calendar Modal, Menu Detail Modal
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
@@ -113,21 +114,38 @@ export default function OrderScreen() {
     }
 
     const dayCart = cart[dateKey] || {};
-    const keywordsMap: Record<CategoryId, string[]> = {
-      BUBUR: ['bubur', 'porridge'],
-      NASI_TIM: ['nasi tim', 'tim'],
-      SUP: ['sup', 'soup', 'kuah'],
-    };
-
-    const activeKeywords = activeCategories.flatMap((c) => keywordsMap[c]);
 
     return allDayMenus.filter((menu) => {
-      // Always show if already in cart with qty > 0
+      // 1. Always show secondary menus (Snack / Pelengkap) so parents can add them as complements
+      if (menu.menuType === 'SEKUNDER') return true;
+
+      // 2. Always show if already in cart with qty > 0
       if ((dayCart[menu.id] || 0) > 0) return true;
 
-      const catLower = menu.category.toLowerCase();
-      const nameLower = menu.name.toLowerCase();
-      return activeKeywords.some((kw) => catLower.includes(kw) || nameLower.includes(kw));
+      // 3. Match against active categories
+      return activeCategories.some((catKey) => {
+        const target = catKey.toLowerCase();
+        const catObj = mainCategories?.find((c) => c.id.toLowerCase() === target || c.code.toLowerCase() === target);
+
+        // Match by UUID
+        if (menu.categoryId && menu.categoryId.toLowerCase() === target) return true;
+        if (catObj && menu.categoryId && menu.categoryId.toLowerCase() === catObj.id.toLowerCase()) return true;
+
+        // Match by Category Name
+        const catLower = (menu.category || '').toLowerCase();
+        if (catObj && catObj.name && (catLower === catObj.name.toLowerCase() || catLower.includes(catObj.name.toLowerCase()))) {
+          return true;
+        }
+        if (catLower && (catLower === target || target.includes(catLower) || catLower.includes(target))) {
+          return true;
+        }
+
+        // Match by Fallback Keywords
+        const codeOrTarget = (catObj?.code || catKey).toUpperCase();
+        const keywords = CATEGORY_KEYWORDS[codeOrTarget] || [];
+        const nameLower = (menu.name || '').toLowerCase();
+        return keywords.some((kw) => catLower.includes(kw) || nameLower.includes(kw));
+      });
     });
   };
 

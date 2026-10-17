@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  TextInput,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -18,11 +19,15 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
-  useDeleteMenu,
+  useBatchAssignMenusToDay,
+  useDeleteMasterMenu,
+  useGetMasterMenus,
+  useGetMenuCategories,
   useGetWeeklyMenu,
+  useRemoveMenuFromDay,
   useToggleMenuStatus,
 } from '@/features/menu/useMenu';
-import { Menu } from '@/types/menu';
+import { MasterMenu, Menu } from '@/types/menu';
 
 const DAYS = [
   { id: 1, name: 'Senin' },
@@ -38,88 +43,161 @@ export default function AdminMenuScreen() {
   const theme = useTheme();
   const router = useRouter();
 
+  // Active top tab: 'schedule' (Jadwal Harian) or 'catalog' (Katalog Master Menu)
+  const [activeTab, setActiveTab] = useState<'schedule' | 'catalog'>('schedule');
+
+  // Schedule Tab state
   const [selectedDay, setSelectedDay] = useState<number>(1);
+  const [pickerModalVisible, setPickerModalVisible] = useState(false);
+  const [selectedMenuIdsForBatch, setSelectedMenuIdsForBatch] = useState<string[]>([]);
+
+  // Catalog Tab state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
 
   // Detail Pop-up Modal (Saat Card Diklik)
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedDetailMenu, setSelectedDetailMenu] = useState<Menu | null>(null);
 
   // TanStack Query Hooks
-  const { data: weeklyData, isLoading, refetch } = useGetWeeklyMenu();
-  const deleteMenuMutation = useDeleteMenu();
-  const toggleStatusMutation = useToggleMenuStatus();
+  const { data: weeklyData, isLoading: isLoadingWeekly, refetch: refetchWeekly } = useGetWeeklyMenu();
+  const { data: masterMenus, isLoading: isLoadingMaster, refetch: refetchMaster } = useGetMasterMenus();
+  const { data: categories } = useGetMenuCategories();
 
+  // Mutations
+  const toggleStatusMutation = useToggleMenuStatus();
+  const deleteMasterMenuMutation = useDeleteMasterMenu();
+  const batchAssignMutation = useBatchAssignMenusToDay();
+  const removeAssignmentMutation = useRemoveMenuFromDay();
+
+  // Current Day Menus
   const currentDaySchedule = weeklyData?.days?.find((d) => d.dayOfWeek === selectedDay);
   const mainMenus = currentDaySchedule?.mainMenus || [];
   const secondaryMenus = currentDaySchedule?.secondaryMenus || [];
+  const assignedMenuIdsCurrentDay = useMemo(() => {
+    return [...mainMenus, ...secondaryMenus].map((m) => m.id);
+  }, [mainMenus, secondaryMenus]);
 
-  // Buka Pop-up Detail saat kartu diklik
+  // Filtered Master Menus for Catalog Tab
+  const filteredMasterMenus = useMemo(() => {
+    if (!masterMenus) return [];
+    return masterMenus.filter((m) => {
+      const matchSearch = !searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchCategory = selectedCategoryFilter === 'ALL' || m.categoryId === selectedCategoryFilter;
+      return matchSearch && matchCategory;
+    });
+  }, [masterMenus, searchQuery, selectedCategoryFilter]);
+
+  // Open Pop-up Detail
   const handleCardPress = (menu: Menu) => {
     setSelectedDetailMenu(menu);
     setDetailModalVisible(true);
   };
 
-  // Navigasi ke halaman form tambah menu baru
-  const navigateToCreateForm = (menuType: 'UTAMA' | 'SEKUNDER' = 'UTAMA') => {
-    router.push({
-      pathname: '/admin/menu-form' as any,
-      params: {
-        day: selectedDay.toString(),
-        type: menuType,
-      },
-    });
+  // Open Picker Modal to assign menus to selectedDay
+  const handleOpenPickerModal = () => {
+    setSelectedMenuIdsForBatch([]);
+    setPickerModalVisible(true);
   };
 
-  // Navigasi ke halaman form edit dari pop-up detail
-  const handleEditFromDetail = () => {
-    if (selectedDetailMenu) {
-      const targetId = selectedDetailMenu.id;
-      setDetailModalVisible(false);
-      router.push({
-        pathname: '/admin/menu-form' as any,
-        params: {
-          id: targetId,
-        },
+  const handleTogglePickerMenu = (menuId: string) => {
+    if (assignedMenuIdsCurrentDay.includes(menuId)) return; // already assigned
+    setSelectedMenuIdsForBatch((prev) =>
+      prev.includes(menuId) ? prev.filter((id) => id !== menuId) : [...prev, menuId]
+    );
+  };
+
+  const handleSaveBatchAssignment = async () => {
+    if (selectedMenuIdsForBatch.length === 0) return;
+    try {
+      await batchAssignMutation.mutateAsync({
+        dayOfWeek: selectedDay,
+        menuIds: selectedMenuIdsForBatch,
       });
+      setPickerModalVisible(false);
+      setSelectedMenuIdsForBatch([]);
+      refetchWeekly();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Gagal menugaskan menu.';
+      Alert.alert('Gagal Menugaskan', msg);
     }
   };
 
-  // Toggle status aktif/non-aktif langsung dari pop-up detail
-  const handleToggleFromDetail = async () => {
-    if (selectedDetailMenu) {
-      const newStatus = !selectedDetailMenu.isActive;
-      await toggleStatusMutation.mutateAsync({
-        id: selectedDetailMenu.id,
-        isActive: newStatus,
-      });
-      setSelectedDetailMenu((prev) => (prev ? { ...prev, isActive: newStatus } : null));
-    }
-  };
-
-  // Hapus menu dari pop-up detail
-  const handleDeleteFromDetail = () => {
-    if (!selectedDetailMenu) return;
-    const target = selectedDetailMenu;
-
-    const confirmDelete = async () => {
-      await deleteMenuMutation.mutateAsync(target.id);
-      setDetailModalVisible(false);
-      setSelectedDetailMenu(null);
+  // Unassign Menu from current day
+  const handleUnassignMenu = (menu: Menu) => {
+    if (!menu.assignmentId) return;
+    const assignmentId = menu.assignmentId;
+    const confirmAction = async () => {
+      try {
+        await removeAssignmentMutation.mutateAsync(assignmentId);
+        setDetailModalVisible(false);
+        setSelectedDetailMenu(null);
+        refetchWeekly();
+      } catch (err: any) {
+        const msg = err.response?.data?.message || err.message || 'Gagal melepaskan menu dari jadwal.';
+        Alert.alert('Gagal', msg);
+      }
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(`Yakin ingin menghapus menu "${target.name}"?`)) {
+      if (window.confirm(`Lepaskan hidangan "${menu.name}" dari jadwal hari ${DAYS.find((d) => d.id === selectedDay)?.name}?`)) {
+        confirmAction();
+      }
+    } else {
+      Alert.alert(
+        'Konfirmasi Lepaskan',
+        `Apakah Anda yakin ingin melepaskan "${menu.name}" dari hari ${DAYS.find((d) => d.id === selectedDay)?.name}?`,
+        [
+          { text: 'Batal', style: 'cancel' },
+          { text: 'Lepaskan', style: 'destructive', onPress: confirmAction },
+        ]
+      );
+    }
+  };
+
+  // Delete Master Menu
+  const handleDeleteMasterMenu = (m: MasterMenu) => {
+    const confirmDelete = async () => {
+      try {
+        await deleteMasterMenuMutation.mutateAsync(m.id);
+        refetchMaster();
+      } catch (err: any) {
+        const msg = err.response?.data?.message || err.message || 'Menu tidak dapat dihapus.';
+        if (Platform.OS === 'web') {
+          window.alert(msg);
+        } else {
+          Alert.alert('Tidak Dapat Dihapus', msg);
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Hapus master menu "${m.name}"? Jika menu masih ditugaskan ke hari apapun, penghapusan akan ditolak.`)) {
         confirmDelete();
       }
     } else {
       Alert.alert(
         'Konfirmasi Hapus',
-        `Apakah Anda yakin ingin menghapus menu "${target.name}"?`,
+        `Apakah Anda yakin ingin menghapus "${m.name}" dari katalog?`,
         [
           { text: 'Batal', style: 'cancel' },
           { text: 'Hapus', style: 'destructive', onPress: confirmDelete },
         ]
       );
+    }
+  };
+
+  // Toggle active status in Master Menu
+  const handleToggleStatus = async (menuId: string, currentStatus: boolean) => {
+    try {
+      await toggleStatusMutation.mutateAsync({
+        id: menuId,
+        isActive: !currentStatus,
+      });
+      refetchMaster();
+      refetchWeekly();
+    } catch (err: any) {
+      Alert.alert('Gagal', err.response?.data?.message || 'Gagal mengubah status menu.');
     }
   };
 
@@ -141,7 +219,7 @@ export default function AdminMenuScreen() {
               <View style={{ flex: 1, gap: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <ThemedText style={[styles.headerTitle, { color: theme.secondary }]}>
-                    Kelola Menu Harian
+                    Manajemen Menu Produk
                   </ThemedText>
                   <View
                     style={[
@@ -150,212 +228,520 @@ export default function AdminMenuScreen() {
                     ]}
                   >
                     <ThemedText style={[styles.activeTotalText, { color: theme.primary }]}>
-                      {weeklyData?.totalMenus || 0} Menu
+                      {weeklyData?.totalMenus || 0} Terjadwal
                     </ThemedText>
                   </View>
                 </View>
                 <ThemedText style={styles.headerSubtitle}>
-                  Klik pada kartu hidangan untuk melihat detail lengkap, nutrisi, atau mengubah data.
+                  Kelola katalog Master Menu hidangan dan atur penugasan jadwal rotasi mingguan.
                 </ThemedText>
               </View>
-
-              <Pressable
-                onPress={() => navigateToCreateForm('UTAMA')}
-                style={({ pressed }) => [
-                  styles.addMenuBtn,
-                  { backgroundColor: theme.primary },
-                  pressed && styles.pressed,
-                ]}
-              >
-                <ThemedText style={styles.addMenuBtnText}>+ Tambah Menu</ThemedText>
-              </Pressable>
             </View>
 
-            {/* 7-Day Selector Pills */}
-            <View style={styles.daysTabContainer}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.daysTabScroll}
+            {/* Top Segmented Navigation Tabs */}
+            <View style={[styles.segmentedTabContainer, { backgroundColor: '#F1F5F9' }]}>
+              <Pressable
+                onPress={() => setActiveTab('schedule')}
+                style={[
+                  styles.segmentedTabBtn,
+                  activeTab === 'schedule' && {
+                    backgroundColor: '#FFFFFF',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 2,
+                    elevation: 2,
+                  },
+                ]}
               >
-                {DAYS.map((day) => {
-                  const isSelected = selectedDay === day.id;
-                  const dayData = weeklyData?.days?.find((d) => d.dayOfWeek === day.id);
-                  const count =
-                    (dayData?.mainMenus?.length || 0) + (dayData?.secondaryMenus?.length || 0);
+                <ThemedText
+                  style={[
+                    styles.segmentedTabText,
+                    { color: activeTab === 'schedule' ? theme.primary : '#64748B' },
+                    activeTab === 'schedule' && { fontWeight: '800' },
+                  ]}
+                >
+                  📅 Jadwal Harian ({DAYS.find((d) => d.id === selectedDay)?.name})
+                </ThemedText>
+              </Pressable>
 
-                  return (
-                    <Pressable
-                      key={day.id}
-                      onPress={() => setSelectedDay(day.id)}
-                      style={({ pressed }) => [
-                        styles.dayTabItem,
-                        isSelected
-                          ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                          : { backgroundColor: '#F8FAFC', borderColor: theme.border },
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <ThemedText
+              <Pressable
+                onPress={() => setActiveTab('catalog')}
+                style={[
+                  styles.segmentedTabBtn,
+                  activeTab === 'catalog' && {
+                    backgroundColor: '#FFFFFF',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 2,
+                    elevation: 2,
+                  },
+                ]}
+              >
+                <ThemedText
+                  style={[
+                    styles.segmentedTabText,
+                    { color: activeTab === 'catalog' ? theme.primary : '#64748B' },
+                    activeTab === 'catalog' && { fontWeight: '800' },
+                  ]}
+                >
+                  📖 Katalog Master Menu ({masterMenus?.length || 0})
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* ========================================================= */}
+          {/* TAB 1: JADWAL HARIAN (SENIN - MINGGU) */}
+          {/* ========================================================= */}
+          {activeTab === 'schedule' && (
+            <View style={{ gap: 16 }}>
+              {/* Day Selector Chips */}
+              <View style={styles.daysScrollWrapper}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.daysScrollContent}
+                >
+                  {DAYS.map((d) => {
+                    const isSelected = selectedDay === d.id;
+                    const dayItem = weeklyData?.days?.find((item) => item.dayOfWeek === d.id);
+                    const totalDayMenus =
+                      (dayItem?.mainMenus?.length || 0) + (dayItem?.secondaryMenus?.length || 0);
+
+                    return (
+                      <Pressable
+                        key={d.id}
+                        onPress={() => setSelectedDay(d.id)}
                         style={[
-                          styles.dayTabText,
-                          { color: isSelected ? '#FFFFFF' : '#475569' },
-                          isSelected && { fontWeight: '800' },
-                        ]}
-                      >
-                        {day.name}
-                      </ThemedText>
-                      <View
-                        style={[
-                          styles.dayTabCountBadge,
-                          {
-                            backgroundColor: isSelected
-                              ? 'rgba(255, 255, 255, 0.25)'
-                              : '#E2E8F0',
-                          },
+                          styles.dayChip,
+                          isSelected
+                            ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                            : { backgroundColor: theme.card, borderColor: theme.border },
                         ]}
                       >
                         <ThemedText
                           style={[
-                            styles.dayTabCountText,
-                            { color: isSelected ? '#FFFFFF' : '#64748B' },
+                            styles.dayChipTitle,
+                            { color: isSelected ? '#FFFFFF' : theme.secondary },
+                            isSelected && { fontWeight: '800' },
                           ]}
                         >
-                          {count}
+                          {d.name}
+                        </ThemedText>
+                        <View
+                          style={[
+                            styles.dayChipBadge,
+                            {
+                              backgroundColor: isSelected
+                                ? 'rgba(255, 255, 255, 0.25)'
+                                : '#F1F5F9',
+                            },
+                          ]}
+                        >
+                          <ThemedText
+                            style={[
+                              styles.dayChipBadgeText,
+                              { color: isSelected ? '#FFFFFF' : '#64748B' },
+                            ]}
+                          >
+                            {totalDayMenus}
+                          </ThemedText>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Day Header Bar & Add Menu Button */}
+              <View style={[styles.dayScheduleHeaderCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={{ gap: 2 }}>
+                  <ThemedText style={[styles.dayScheduleTitle, { color: theme.secondary }]}>
+                    Jadwal Menu Hari {DAYS.find((d) => d.id === selectedDay)?.name}
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 13, color: '#64748B' }}>
+                    {mainMenus.length} Menu Utama • {secondaryMenus.length} Menu Sekunder
+                  </ThemedText>
+                </View>
+
+                <Pressable
+                  onPress={handleOpenPickerModal}
+                  style={({ pressed }) => [
+                    styles.assignActionBtn,
+                    { backgroundColor: theme.primary },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <ThemedText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+                    + Tambah dari Katalog
+                  </ThemedText>
+                </Pressable>
+              </View>
+
+              {isLoadingWeekly ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={theme.primary} />
+                  <ThemedText style={{ color: '#64748B', marginTop: 10 }}>
+                    Memuat jadwal hidangan...
+                  </ThemedText>
+                </View>
+              ) : (
+                <View style={{ gap: 20 }}>
+                  {/* SECTION 1: MENU UTAMA */}
+                  <View style={styles.sectionBlock}>
+                    <View style={styles.sectionHeaderRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <ThemedText style={{ fontSize: 20 }}>🍲</ThemedText>
+                        <ThemedText style={styles.sectionHeading}>
+                          Menu Utama ({mainMenus.length})
                         </ThemedText>
                       </View>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          </View>
+                      <View style={[styles.typeBadge, { backgroundColor: '#E0F2FE' }]}>
+                        <ThemedText style={[styles.typeBadgeText, { color: '#0369A1' }]}>
+                          Kategori Utama
+                        </ThemedText>
+                      </View>
+                    </View>
 
-          {/* Loading Indicator */}
-          {isLoading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.primary} />
-              <ThemedText style={{ color: '#64748B', marginTop: 8 }}>
-                Memuat menu hari {DAYS.find((d) => d.id === selectedDay)?.name}...
-              </ThemedText>
+                    {mainMenus.length === 0 ? (
+                      <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                        <ThemedText style={{ fontSize: 28 }}>🍲</ThemedText>
+                        <ThemedText style={styles.emptyTitle}>
+                          Belum ada Menu Utama untuk hari {DAYS.find((d) => d.id === selectedDay)?.name}
+                        </ThemedText>
+                        <Pressable
+                          onPress={handleOpenPickerModal}
+                          style={[styles.emptyActionBtn, { backgroundColor: theme.primary }]}
+                        >
+                          <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                            + Pilih Menu dari Katalog
+                          </ThemedText>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <View style={styles.cardsList}>
+                        {mainMenus.map((menu) => (
+                          <AssignedMenuCard
+                            key={menu.id}
+                            menu={menu}
+                            theme={theme}
+                            onPress={() => handleCardPress(menu)}
+                            onUnassign={() => handleUnassignMenu(menu)}
+                          />
+                        ))}
+                      </View>
+                    )}
+                  </View>
+
+                  {/* SECTION 2: MENU SEKUNDER */}
+                  <View style={styles.sectionBlock}>
+                    <View style={styles.sectionHeaderRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <ThemedText style={{ fontSize: 20 }}>🥗</ThemedText>
+                        <ThemedText style={styles.sectionHeading}>
+                          Menu Sekunder ({secondaryMenus.length})
+                        </ThemedText>
+                      </View>
+                      <View style={[styles.typeBadge, { backgroundColor: '#DCFCE7' }]}>
+                        <ThemedText style={[styles.typeBadgeText, { color: '#15803D' }]}>
+                          Kategori Sekunder
+                        </ThemedText>
+                      </View>
+                    </View>
+
+                    {secondaryMenus.length === 0 ? (
+                      <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                        <ThemedText style={{ fontSize: 28 }}>🥟</ThemedText>
+                        <ThemedText style={styles.emptyTitle}>
+                          Belum ada Menu Sekunder untuk hari {DAYS.find((d) => d.id === selectedDay)?.name}
+                        </ThemedText>
+                        <Pressable
+                          onPress={handleOpenPickerModal}
+                          style={[styles.emptyActionBtn, { backgroundColor: '#10B981' }]}
+                        >
+                          <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                            + Pilih Menu Sekunder dari Katalog
+                          </ThemedText>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <View style={styles.cardsList}>
+                        {secondaryMenus.map((menu) => (
+                          <AssignedMenuCard
+                            key={menu.id}
+                            menu={menu}
+                            theme={theme}
+                            onPress={() => handleCardPress(menu)}
+                            onUnassign={() => handleUnassignMenu(menu)}
+                          />
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
             </View>
           )}
 
-          {/* Content Section when loaded */}
-          {!isLoading && (
-            <View style={styles.menuSectionsContainer}>
-              {/* SECTION 1: MENU UTAMA */}
-              <View style={styles.sectionBlock}>
-                <View style={styles.sectionHeaderRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <ThemedText style={{ fontSize: 20 }}>🍲</ThemedText>
-                    <ThemedText style={styles.sectionHeading}>
-                      Menu Utama ({mainMenus.length})
-                    </ThemedText>
+          {/* ========================================================= */}
+          {/* TAB 2: KATALOG MASTER MENU (MASTER PRODUK) */}
+          {/* ========================================================= */}
+          {activeTab === 'catalog' && (
+            <View style={{ gap: 16 }}>
+              {/* Search & Actions Bar */}
+              <View style={[styles.catalogControlCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={styles.catalogTopActionRow}>
+                  {/* Search Input */}
+                  <View style={styles.searchBox}>
+                    <ThemedText style={{ fontSize: 14 }}>🔍</ThemedText>
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Cari hidangan master..."
+                      placeholderTextColor="#94A3B8"
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                    />
+                    {searchQuery.length > 0 && (
+                      <Pressable onPress={() => setSearchQuery('')}>
+                        <ThemedText style={{ color: '#94A3B8', fontSize: 16 }}>✕</ThemedText>
+                      </Pressable>
+                    )}
                   </View>
-                  <View style={[styles.typeBadge, { backgroundColor: '#E0F2FE' }]}>
-                    <ThemedText style={[styles.typeBadgeText, { color: '#0369A1' }]}>
-                      Wajib Berbeda Tiap Hari
-                    </ThemedText>
-                  </View>
-                </View>
 
-                <ThemedText style={styles.sectionDescription}>
-                  Menu pokok harian bayi. Klik kartu untuk melihat detail gizi dan tindakan kelola.
-                </ThemedText>
-
-                {mainMenus.length === 0 ? (
-                  <View
-                    style={[
-                      styles.emptyCard,
-                      { backgroundColor: theme.card, borderColor: theme.border },
+                  {/* Add Master Menu Button */}
+                  <Pressable
+                    onPress={() => router.push('/admin/menu-form' as any)}
+                    style={({ pressed }) => [
+                      styles.addMasterBtn,
+                      { backgroundColor: theme.primary },
+                      pressed && styles.pressed,
                     ]}
                   >
-                    <ThemedText style={{ fontSize: 28 }}>🥣</ThemedText>
-                    <ThemedText style={styles.emptyTitle}>
-                      Belum ada Menu Utama untuk hari {DAYS.find((d) => d.id === selectedDay)?.name}
+                    <ThemedText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+                      + Buat Master Menu
                     </ThemedText>
-                    <Pressable
-                      onPress={() => navigateToCreateForm('UTAMA')}
-                      style={[styles.emptyActionBtn, { backgroundColor: theme.primary }]}
-                    >
-                      <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
-                        + Tambah Menu Utama
-                      </ThemedText>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View style={styles.cardsList}>
-                    {mainMenus.map((menu) => (
-                      <CompactMenuCard
-                        key={menu.id}
-                        menu={menu}
-                        theme={theme}
-                        onPress={() => handleCardPress(menu)}
-                      />
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {/* SECTION 2: MENU SEKUNDER */}
-              <View style={styles.sectionBlock}>
-                <View style={styles.sectionHeaderRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <ThemedText style={{ fontSize: 20 }}>🥗</ThemedText>
-                    <ThemedText style={styles.sectionHeading}>
-                      Menu Sekunder / Pendamping ({secondaryMenus.length})
-                    </ThemedText>
-                  </View>
-                  <View style={[styles.typeBadge, { backgroundColor: '#DCFCE7' }]}>
-                    <ThemedText style={[styles.typeBadgeText, { color: '#15803D' }]}>
-                      Fleksibel (Lauk Tambahan / Snack)
-                    </ThemedText>
-                  </View>
+                  </Pressable>
                 </View>
 
-                <ThemedText style={styles.sectionDescription}>
-                  Menu pelengkap harian bayi. Klik kartu untuk melihat detail atau mengubah data.
-                </ThemedText>
-
-                {secondaryMenus.length === 0 ? (
-                  <View
+                {/* Category Filter Pills */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 4 }}>
+                  <Pressable
+                    onPress={() => setSelectedCategoryFilter('ALL')}
                     style={[
-                      styles.emptyCard,
-                      { backgroundColor: theme.card, borderColor: theme.border },
+                      styles.catFilterPill,
+                      selectedCategoryFilter === 'ALL'
+                        ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                        : { backgroundColor: '#F8FAFC', borderColor: theme.border },
                     ]}
                   >
-                    <ThemedText style={{ fontSize: 28 }}>🥟</ThemedText>
-                    <ThemedText style={styles.emptyTitle}>
-                      Belum ada Menu Sekunder untuk hari{' '}
-                      {DAYS.find((d) => d.id === selectedDay)?.name}
-                    </ThemedText>
-                    <Pressable
-                      onPress={() => navigateToCreateForm('SEKUNDER')}
-                      style={[styles.emptyActionBtn, { backgroundColor: '#10B981' }]}
+                    <ThemedText
+                      style={[
+                        styles.catFilterPillText,
+                        { color: selectedCategoryFilter === 'ALL' ? '#FFFFFF' : '#64748B' },
+                        selectedCategoryFilter === 'ALL' && { fontWeight: '700' },
+                      ]}
                     >
-                      <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
-                        + Tambah Menu Sekunder
-                      </ThemedText>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View style={styles.cardsList}>
-                    {secondaryMenus.map((menu) => (
-                      <CompactMenuCard
-                        key={menu.id}
-                        menu={menu}
-                        theme={theme}
-                        onPress={() => handleCardPress(menu)}
-                      />
-                    ))}
-                  </View>
-                )}
+                      Semua
+                    </ThemedText>
+                  </Pressable>
+
+                  {categories?.map((c) => {
+                    const isSelected = selectedCategoryFilter === c.id;
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => setSelectedCategoryFilter(c.id)}
+                        style={[
+                          styles.catFilterPill,
+                          isSelected
+                            ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                            : { backgroundColor: '#F8FAFC', borderColor: theme.border },
+                        ]}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.catFilterPillText,
+                            { color: isSelected ? '#FFFFFF' : '#64748B' },
+                            isSelected && { fontWeight: '700' },
+                          ]}
+                        >
+                          {c.name}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               </View>
+
+              {/* Master Menus Grid / List */}
+              {isLoadingMaster ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={theme.primary} />
+                  <ThemedText style={{ color: '#64748B', marginTop: 10 }}>
+                    Memuat katalog hidangan...
+                  </ThemedText>
+                </View>
+              ) : filteredMasterMenus.length === 0 ? (
+                <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <ThemedText style={{ fontSize: 32 }}>🍽️</ThemedText>
+                  <ThemedText style={styles.emptyTitle}>Tidak ada Master Menu yang cocok</ThemedText>
+                  <ThemedText style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center' }}>
+                    Coba sesuaikan pencarian kata kunci atau filter kategori Anda.
+                  </ThemedText>
+                </View>
+              ) : (
+                <View style={styles.cardsList}>
+                  {filteredMasterMenus.map((m) => (
+                    <MasterMenuCard
+                      key={m.id}
+                      item={m}
+                      theme={theme}
+                      onEdit={() => router.push({ pathname: '/admin/menu-form' as any, params: { id: m.id } })}
+                      onDelete={() => handleDeleteMasterMenu(m)}
+                      onToggleStatus={() => handleToggleStatus(m.id, m.isActive)}
+                    />
+                  ))}
+                </View>
+              )}
             </View>
           )}
 
-          {/* DETAIL POP-UP MODAL (Saat Card Diklik) */}
+          {/* ========================================================= */}
+          {/* MODAL 1: PICKER UNTUK ASSIGN MASTER MENU KE HARI INI */}
+          {/* ========================================================= */}
+          <Modal
+            visible={pickerModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setPickerModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.pickerModalCard, { backgroundColor: theme.card }]}>
+                {/* Header */}
+                <View style={styles.modalHeader}>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <ThemedText style={styles.detailModalCategoryLabel}>
+                      PENUGASAN MENU HARIAN
+                    </ThemedText>
+                    <ThemedText style={[styles.detailModalTitle, { color: theme.secondary }]}>
+                      Pilih Menu untuk Hari {DAYS.find((d) => d.id === selectedDay)?.name}
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 12, color: '#64748B' }}>
+                      Pilih satu atau beberapa hidangan dari Master Menu di bawah:
+                    </ThemedText>
+                  </View>
+                  <Pressable onPress={() => setPickerModalVisible(false)} style={styles.closeBtn}>
+                    <ThemedText style={{ fontSize: 22, color: '#94A3B8' }}>✕</ThemedText>
+                  </Pressable>
+                </View>
+
+                {/* List of Master Menus with Checkboxes */}
+                <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+                  <View style={{ gap: 8, paddingVertical: 4 }}>
+                    {masterMenus?.map((m) => {
+                      const isAlreadyAssigned = assignedMenuIdsCurrentDay.includes(m.id);
+                      const isChecked = selectedMenuIdsForBatch.includes(m.id) || isAlreadyAssigned;
+
+                      return (
+                        <Pressable
+                          key={m.id}
+                          onPress={() => handleTogglePickerMenu(m.id)}
+                          disabled={isAlreadyAssigned}
+                          style={[
+                            styles.pickerItemRow,
+                            { borderColor: theme.border },
+                            isChecked && !isAlreadyAssigned && { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' },
+                            isAlreadyAssigned && { backgroundColor: '#F8FAFC', opacity: 0.6 },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.pickerCheckbox,
+                              isChecked && { backgroundColor: theme.primary, borderColor: theme.primary },
+                              isAlreadyAssigned && { backgroundColor: '#94A3B8', borderColor: '#94A3B8' },
+                            ]}
+                          >
+                            {isChecked && <ThemedText style={{ color: '#FFFFFF', fontSize: 12 }}>✓</ThemedText>}
+                          </View>
+
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <ThemedText style={{ fontSize: 14, fontWeight: '700', color: theme.secondary }}>
+                              {m.name}
+                            </ThemedText>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <View
+                                style={[
+                                  styles.pickerTypeBadge,
+                                  {
+                                    backgroundColor: m.categoryType === 'UTAMA' ? '#E0F2FE' : '#DCFCE7',
+                                  },
+                                ]}
+                              >
+                                <ThemedText
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: '700',
+                                    color: m.categoryType === 'UTAMA' ? '#0369A1' : '#15803D',
+                                  }}
+                                >
+                                  {m.categoryName} ({m.categoryType === 'UTAMA' ? 'Utama' : 'Sekunder'})
+                                </ThemedText>
+                              </View>
+                              <ThemedText style={{ fontSize: 12, fontWeight: '600', color: theme.primary }}>
+                                Rp {m.price.toLocaleString('id-ID')}
+                              </ThemedText>
+                            </View>
+                          </View>
+
+                          {isAlreadyAssigned && (
+                            <View style={styles.alreadyBadge}>
+                              <ThemedText style={styles.alreadyBadgeText}>Sudah Ada</ThemedText>
+                            </View>
+                          )}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+
+                {/* Footer Actions */}
+                <View style={[styles.modalActionsRow, { borderTopColor: theme.border }]}>
+                  <Pressable
+                    onPress={() => setPickerModalVisible(false)}
+                    style={[styles.modalActionCancelBtn, { borderColor: theme.border }]}
+                  >
+                    <ThemedText style={{ color: '#64748B', fontWeight: '600', fontSize: 13 }}>
+                      Batal
+                    </ThemedText>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleSaveBatchAssignment}
+                    disabled={selectedMenuIdsForBatch.length === 0 || batchAssignMutation.isPending}
+                    style={[
+                      styles.modalActionSaveBtn,
+                      { backgroundColor: theme.primary },
+                      selectedMenuIdsForBatch.length === 0 && { opacity: 0.5 },
+                    ]}
+                  >
+                    {batchAssignMutation.isPending ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <ThemedText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+                        Tugaskan ({selectedMenuIdsForBatch.length} Menu)
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* ========================================================= */}
+          {/* MODAL 2: DETAIL POP-UP MODAL (Saat Card Jadwal Diklik) */}
+          {/* ========================================================= */}
           <Modal
             visible={detailModalVisible}
             transparent
@@ -366,7 +752,6 @@ export default function AdminMenuScreen() {
               <View style={[styles.detailModalCard, { backgroundColor: theme.card }]}>
                 {selectedDetailMenu && (
                   <>
-                    {/* Modal Header */}
                     <View style={styles.modalHeader}>
                       <View style={{ gap: 2, flex: 1 }}>
                         <ThemedText style={styles.detailModalCategoryLabel}>
@@ -376,211 +761,92 @@ export default function AdminMenuScreen() {
                           {selectedDetailMenu.name}
                         </ThemedText>
                       </View>
-                      <Pressable
-                        onPress={() => setDetailModalVisible(false)}
-                        style={styles.closeBtn}
-                        accessibilityLabel="Tutup"
-                      >
+                      <Pressable onPress={() => setDetailModalVisible(false)} style={styles.closeBtn}>
                         <ThemedText style={{ fontSize: 22, color: '#94A3B8' }}>✕</ThemedText>
                       </Pressable>
                     </View>
 
-                    {/* Quick Badges Row */}
-                    <View style={styles.detailBadgesRow}>
-                      <View
-                        style={[
-                          styles.catTag,
-                          {
-                            backgroundColor:
-                              selectedDetailMenu.menuType === 'UTAMA' ? '#EFF6FF' : '#F0FDF4',
-                            borderColor:
-                              selectedDetailMenu.menuType === 'UTAMA' ? '#BFDBFE' : '#BBF7D0',
-                          },
-                        ]}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.catTagText,
-                            {
-                              color:
-                                selectedDetailMenu.menuType === 'UTAMA' ? '#1D4ED8' : '#15803D',
-                            },
-                          ]}
-                        >
-                          {selectedDetailMenu.category}
-                        </ThemedText>
-                      </View>
+                    <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                      <View style={{ gap: 14 }}>
+                        {selectedDetailMenu.imageUrl && (
+                          <Image
+                            source={{ uri: selectedDetailMenu.imageUrl }}
+                            style={styles.detailModalImage}
+                            resizeMode="cover"
+                          />
+                        )}
 
-                      <View
-                        style={[
-                          styles.dayBadgePill,
-                          { backgroundColor: '#F8FAFC', borderColor: theme.border },
-                        ]}
-                      >
-                        <ThemedText style={styles.dayBadgePillText}>
-                          📅 Hari {selectedDetailMenu.dayName}
-                        </ThemedText>
-                      </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <ThemedText style={{ fontSize: 18, fontWeight: '800', color: theme.primary }}>
+                            Rp {selectedDetailMenu.price.toLocaleString('id-ID')}
+                          </ThemedText>
+                          <View
+                            style={[
+                              styles.typeBadge,
+                              {
+                                backgroundColor: selectedDetailMenu.menuType === 'UTAMA' ? '#E0F2FE' : '#DCFCE7',
+                              },
+                            ]}
+                          >
+                            <ThemedText
+                              style={[
+                                styles.typeBadgeText,
+                                {
+                                  color: selectedDetailMenu.menuType === 'UTAMA' ? '#0369A1' : '#15803D',
+                                },
+                              ]}
+                            >
+                              {selectedDetailMenu.category} • {selectedDetailMenu.menuType === 'UTAMA' ? 'Menu Utama' : 'Menu Sekunder'}
+                            </ThemedText>
+                          </View>
+                        </View>
 
-                      <View
-                        style={[
-                          styles.typeBadgePill,
-                          {
-                            backgroundColor:
-                              selectedDetailMenu.menuType === 'UTAMA' ? '#E0F2FE' : '#DCFCE7',
-                          },
-                        ]}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.typeBadgePillText,
-                            {
-                              color:
-                                selectedDetailMenu.menuType === 'UTAMA' ? '#0369A1' : '#15803D',
-                            },
-                          ]}
-                        >
-                          {selectedDetailMenu.menuType === 'UTAMA'
-                            ? 'Menu Utama'
-                            : 'Menu Sekunder'}
-                        </ThemedText>
-                      </View>
+                        {selectedDetailMenu.ingredients && (
+                          <View style={styles.detailSectionBox}>
+                            <ThemedText style={styles.detailSectionHeading}>🌾 Komposisi Bahan Pangan</ThemedText>
+                            <ThemedText style={styles.detailSectionBody}>{selectedDetailMenu.ingredients}</ThemedText>
+                          </View>
+                        )}
 
-                      <View
-                        style={[
-                          styles.statusBadgePill,
-                          {
-                            backgroundColor: selectedDetailMenu.isActive ? '#DCFCE7' : '#F1F5F9',
-                          },
-                        ]}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.statusBadgePillText,
-                            { color: selectedDetailMenu.isActive ? '#15803D' : '#64748B' },
-                          ]}
-                        >
-                          {selectedDetailMenu.isActive ? '🟢 Aktif' : '⚪ Non-Aktif'}
-                        </ThemedText>
-                      </View>
-                    </View>
+                        {selectedDetailMenu.nutritionInfo && (
+                          <View style={styles.detailSectionBox}>
+                            <ThemedText style={styles.detailSectionHeading}>📊 Informasi Nutrisi</ThemedText>
+                            <ThemedText style={styles.detailSectionBody}>{selectedDetailMenu.nutritionInfo}</ThemedText>
+                          </View>
+                        )}
 
-                    {/* Image Banner if available */}
-                    {selectedDetailMenu.imageUrl && (
-                      <Image
-                        source={{ uri: selectedDetailMenu.imageUrl }}
-                        style={styles.detailHeroImage}
-                        resizeMode="cover"
-                      />
-                    )}
-
-                    {/* Price Banner */}
-                    <View
-                      style={[
-                        styles.priceBanner,
-                        {
-                          backgroundColor: theme.primaryLight || '#FFF0E8',
-                          borderColor: theme.primary,
-                        },
-                      ]}
-                    >
-                      <ThemedText style={[styles.priceBannerLabel, { color: theme.secondary }]}>
-                        Harga Satuan
-                      </ThemedText>
-                      <ThemedText style={[styles.priceBannerValue, { color: theme.primary }]}>
-                        Rp {Number(selectedDetailMenu.price).toLocaleString('id-ID')}
-                      </ThemedText>
-                    </View>
-
-                    {/* Scrollable Detailed Info */}
-                    <ScrollView
-                      style={styles.detailScroll}
-                      showsVerticalScrollIndicator={false}
-                    >
-                      {/* Deskripsi */}
-                      <View style={styles.detailSectionBox}>
-                        <ThemedText style={styles.detailSectionLabel}>
-                          📝 Deskripsi Menu
-                        </ThemedText>
-                        <ThemedText style={styles.detailSectionText}>
-                          {selectedDetailMenu.description || 'Tidak ada deskripsi tambahan.'}
-                        </ThemedText>
-                      </View>
-
-                      {/* Komposisi Bahan */}
-                      <View style={styles.detailSectionBox}>
-                        <ThemedText style={styles.detailSectionLabel}>
-                          🥣 Bahan Pangan (Ingredients)
-                        </ThemedText>
-                        <ThemedText style={styles.detailSectionText}>
-                          {selectedDetailMenu.ingredients || 'Belum ada data bahan pangan.'}
-                        </ThemedText>
-                      </View>
-
-                      {/* Informasi Gizi */}
-                      <View style={styles.detailSectionBox}>
-                        <ThemedText style={styles.detailSectionLabel}>
-                          📊 Informasi Nutrisi & Gizi
-                        </ThemedText>
-                        <ThemedText style={styles.detailSectionText}>
-                          {selectedDetailMenu.nutritionInfo || 'Belum ada informasi nutrisi gizi.'}
-                        </ThemedText>
+                        {selectedDetailMenu.description && (
+                          <View style={styles.detailSectionBox}>
+                            <ThemedText style={styles.detailSectionHeading}>📝 Deskripsi</ThemedText>
+                            <ThemedText style={styles.detailSectionBody}>{selectedDetailMenu.description}</ThemedText>
+                          </View>
+                        )}
                       </View>
                     </ScrollView>
 
-                    {/* Detail Actions Footer */}
-                    <View style={[styles.detailFooterActions, { borderTopColor: theme.border }]}>
+                    {/* Footer Actions inside detail modal */}
+                    <View style={[styles.modalActionsRow, { borderTopColor: theme.border, paddingTop: 14 }]}>
                       <Pressable
-                        onPress={handleToggleFromDetail}
-                        disabled={toggleStatusMutation.isPending}
-                        style={[
-                          styles.detailActionBtn,
-                          {
-                            backgroundColor: selectedDetailMenu.isActive ? '#F8FAFC' : '#ECFDF5',
-                            borderColor: selectedDetailMenu.isActive ? theme.border : '#6EE7B7',
-                          },
-                        ]}
+                        onPress={() => handleUnassignMenu(selectedDetailMenu)}
+                        style={[styles.unassignBtn, { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' }]}
                       >
-                        <ThemedText
-                          style={[
-                            styles.detailActionBtnText,
-                            { color: selectedDetailMenu.isActive ? '#64748B' : '#059669' },
-                          ]}
-                        >
-                          {selectedDetailMenu.isActive ? '⚪ Nonaktifkan' : '🟢 Aktifkan'}
+                        <ThemedText style={{ color: '#DC2626', fontWeight: '700', fontSize: 13 }}>
+                          Lepaskan dari Hari Ini
                         </ThemedText>
                       </Pressable>
 
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <Pressable
-                          onPress={handleEditFromDetail}
-                          style={[
-                            styles.detailActionBtn,
-                            { borderColor: '#0284C7', backgroundColor: '#F0F9FF' },
-                          ]}
-                        >
-                          <ThemedText
-                            style={[styles.detailActionBtnText, { color: '#0284C7' }]}
-                          >
-                            ✏️ Edit
-                          </ThemedText>
-                        </Pressable>
-
-                        <Pressable
-                          onPress={handleDeleteFromDetail}
-                          disabled={deleteMenuMutation.isPending}
-                          style={[
-                            styles.detailActionBtn,
-                            { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
-                          ]}
-                        >
-                          <ThemedText
-                            style={[styles.detailActionBtnText, { color: '#DC2626' }]}
-                          >
-                            🗑️ Hapus
-                          </ThemedText>
-                        </Pressable>
-                      </View>
+                      <Pressable
+                        onPress={() => {
+                          const targetId = selectedDetailMenu.id;
+                          setDetailModalVisible(false);
+                          router.push({ pathname: '/admin/menu-form' as any, params: { id: targetId } });
+                        }}
+                        style={[styles.modalActionSaveBtn, { backgroundColor: theme.primary }]}
+                      >
+                        <ThemedText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+                          Edit Master Menu
+                        </ThemedText>
+                      </Pressable>
                     </View>
                   </>
                 )}
@@ -593,118 +859,160 @@ export default function AdminMenuScreen() {
   );
 }
 
-// =========================================================================
-// COMPACT LIST CARD (Ringkas & Minimalis, Pop-up muncul saat diklik)
-// =========================================================================
-
-interface CompactMenuCardProps {
+// ==========================================
+// COMPONENT: AssignedMenuCard (Di Jadwal Harian)
+// ==========================================
+function AssignedMenuCard({
+  menu,
+  theme,
+  onPress,
+  onUnassign,
+}: {
   menu: Menu;
   theme: any;
   onPress: () => void;
-}
-
-const CompactMenuCard: React.FC<CompactMenuCardProps> = ({ menu, theme, onPress }) => {
-  const isUtama = menu.menuType === 'UTAMA';
-
+  onUnassign: () => void;
+}) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.compactCard,
-        {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-          opacity: menu.isActive ? 1 : 0.65,
-        },
+        { backgroundColor: theme.card, borderColor: theme.border },
         pressed && styles.pressed,
       ]}
-      accessibilityRole="button"
-      accessibilityLabel={`Menu ${menu.name}, Klik untuk melihat detail`}
     >
-      <View style={styles.compactCardLeft}>
-        {/* Menu Thumbnail or Fallback Icon */}
+      <View style={styles.compactThumbWrapper}>
         {menu.imageUrl ? (
-          <Image source={{ uri: menu.imageUrl }} style={styles.compactThumbnail} />
+          <Image source={{ uri: menu.imageUrl }} style={styles.compactThumb} resizeMode="cover" />
         ) : (
-          <View
-            style={[
-              styles.compactThumbnailPlaceholder,
-              { backgroundColor: isUtama ? '#EFF6FF' : '#F0FDF4' },
-            ]}
-          >
-            <ThemedText style={{ fontSize: 16 }}>{isUtama ? '🍲' : '🥗'}</ThemedText>
+          <View style={[styles.compactThumbPlaceholder, { backgroundColor: '#F1F5F9' }]}>
+            <ThemedText style={{ fontSize: 24 }}>🍲</ThemedText>
           </View>
         )}
+      </View>
 
-        {/* Category Tag */}
-        <View
-          style={[
-            styles.compactCatTag,
-            {
-              backgroundColor: isUtama ? '#EFF6FF' : '#F0FDF4',
-              borderColor: isUtama ? '#BFDBFE' : '#BBF7D0',
-            },
-          ]}
-        >
-          <ThemedText
-            style={[
-              styles.compactCatTagText,
-              { color: isUtama ? '#1D4ED8' : '#15803D' },
-            ]}
-          >
-            {menu.category}
-          </ThemedText>
-        </View>
-
-        {/* Menu Name */}
-        <ThemedText style={styles.compactMenuName} numberOfLines={1}>
+      <View style={{ flex: 1, gap: 4 }}>
+        <ThemedText style={[styles.cardTitle, { color: theme.secondary }]} numberOfLines={1}>
           {menu.name}
         </ThemedText>
-      </View>
-
-      <View style={styles.compactCardRight}>
-        {/* Price */}
-        <ThemedText style={[styles.compactMenuPrice, { color: theme.primary }]}>
-          Rp {Number(menu.price).toLocaleString('id-ID')}
-        </ThemedText>
-
-        {/* Status Indicator Dot/Badge */}
-        <View
-          style={[
-            styles.compactStatusBadge,
-            {
-              backgroundColor: menu.isActive ? '#DCFCE7' : '#F1F5F9',
-            },
-          ]}
-        >
-          <ThemedText
-            style={[
-              styles.compactStatusText,
-              { color: menu.isActive ? '#15803D' : '#94A3B8' },
-            ]}
-          >
-            {menu.isActive ? 'Aktif' : 'Nonaktif'}
-          </ThemedText>
-        </View>
-
-        {/* Chevron Icon */}
-        <View style={styles.chevronBox}>
-          <ThemedText style={{ color: '#94A3B8', fontSize: 14, fontWeight: '700' }}>
-            ➔
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={[styles.catPillBadge, { backgroundColor: '#F1F5F9' }]}>
+            <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>
+              {menu.category}
+            </ThemedText>
+          </View>
+          <ThemedText style={{ fontSize: 13, fontWeight: '800', color: theme.primary }}>
+            Rp {menu.price.toLocaleString('id-ID')}
           </ThemedText>
         </View>
       </View>
+
+      {/* Unassign button */}
+      <Pressable
+        onPress={(e) => {
+          e.stopPropagation();
+          onUnassign();
+        }}
+        style={styles.unassignSmallBtn}
+        accessibilityLabel="Lepaskan menu dari hari ini"
+      >
+        <ThemedText style={{ fontSize: 14, color: '#EF4444' }}>✕</ThemedText>
+      </Pressable>
     </Pressable>
   );
-};
+}
+
+// ==========================================
+// COMPONENT: MasterMenuCard (Di Tab Katalog)
+// ==========================================
+function MasterMenuCard({
+  item,
+  theme,
+  onEdit,
+  onDelete,
+  onToggleStatus,
+}: {
+  item: MasterMenu;
+  theme: any;
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggleStatus: () => void;
+}) {
+  return (
+    <View style={[styles.masterCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={styles.compactThumbWrapper}>
+        {item.imageUrl ? (
+          <Image source={{ uri: item.imageUrl }} style={styles.compactThumb} resizeMode="cover" />
+        ) : (
+          <View style={[styles.compactThumbPlaceholder, { backgroundColor: '#F1F5F9' }]}>
+            <ThemedText style={{ fontSize: 24 }}>🍲</ThemedText>
+          </View>
+        )}
+      </View>
+
+      <View style={{ flex: 1, gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <ThemedText style={[styles.cardTitle, { color: theme.secondary, flex: 1 }]} numberOfLines={1}>
+            {item.name}
+          </ThemedText>
+          <View
+            style={[
+              styles.typeBadge,
+              { backgroundColor: item.categoryType === 'UTAMA' ? '#E0F2FE' : '#DCFCE7' },
+            ]}
+          >
+            <ThemedText
+              style={[
+                styles.typeBadgeText,
+                { color: item.categoryType === 'UTAMA' ? '#0369A1' : '#15803D' },
+              ]}
+            >
+              {item.categoryName}
+            </ThemedText>
+          </View>
+        </View>
+
+        <ThemedText style={{ fontSize: 13, fontWeight: '800', color: theme.primary }}>
+          Rp {item.price.toLocaleString('id-ID')}
+        </ThemedText>
+
+        {item.description && (
+          <ThemedText style={{ fontSize: 11, color: '#64748B' }} numberOfLines={1}>
+            {item.description}
+          </ThemedText>
+        )}
+
+        <View style={styles.masterCardActionRow}>
+          <Pressable onPress={onToggleStatus} style={styles.toggleActiveBtn}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: item.isActive ? '#22C55E' : '#94A3B8' },
+              ]}
+            />
+            <ThemedText style={{ fontSize: 12, fontWeight: '600', color: item.isActive ? '#15803D' : '#64748B' }}>
+              {item.isActive ? 'Aktif' : 'Non-Aktif'}
+            </ThemedText>
+          </Pressable>
+
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable onPress={onEdit} style={[styles.editSmallBtn, { borderColor: theme.border }]}>
+              <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#0284C7' }}>Ubah</ThemedText>
+            </Pressable>
+            <Pressable onPress={onDelete} style={[styles.deleteSmallBtn, { borderColor: '#FCA5A5' }]}>
+              <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>Hapus</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
   scrollContent: {
     maxWidth: MaxContentWidth,
     width: '100%',
@@ -715,35 +1023,28 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   headerCard: {
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 20,
-    gap: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    padding: 18,
+    gap: 14,
   },
   headerTitleRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    flexWrap: 'wrap',
   },
   headerTitle: {
     fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: -0.4,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   activeTotalBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
     borderRadius: 8,
   },
   activeTotalText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
   },
   headerSubtitle: {
@@ -751,91 +1052,97 @@ const styles = StyleSheet.create({
     color: '#64748B',
     lineHeight: 18,
   },
-  addMenuBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  segmentedTabContainer: {
+    flexDirection: 'row',
     borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  segmentedTabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer' as any,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
   },
-  addMenuBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  daysTabContainer: {
-    width: '100%',
-  },
-  daysTabScroll: {
-    gap: 8,
-    paddingVertical: 4,
-  },
-  dayTabItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 8,
-    cursor: 'pointer' as any,
-  },
-  dayTabText: {
+  segmentedTabText: {
     fontSize: 13,
     fontWeight: '600',
   },
-  dayTabCountBadge: {
+  daysScrollWrapper: {
+    marginHorizontal: -16,
+  },
+  daysScrollContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  dayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  dayChipTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  dayChipBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  dayTabCountText: {
+  dayChipBadgeText: {
     fontSize: 11,
     fontWeight: '700',
   },
-  loadingContainer: {
+  dayScheduleHeaderCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
+    justifyContent: 'space-between',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
   },
-  menuSectionsContainer: {
-    gap: 24,
+  dayScheduleTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  assignActionBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
   },
   sectionBlock: {
-    gap: 12,
+    gap: 10,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 8,
   },
   sectionHeading: {
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.3,
+    fontSize: 16,
+    fontWeight: '700',
   },
   typeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   typeBadgeText: {
     fontSize: 11,
     fontWeight: '700',
   },
-  sectionDescription: {
-    color: '#64748B',
-    fontSize: 12,
-    lineHeight: 17,
-  },
   emptyCard: {
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderStyle: 'dashed',
-    padding: 20,
+    padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
@@ -843,255 +1150,272 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 14,
     fontWeight: '700',
+    color: '#64748B',
     textAlign: 'center',
   },
   emptyActionBtn: {
-    marginTop: 4,
-    paddingHorizontal: 14,
     paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 10,
-    cursor: 'pointer' as any,
+    marginTop: 4,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
   },
-
-  // ==========================================
-  // COMPACT LIST CARD STYLES
-  // ==========================================
   cardsList: {
     gap: 10,
   },
   compactCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     borderRadius: 14,
     borderWidth: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    padding: 12,
     gap: 12,
-    cursor: 'pointer' as any,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
   },
-  compactCardLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  compactThumbWrapper: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
     overflow: 'hidden',
   },
-  compactThumbnail: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+  compactThumb: {
+    width: '100%',
+    height: '100%',
   },
-  compactThumbnailPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+  compactThumbPlaceholder: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  compactCatTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  compactCatTagText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  compactMenuName: {
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-    flexShrink: 1,
-  },
-  compactCardRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  compactMenuPrice: {
+  cardTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
   },
-  compactStatusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  catPillBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 6,
   },
-  compactStatusText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  chevronBox: {
-    paddingLeft: 2,
-  },
-
-  // ==========================================
-  // DETAIL POP-UP MODAL STYLES
-  // ==========================================
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-  },
-  detailModalCard: {
-    maxWidth: 540,
-    width: '100%',
-    maxHeight: '90%',
-    borderRadius: 22,
-    padding: 24,
-    gap: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  detailModalCategoryLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#94A3B8',
-    letterSpacing: 1,
-  },
-  detailModalTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: -0.3,
-  },
-  detailBadgesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 8,
-  },
-  catTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  unassignSmallBtn: {
+    padding: 8,
     borderRadius: 8,
-    borderWidth: 1,
+    backgroundColor: '#FEF2F2',
+    ...Platform.select({ web: { cursor: 'pointer' } }),
   },
-  catTagText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  dayBadgePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  dayBadgePillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  typeBadgePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  typeBadgePillText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  statusBadgePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  statusBadgePillText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  priceBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  detailHeroImage: {
-    width: '100%',
-    height: 180,
+  catalogControlCard: {
     borderRadius: 14,
-    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  priceBannerLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  priceBannerValue: {
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  detailScroll: {
-    maxHeight: 280,
-  },
-  detailSectionBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 12,
-    gap: 6,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  detailSectionLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#475569',
-  },
-  detailSectionText: {
-    fontSize: 13,
-    color: '#334155',
-    lineHeight: 19,
-  },
-  detailFooterActions: {
-    borderTopWidth: 1,
-    paddingTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
+    padding: 14,
     gap: 10,
   },
-  detailActionBtn: {
+  catalogTopActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  searchInput: {
+    flex: 1,
     paddingVertical: 8,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  addMasterBtn: {
+    paddingVertical: 9,
     paddingHorizontal: 14,
     borderRadius: 10,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  catFilterPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
     borderWidth: 1,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  catFilterPillText: {
+    fontSize: 12,
+  },
+  masterCard: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 12,
+  },
+  masterCardActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 6,
+  },
+  toggleActiveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  editSmallBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    backgroundColor: '#F0F9FF',
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  deleteSmallBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    backgroundColor: '#FEF2F2',
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  loadingContainer: {
+    padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer' as any,
   },
-  detailActionBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  pickerModalCard: {
+    maxWidth: 520,
+    width: '100%',
+    borderRadius: 16,
+    padding: 20,
+    gap: 14,
+  },
+  detailModalCard: {
+    maxWidth: 500,
+    width: '100%',
+    borderRadius: 16,
+    padding: 20,
+    gap: 14,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
+  detailModalCategoryLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  detailModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
   closeBtn: {
     padding: 4,
-    cursor: 'pointer' as any,
+  },
+  pickerItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    gap: 10,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  pickerCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerTypeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  alreadyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#E2E8F0',
+  },
+  alreadyBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  modalActionCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  modalActionSaveBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  unassignBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  detailModalImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+  },
+  detailSectionBox: {
+    gap: 4,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+  },
+  detailSectionHeading: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  detailSectionBody: {
+    fontSize: 13,
+    color: '#1E293B',
+    lineHeight: 18,
   },
   pressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.985 }],
+    opacity: 0.85,
+    transform: [{ scale: 0.99 }],
   },
 });
