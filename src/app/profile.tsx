@@ -80,7 +80,7 @@ export default function ProfileScreen() {
       id: 'tema',
       label: 'Tema',
       icon: (color) => <MenuIconTheme size={20} color={color} />,
-      rightElement: <ProfileThemeSwitch />,
+      rightElement: <ProfileThemeSwitch size="medium" />,
     },
   ];
 

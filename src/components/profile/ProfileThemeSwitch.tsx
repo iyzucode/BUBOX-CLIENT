@@ -3,17 +3,26 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useProfilePalette } from './profilePalette';
 
-export const ProfileThemeSwitch: React.FC = () => {
+interface ProfileThemeSwitchProps {
+  size?: 'medium' | 'large';
+}
+
+export const ProfileThemeSwitch: React.FC<ProfileThemeSwitchProps> = ({
+  size = 'large',
+}) => {
   const palette = useProfilePalette();
   const themeMode = useThemeStore((s) => s.themeMode);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const isDark = themeMode === 'dark';
+  const isLarge = size === 'large';
+  const iconSize = isLarge ? 16 : 13;
 
   return (
     <Pressable
       onPress={toggleTheme}
       style={({ pressed }) => [
-        styles.track,
+        styles.trackBase,
+        isLarge ? styles.trackLarge : styles.trackMedium,
         {
           backgroundColor: isDark ? '#374151' : '#9CA3AF',
         },
@@ -22,11 +31,12 @@ export const ProfileThemeSwitch: React.FC = () => {
       accessibilityRole="switch"
       accessibilityLabel={`Ganti tema, saat ini mode ${isDark ? 'Gelap' : 'Terang'}`}
       accessibilityState={{ checked: isDark }}
-      hitSlop={6}
+      hitSlop={8}
     >
       <View
         style={[
-          styles.thumb,
+          styles.thumbBase,
+          isLarge ? styles.thumbLarge : styles.thumbMedium,
           isDark ? styles.thumbDark : styles.thumbLight,
           {
             backgroundColor: '#FFFFFF',
@@ -34,7 +44,7 @@ export const ProfileThemeSwitch: React.FC = () => {
         ]}
       >
         {Platform.OS === 'web' && (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none">
             {isDark ? (
               // Moon icon
               <path
@@ -61,37 +71,52 @@ export const ProfileThemeSwitch: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  track: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    padding: 2,
+  trackBase: {
     justifyContent: 'center',
     ...Platform.select({
       web: { cursor: 'pointer', transition: 'background-color 0.2s ease' } as any,
     }),
   },
-  thumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  trackMedium: {
+    width: 46,
+    height: 26,
+    borderRadius: 13,
+    padding: 2,
+  },
+  trackLarge: {
+    width: 60,
+    height: 32,
+    borderRadius: 16,
+    padding: 3,
+  },
+  thumbBase: {
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 1.5,
+        shadowOffset: { width: 0, height: 1.5 },
+        shadowOpacity: 0.25,
+        shadowRadius: 2,
       },
       android: {
-        elevation: 2,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
         transition: 'transform 0.2s ease',
       } as any,
     }),
+  },
+  thumbMedium: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+  },
+  thumbLarge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
   },
   thumbLight: {
     alignSelf: 'flex-start',
