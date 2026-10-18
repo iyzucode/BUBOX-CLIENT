@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useThemeContext } from '@/context/ThemeContext';
+import { useAuthStore } from '@/store/useAuthStore';
 import { ProfileBottomSheetModal } from '@/components/profile/ProfileBottomSheetModal';
 
 // Asset Hero Image
@@ -26,6 +27,7 @@ const HEADER_MIN_HEIGHT = 270;
 export default function HomeScreen() {
   const router = useRouter();
   const { theme, isDark } = useThemeContext();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const insets = useSafeAreaInsets();
   const { width, height: windowHeight } = useWindowDimensions();
   const isDesktop = width > 768;
@@ -114,14 +116,20 @@ export default function HomeScreen() {
             )}
           </Pressable>
 
-          {/* User Profile Button - Opens Bottom Sheet Overlay */}
+          {/* User Profile Button - Routes to /login if guest, opens Bottom Sheet if logged in */}
           <Pressable
-            onPress={() => setIsProfileSheetOpen(true)}
+            onPress={() => {
+              if (!isAuthenticated) {
+                router.push('/login');
+              } else {
+                setIsProfileSheetOpen(true);
+              }
+            }}
             style={({ pressed }) => [
               styles.circleButton,
               pressed && styles.buttonPressed,
             ]}
-            accessibilityLabel="Menu Profil"
+            accessibilityLabel={isAuthenticated ? 'Menu Profil' : 'Masuk ke Akun'}
             accessibilityRole="button"
           >
             {Platform.OS === 'web' ? (
