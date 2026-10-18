@@ -8,8 +8,10 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
@@ -32,6 +34,10 @@ export const ProfileBottomSheetModal: React.FC<ProfileBottomSheetModalProps> = (
 }) => {
   const router = useRouter();
   const palette = useProfilePalette();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const isMobile = width <= 768;
+
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const logoutMutation = useLogout();
@@ -122,6 +128,8 @@ export const ProfileBottomSheetModal: React.FC<ProfileBottomSheetModalProps> = (
             styles.sheetCard,
             {
               backgroundColor: sheetBg,
+              maxWidth: isMobile ? '100%' : 500,
+              paddingBottom: isMobile && insets.bottom > 0 ? insets.bottom : 0,
               transform: [{ translateY }],
             },
           ]}
@@ -271,7 +279,6 @@ const styles = StyleSheet.create({
   },
   sheetCard: {
     width: '100%',
-    maxWidth: 500,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     overflow: 'visible',

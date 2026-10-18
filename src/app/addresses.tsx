@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,17 +6,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Navbar } from '@/components/ui/Navbar';
 import { AddressCard } from '@/components/address/AddressCard';
-import { BottomTabInset, MaxContentWidth } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useThemeContext } from '@/context/ThemeContext';
 import {
   useAddresses,
   useDeleteAddress,
@@ -25,8 +24,13 @@ import {
 import { Address } from '@/types/address';
 
 export default function AddressesScreen() {
-  const theme = useTheme();
+  const { isDark, theme } = useThemeContext();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isDesktop = width > 768;
+
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const { data: addresses, isLoading, isError, error, refetch } = useAddresses();
   const setPrimaryMutation = useSetPrimaryAddress();
@@ -75,146 +79,227 @@ export default function AddressesScreen() {
     }
   };
 
+  const handleClose = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.push('/profile');
+    }
+  };
+
+  const headerPaddingTop = insets.top > 0 ? insets.top + 8 : 16;
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        {/* Navbar */}
-        <Navbar />
-
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+    <ThemedView
+      style={[
+        styles.container,
+        { backgroundColor: isDark ? '#111827' : '#FFFFFF' },
+      ]}
+    >
+      {/* 1. CUSTOM TOP HEADER (Dark Grey Bar with Circle 'X' & 'Alamat' Text) */}
+      <View
+        style={[
+          styles.headerBar,
+          {
+            paddingTop: headerPaddingTop,
+            backgroundColor: isDark ? '#1F2937' : '#616161',
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.headerInner,
+            { maxWidth: isDesktop ? 600 : '100%' },
+          ]}
         >
-          {/* Back Button & Breadcrumb */}
-          <View style={styles.topNavRow}>
-            <Pressable
-              onPress={() => router.push('/profile')}
-              style={({ pressed }) => [
-                styles.backBtn,
-                {
-                  backgroundColor: theme.backgroundElement,
-                  borderColor: theme.border,
-                },
-                pressed && styles.pressed,
-              ]}
-            >
-              <ThemedText type="smallBold" style={{ color: theme.text }}>
-                ← Kembali ke Profil
-              </ThemedText>
-            </Pressable>
+          {/* Circular Close / Cancel Button */}
+          <Pressable
+            onPress={handleClose}
+            style={({ pressed }) => [
+              styles.closeCircleButton,
+              pressed && styles.buttonPressed,
+            ]}
+            accessibilityLabel="Tutup dan Kembali"
+            accessibilityRole="button"
+          >
+            {Platform.OS === 'web' ? (
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#111827"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            ) : (
+              <ThemedText style={styles.closeIconText}>✕</ThemedText>
+            )}
+          </Pressable>
+
+          {/* Right Header Title */}
+          <ThemedText style={styles.headerTitle}>Alamat</ThemedText>
+        </View>
+      </View>
+
+      {/* 2. SCROLLABLE ADDRESS LIST */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { maxWidth: isDesktop ? 600 : '100%' },
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={() => setOpenMenuId(null)}
+      >
+        {isLoading ? (
+          <View style={styles.centerBox}>
+            <ActivityIndicator size="large" color={theme.primary} />
+            <ThemedText style={[styles.loadingText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+              Memuat daftar alamat...
+            </ThemedText>
           </View>
-
-          {/* Header Title & Add Button */}
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1, gap: 4 }}>
-              <ThemedText type="title" style={styles.title}>
-                Alamat Pengiriman
-              </ThemedText>
-              <ThemedText type="small" style={styles.subtitle}>
-                Kelola alamat pengantaran katering MPASI si kecil. Anda dapat menambahkan beberapa alamat berbeda.
-              </ThemedText>
-            </View>
-
+        ) : isError ? (
+          <View
+            style={[
+              styles.stateCard,
+              {
+                backgroundColor: isDark ? '#1F2937' : '#F3F4F6',
+                borderColor: isDark ? '#374151' : '#E5E7EB',
+              },
+            ]}
+          >
+            <ThemedText style={{ fontSize: 32 }}>⚠️</ThemedText>
+            <ThemedText style={[styles.stateTitle, { color: theme.text }]}>
+              Gagal Memuat Alamat
+            </ThemedText>
+            <ThemedText style={[styles.stateDesc, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+              {error?.response?.data?.message || 'Terjadi kesalahan saat memuat data alamat.'}
+            </ThemedText>
             <Pressable
-              onPress={handleOpenAdd}
+              onPress={() => refetch()}
               style={({ pressed }) => [
-                styles.addBtn,
+                styles.retryButton,
                 { backgroundColor: theme.primary },
-                pressed && styles.pressed,
+                pressed && styles.buttonPressed,
               ]}
             >
-              <ThemedText type="smallBold" style={styles.addBtnText}>
-                + Tambah Alamat
-              </ThemedText>
+              <ThemedText style={styles.retryButtonText}>Coba Lagi</ThemedText>
             </Pressable>
           </View>
+        ) : !addresses || addresses.length === 0 ? (
+          <View
+            style={[
+              styles.stateCard,
+              {
+                backgroundColor: isDark ? '#1F2937' : '#F3F4F6',
+                borderColor: isDark ? '#374151' : '#E5E7EB',
+              },
+            ]}
+          >
+            <View style={styles.emptyIconCircle}>
+              <ThemedText style={{ fontSize: 34 }}>📍</ThemedText>
+            </View>
+            <ThemedText style={[styles.stateTitle, { color: theme.text }]}>
+              Belum Ada Alamat Tersimpan
+            </ThemedText>
+            <ThemedText style={[styles.stateDesc, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+              Tambahkan alamat rumah atau pengantaran katering si kecil dengan menekan tombol Tambah baru di bawah.
+            </ThemedText>
+          </View>
+        ) : (
+          <View style={styles.addressListContainer}>
+            {addresses.map((addr) => (
+              <AddressCard
+                key={addr.id}
+                address={addr}
+                isMenuOpen={openMenuId === addr.id}
+                onToggleMenu={() =>
+                  setOpenMenuId((prev) => (prev === addr.id ? null : addr.id))
+                }
+                onCloseMenu={() => setOpenMenuId(null)}
+                onEdit={(a) => {
+                  setOpenMenuId(null);
+                  handleOpenEdit(a);
+                }}
+                onDelete={(id) => {
+                  setOpenMenuId(null);
+                  handleDelete(id);
+                }}
+                onSetPrimary={(id) => {
+                  setOpenMenuId(null);
+                  handleSetPrimary(id);
+                }}
+                isSettingPrimary={
+                  setPrimaryMutation.isPending &&
+                  setPrimaryMutation.variables === addr.id
+                }
+                isDeleting={
+                  deleteMutation.isPending &&
+                  deleteMutation.variables === addr.id
+                }
+              />
+            ))}
+          </View>
+        )}
+      </ScrollView>
 
-          {/* List or State */}
-          {isLoading ? (
-            <View style={styles.centerBox}>
-              <ActivityIndicator size="large" color={theme.primary} />
-              <ThemedText type="small" style={{ opacity: 0.7, marginTop: 8 }}>
-                Memuat daftar alamat...
-              </ThemedText>
-            </View>
-          ) : isError ? (
-            <View
-              style={[
-                styles.emptyCard,
-                { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-            >
-              <ThemedText style={{ fontSize: 32 }}>⚠️</ThemedText>
-              <ThemedText type="subtitle">Gagal Memuat Alamat</ThemedText>
-              <ThemedText type="small" style={styles.emptyDesc}>
-                {error?.response?.data?.message || 'Terjadi kesalahan saat memuat data alamat.'}
-              </ThemedText>
-              <Pressable
-                onPress={() => refetch()}
-                style={[styles.actionButton, { backgroundColor: theme.primary }]}
+      {/* 3. STICKY BOTTOM BUTTON "Tambah baru +" */}
+      <View
+        style={[
+          styles.stickyContainer,
+          {
+            maxWidth: isDesktop ? 600 : '100%',
+            bottom: insets.bottom > 0 ? insets.bottom + 16 : 24,
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        <Pressable
+          onPress={handleOpenAdd}
+          style={({ pressed }) => [
+            styles.stickyAddButton,
+            { backgroundColor: isDark ? '#374151' : '#D9D9D9' },
+            pressed && styles.buttonPressed,
+          ]}
+          accessibilityLabel="Tambah Alamat Baru"
+          accessibilityRole="button"
+        >
+          <ThemedText
+            style={[
+              styles.stickyAddText,
+              { color: isDark ? '#F9FAFB' : '#111827' },
+            ]}
+          >
+            Tambah baru
+          </ThemedText>
+
+          <View style={styles.plusCircle}>
+            {Platform.OS === 'web' ? (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#FFFFFF"
+                strokeWidth="3.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <ThemedText type="smallBold" style={{ color: '#FFFFFF' }}>
-                  Coba Lagi
-                </ThemedText>
-              </Pressable>
-            </View>
-          ) : !addresses || addresses.length === 0 ? (
-            <View
-              style={[
-                styles.emptyCard,
-                { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-            >
-              <View
-                style={[
-                  styles.iconCircle,
-                  {
-                    backgroundColor: theme.primary + '15',
-                    borderColor: theme.primary + '30',
-                  },
-                ]}
-              >
-                <ThemedText style={{ fontSize: 36 }}>📍</ThemedText>
-              </View>
-              <ThemedText type="subtitle" style={styles.emptyTitle}>
-                Belum Ada Alamat Tersimpan
-              </ThemedText>
-              <ThemedText type="small" style={styles.emptyDesc}>
-                Tambahkan alamat rumah, kantor, atau tujuan pengantaran Anda agar pengiriman katering dapat diproses dengan cepat.
-              </ThemedText>
-              <Pressable
-                onPress={handleOpenAdd}
-                style={[styles.actionButton, { backgroundColor: theme.primary }]}
-              >
-                <ThemedText type="smallBold" style={{ color: '#FFFFFF' }}>
-                  + Tambah Alamat Pertama
-                </ThemedText>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.addressList}>
-              {addresses.map((addr) => (
-                <AddressCard
-                  key={addr.id}
-                  address={addr}
-                  onEdit={handleOpenEdit}
-                  onDelete={handleDelete}
-                  onSetPrimary={handleSetPrimary}
-                  isSettingPrimary={
-                    setPrimaryMutation.isPending &&
-                    setPrimaryMutation.variables === addr.id
-                  }
-                  isDeleting={
-                    deleteMutation.isPending &&
-                    deleteMutation.variables === addr.id
-                  }
-                />
-              ))}
-            </View>
-          )}
-        </ScrollView>
-      </SafeAreaView>
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            ) : (
+              <ThemedText style={styles.plusIconText}>+</ThemedText>
+            )}
+          </View>
+        </Pressable>
+      </View>
     </ThemedView>
   );
 }
@@ -222,104 +307,167 @@ export default function AddressesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    position: 'relative',
   },
-  safeArea: {
-    flex: 1,
+  headerBar: {
+    width: '100%',
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    zIndex: 20,
   },
-  scrollContent: {
-    maxWidth: MaxContentWidth,
+  headerInner: {
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    paddingBottom: BottomTabInset + 24,
-    gap: 12,
-  },
-  topNavRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    cursor: 'pointer' as any,
-  },
-  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 12,
-    paddingVertical: 8,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 13,
-    opacity: 0.7,
-    maxWidth: 520,
-    lineHeight: 18,
-  },
-  addBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
+  closeCircleButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
-    cursor: 'pointer' as any,
+    alignItems: 'center',
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.15)',
+        cursor: 'pointer',
+      },
+      default: {
+        elevation: 4,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+      },
+    }),
   },
-  addBtnText: {
+  closeIconText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  headerTitle: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 110,
+  },
+  addressListContainer: {
+    width: '100%',
   },
   centerBox: {
-    paddingVertical: 60,
+    paddingVertical: 80,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyCard: {
-    borderRadius: 14,
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+  },
+  stateCard: {
+    borderRadius: 16,
     borderWidth: 1,
     padding: 32,
     alignItems: 'center',
-    textAlign: 'center',
     gap: 12,
+    marginTop: 20,
   },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 1,
-    alignItems: 'center',
+  emptyIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  emptyTitle: {
+  stateTitle: {
     fontSize: 18,
     fontWeight: '700',
+    textAlign: 'center',
   },
-  emptyDesc: {
+  stateDesc: {
     fontSize: 13,
     textAlign: 'center',
-    opacity: 0.7,
-    maxWidth: 420,
-    lineHeight: 18,
+    lineHeight: 19,
+    maxWidth: 380,
   },
-  actionButton: {
-    marginTop: 6,
-    paddingHorizontal: 20,
+  retryButton: {
+    marginTop: 8,
+    paddingHorizontal: 22,
     paddingVertical: 10,
     borderRadius: 10,
     cursor: 'pointer' as any,
   },
-  addressList: {
-    gap: 12,
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  pressed: {
-    opacity: 0.7,
+  stickyContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignSelf: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 18,
+    zIndex: 50,
+    pointerEvents: 'box-none' as any,
+  },
+  stickyAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingLeft: 18,
+    paddingRight: 10,
+    borderRadius: 24,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.16)',
+        cursor: 'pointer',
+      },
+      default: {
+        elevation: 6,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.18,
+        shadowRadius: 6,
+      },
+    }),
+  },
+  stickyAddText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  plusCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  plusIconText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  buttonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.95 }],
   },
 });

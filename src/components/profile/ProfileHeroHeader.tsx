@@ -4,6 +4,7 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -18,6 +19,8 @@ export const ProfileHeroHeader: React.FC = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const palette = useProfilePalette();
+  const { width } = useWindowDimensions();
+  const isMobile = width <= 768;
 
   const handleClose = () => {
     if (router.canGoBack()) {
@@ -53,7 +56,7 @@ export const ProfileHeroHeader: React.FC = () => {
 
       {/* Top Bar with 'X' button on left and 'PROFIL' on right */}
       <View style={[styles.topBarContainer, { top: topOffset }]}>
-        <View style={styles.topBar}>
+        <View style={[styles.topBar, { maxWidth: isMobile ? '100%' : 600 }]}>
           {/* Circular Close Button 'X' */}
           <Pressable
             onPress={handleClose}
@@ -120,7 +123,6 @@ const styles = StyleSheet.create({
   },
   topBar: {
     width: '100%',
-    maxWidth: 500,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',

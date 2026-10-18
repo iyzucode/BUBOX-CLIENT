@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -9,6 +9,9 @@ const defaultBabyAvatar = require('@/assets/images/profile-avatar-baby.jpg');
 
 export const ProfileIdentityCard: React.FC = () => {
   const palette = useProfilePalette();
+  const { width } = useWindowDimensions();
+  const isMobile = width <= 768;
+
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
@@ -47,6 +50,10 @@ export const ProfileIdentityCard: React.FC = () => {
           {
             backgroundColor: palette.cardBg,
             borderColor: palette.cardBorder,
+            borderTopLeftRadius: 36,
+            borderTopRightRadius: 36,
+            borderBottomLeftRadius: isMobile ? 0 : 36,
+            borderBottomRightRadius: isMobile ? 0 : 36,
           },
         ]}
       >
@@ -96,7 +103,6 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    borderRadius: 36,
     borderWidth: 0,
     paddingTop: 56, // Space for the overlapping avatar
     paddingBottom: 22,

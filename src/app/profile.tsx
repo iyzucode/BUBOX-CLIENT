@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -38,6 +39,9 @@ import {
 export default function ProfileScreen() {
   const palette = useProfilePalette();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isMobile = width <= 768;
+
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
@@ -146,13 +150,23 @@ export default function ProfileScreen() {
         {/* 1. Artistic Top Cover Hero with Close (X) & PROFIL title */}
         <ProfileHeroHeader />
 
-        {/* 2. Overlapping Baby Avatar + Name + @handle: NO margin width, half height on banner */}
-        <View style={styles.identityWrapper}>
+        {/* 2. Overlapping Baby Avatar + Name + @handle: Full width on mobile, max 600 on desktop */}
+        <View
+          style={[
+            styles.identityWrapper,
+            { maxWidth: isMobile ? '100%' : 600 },
+          ]}
+        >
           <ProfileIdentityCard />
         </View>
 
-        {/* 3. Main Content Cards (Pesanan Saya, Menu Groups, Logout): WITH margin width */}
-        <View style={styles.bodyWrapper}>
+        {/* 3. Main Content Cards (Pesanan Saya, Menu Groups, Logout): Full width on mobile, max 600 on desktop */}
+        <View
+          style={[
+            styles.bodyWrapper,
+            { maxWidth: isMobile ? '100%' : 600 },
+          ]}
+        >
           {/* Section: Pesanan Saya (4 Status Action Buttons) */}
           <ProfileOrderStatusBar />
 
@@ -246,19 +260,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    width: '100%',
     paddingBottom: BottomTabInset + 40,
     alignItems: 'center',
   },
   identityWrapper: {
     width: '100%',
-    paddingHorizontal: 0, // NO margin width! Full width edge-to-edge
+    paddingHorizontal: 0,
     alignItems: 'center',
     zIndex: 5,
   },
   bodyWrapper: {
     width: '100%',
-    maxWidth: 500,
-    paddingHorizontal: 16, // Inset with margin width for lower cards!
+    paddingHorizontal: 16,
     gap: 14,
     marginTop: 18,
   },
