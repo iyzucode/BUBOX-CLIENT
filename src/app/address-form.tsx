@@ -820,7 +820,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 12,
-    fontSize: 14,
+    fontSize: 16,
   },
   pickerButton: {
     height: 44,

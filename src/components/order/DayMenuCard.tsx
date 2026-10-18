@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     textAlign: 'center',
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     padding: 0,
   },

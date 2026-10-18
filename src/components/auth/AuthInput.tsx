@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   } as any,
   input: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     height: '100%',
   },
   toggleButton: {

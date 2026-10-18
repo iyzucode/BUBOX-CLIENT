@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     paddingVertical: 2,
   },
   centerState: {

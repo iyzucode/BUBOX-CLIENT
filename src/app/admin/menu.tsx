@@ -1228,7 +1228,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     paddingVertical: 8,
-    fontSize: 13,
+    fontSize: 16,
     color: '#0F172A',
   },
   addMasterBtn: {
