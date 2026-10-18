@@ -49,10 +49,11 @@ export default function HomeScreen() {
 
   // Calculate dynamic header height: from HEADER_MAX_HEIGHT down to HEADER_MIN_HEIGHT
   const clampedScroll = Math.min(Math.max(scrollY, 0), SCROLL_DISTANCE);
+  const headerHeight = HEADER_MAX_HEIGHT - clampedScroll;
+
+  // Elastic zoom on image when pulling down without expanding container or displacing the button
   const overscroll = scrollY < 0 ? -scrollY : 0;
-  const headerHeight = HEADER_MAX_HEIGHT - clampedScroll + overscroll;
-  const imageHeight = HEADER_MAX_HEIGHT + overscroll;
-  const imageTop = -overscroll * 0.4;
+  const imageScale = 1 + Math.min(overscroll * 0.0012, 0.15);
 
   const topBarTop = insets.top > 0 ? insets.top + 14 : 20;
 
@@ -68,14 +69,13 @@ export default function HomeScreen() {
           },
         ]}
       >
-        {/* Background Image: Fixed at top, bottom gets cropped as container height decreases */}
+        {/* Background Image: Always covers 100% of header with smooth elastic scale on pull-down */}
         <Image
           source={babyHeroImage}
           style={[
             styles.heroImage,
             {
-              top: imageTop,
-              height: imageHeight,
+              transform: [{ scale: imageScale }],
             },
           ]}
           resizeMode="cover"
@@ -283,9 +283,12 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     position: 'absolute',
+    top: 0,
     left: 0,
     right: 0,
+    bottom: 0,
     width: '100%',
+    height: '100%',
   },
   gradientOverlay: {
     position: 'absolute',
@@ -416,6 +419,11 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    ...Platform.select({
+      web: {
+        overscrollBehaviorY: 'contain' as any,
+      },
+    }),
   },
   scrollContent: {
     width: '100%',
