@@ -10,6 +10,8 @@ export interface Address {
   province: string;
   postalCode: string;
   notes?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   isPrimary: boolean;
   createdAt: string;
   updatedAt: string;
@@ -25,6 +27,8 @@ export interface CreateAddressRequest {
   province: string;
   postalCode: string;
   notes?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isPrimary?: boolean;
 }
 
@@ -38,5 +42,7 @@ export interface UpdateAddressRequest {
   province: string;
   postalCode: string;
   notes?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isPrimary?: boolean;
 }

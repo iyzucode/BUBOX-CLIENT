@@ -9,17 +9,17 @@ import {
   StyleSheet,
   Switch,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Navbar } from '@/components/ui/Navbar';
 import { SelectModalPicker } from '@/components/ui/SelectModalPicker';
-import { BottomTabInset, MaxContentWidth } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { AddressLocationPicker } from '@/components/address/AddressLocationPicker';
+import { FloatingLabelPillInput } from '@/components/ui/FloatingLabelPillInput';
+import { useThemeContext } from '@/context/ThemeContext';
 import {
   useAddress,
   useCreateAddress,
@@ -33,16 +33,17 @@ import {
 } from '@/features/general/useRegions';
 import { CreateAddressRequest } from '@/types/address';
 
-const QUICK_LABELS = ['Rumah', 'Kantor', 'Apartemen', 'Kos', 'Rumah Nenek'];
-
 interface SelectedRegion {
   code: string;
   name: string;
 }
 
 export default function AddressFormScreen() {
-  const theme = useTheme();
+  const { isDark } = useThemeContext();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isDesktop = width > 768;
+
   const { id } = useLocalSearchParams<{ id?: string }>();
   const isEditMode = Boolean(id);
 
@@ -52,13 +53,17 @@ export default function AddressFormScreen() {
   const updateMutation = useUpdateAddress();
 
   // Basic form states
-  const [label, setLabel] = useState('Rumah');
+  const [label, setLabel] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [fullAddress, setFullAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [isPrimary, setIsPrimary] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Location Coordinate states
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
 
   // Regional cascading states
   const [selectedProvince, setSelectedProvince] = useState<SelectedRegion | null>(null);
@@ -82,13 +87,20 @@ export default function AddressFormScreen() {
   // Prepopulate when editing
   useEffect(() => {
     if (addressDetail) {
-      setLabel(addressDetail.label || 'Rumah');
+      setLabel(addressDetail.label || '');
       setRecipientName(addressDetail.recipientName || '');
       setPhoneNumber(addressDetail.phoneNumber || '');
       setFullAddress(addressDetail.fullAddress || '');
       setPostalCode(addressDetail.postalCode || '');
       setNotes(addressDetail.notes || '');
       setIsPrimary(addressDetail.isPrimary || false);
+
+      if (addressDetail.latitude != null) {
+        setLatitude(addressDetail.latitude);
+      }
+      if (addressDetail.longitude != null) {
+        setLongitude(addressDetail.longitude);
+      }
 
       if (addressDetail.province) {
         setSelectedProvince({ code: '', name: addressDetail.province });
@@ -133,7 +145,6 @@ export default function AddressFormScreen() {
   const handleSelectVillage = (item: { value: string; label: string; subtitle?: string }) => {
     setSelectedVillage({ code: item.value, name: item.label });
     if (item.subtitle && item.subtitle.trim().length > 0) {
-      // Extract numeric postal code
       const codeMatch = item.subtitle.match(/\d{5}/);
       if (codeMatch) {
         setPostalCode(codeMatch[0]);
@@ -160,7 +171,7 @@ export default function AddressFormScreen() {
       !districtName.trim() ||
       !postalCode.trim()
     ) {
-      setErrorMessage('Mohon lengkapi semua bidang wajib bertanda bintang (*), termasuk pilihan wilayah.');
+      setErrorMessage('Mohon lengkapi semua bidang wajib, termasuk pilihan wilayah.');
       return;
     }
 
@@ -181,6 +192,8 @@ export default function AddressFormScreen() {
       province: provinceName.trim(),
       postalCode: postalCode.trim(),
       notes: notes.trim() || undefined,
+      latitude: latitude != null ? latitude : undefined,
+      longitude: longitude != null ? longitude : undefined,
       isPrimary,
     };
 
@@ -206,470 +219,475 @@ export default function AddressFormScreen() {
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
+  // Theming colors according to user design
+  const headerBg = isDark ? '#1E2229' : '#555A63';
+  const sheetBg = isDark ? '#262A32' : '#D9D9D9';
+  const pillBg = isDark ? '#374151' : '#B8B8B8';
+  const textPrimary = isDark ? '#F9FAFB' : '#111827';
+  const placeholderColor = isDark ? '#9CA3AF' : '#6B7280';
+  const labelColor = isDark ? '#D1D5DB' : '#6B7280';
+  const dividerColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#BFBFBF';
+  const submitBtnBg = isDark ? '#4B5563' : '#666666';
+
   if (isEditMode && isLoadingDetail) {
     return (
-      <ThemedView style={styles.container}>
+      <View style={[styles.container, { backgroundColor: headerBg }]}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-          <Navbar />
           <View style={styles.centerBox}>
-            <ActivityIndicator size="large" color={theme.primary} />
-            <ThemedText type="small" style={{ marginTop: 12, opacity: 0.7 }}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <ThemedText style={{ marginTop: 12, color: '#FFFFFF' }}>
               Memuat detail alamat...
             </ThemedText>
           </View>
         </SafeAreaView>
-      </ThemedView>
+      </View>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: headerBg }]}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        {/* Navbar */}
-        <Navbar />
-
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1 }}
-        >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Top Navigation Row */}
-            <View style={styles.topNavRow}>
-              <Pressable
-                onPress={() => router.back()}
-                style={({ pressed }) => [
-                  styles.backBtn,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.border,
-                  },
-                  pressed && styles.pressed,
-                ]}
-              >
-                <ThemedText type="smallBold">
-                  ← Kembali ke Daftar Alamat
-                </ThemedText>
-              </Pressable>
-            </View>
-
-            {/* Header Title */}
-            <View style={styles.headerSection}>
-              <ThemedText type="title" style={styles.title}>
-                {isEditMode ? 'Ubah Alamat Pengiriman' : 'Tambah Alamat Baru'}
-              </ThemedText>
-              <ThemedText type="small" style={styles.subtitle}>
-                Pilih wilayah administratif secara bertingkat (Provinsi ➔ Kota ➔ Kecamatan ➔ Kelurahan) untuk pengisian otomatis kode pos.
-              </ThemedText>
-            </View>
-
-            {/* Form Card */}
-            <View
-              style={[
-                styles.formCard,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                },
+        {/* Main Content Wrapper (Desktop Max-Width Constraint) */}
+        <View style={[styles.mainWrapper, { maxWidth: isDesktop ? 600 : '100%' }]}>
+          {/* 1. HEADER BAR */}
+          <View style={[styles.header, { backgroundColor: headerBg }]}>
+            <Pressable
+              onPress={() => router.back()}
+              style={({ pressed }) => [
+                styles.headerBackBtn,
+                pressed && styles.buttonPressed,
               ]}
+              accessibilityLabel="Kembali"
+              accessibilityRole="button"
             >
-              {errorMessage ? (
-                <View style={styles.errorBox}>
-                  <ThemedText type="small" style={styles.errorText}>
-                    {errorMessage}
-                  </ThemedText>
-                </View>
-              ) : null}
-
-              {/* Label Alamat */}
-              <View style={styles.fieldGroup}>
-                <ThemedText type="smallBold" style={styles.fieldLabel}>
-                  Label Alamat *
+              {Platform.OS === 'web' ? (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#111827"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              ) : (
+                <ThemedText style={{ fontSize: 16, color: '#111827', fontWeight: 'bold' }}>
+                  ❮
                 </ThemedText>
-                <View style={styles.quickLabelRow}>
-                  {QUICK_LABELS.map((item) => (
-                    <Pressable
-                      key={item}
-                      onPress={() => setLabel(item)}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor:
-                            label === item
-                              ? theme.primary + '20'
-                              : theme.backgroundElement,
-                          borderColor:
-                            label === item ? theme.primary : theme.border,
-                        },
-                      ]}
-                    >
-                      <ThemedText
-                        type="small"
-                        style={{
-                          color: label === item ? theme.primary : undefined,
-                          fontWeight: label === item ? '700' : '400',
-                        }}
-                      >
-                        {item}
-                      </ThemedText>
-                    </Pressable>
-                  ))}
-                </View>
-                <TextInput
-                  value={label}
-                  onChangeText={setLabel}
-                  placeholder="Contoh: Rumah, Kantor, Kos"
-                  placeholderTextColor={theme.border}
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: theme.backgroundElement,
-                      color: theme.text,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                />
-              </View>
+              )}
+            </Pressable>
 
-              {/* Recipient Name & Phone Number */}
-              <View style={styles.rowTwoCols}>
-                <View style={[styles.fieldGroup, { flex: 1, minWidth: 240 }]}>
-                  <ThemedText type="smallBold" style={styles.fieldLabel}>
-                    Nama Penerima *
-                  </ThemedText>
-                  <TextInput
+            <ThemedText style={styles.headerTitle}>
+              {isEditMode ? 'Ubah Alamat' : 'Tambah Alamat'}
+            </ThemedText>
+          </View>
+
+          {/* 2. SCROLLABLE FORM & MAP CONTAINER */}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ flex: 1 }}
+          >
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* INTERACTIVE OPENSTREETMAP LOCATION PICKER */}
+              <AddressLocationPicker
+                initialLatitude={latitude}
+                initialLongitude={longitude}
+                onLocationChange={(lat, lng) => {
+                  setLatitude(lat);
+                  setLongitude(lng);
+                }}
+                height={230}
+              />
+
+              {/* 3. CURVED BOTTOM SHEET FORM CONTAINER */}
+              <View style={[styles.sheetContainer, { backgroundColor: sheetBg }]}>
+                {/* Drag Handle Bar Pill */}
+                <View style={styles.dragHandle} />
+
+                {/* Error Banner */}
+                {errorMessage ? (
+                  <View style={styles.errorBox}>
+                    <ThemedText style={styles.errorText}>
+                      {errorMessage}
+                    </ThemedText>
+                  </View>
+                ) : null}
+
+                {/* SECTION 1: IDENTITAS & KONTAK */}
+                <View style={styles.sectionGroup}>
+                  {/* Nama Alamat */}
+                  <FloatingLabelPillInput
+                    label="Nama alamat"
+                    hint="Cth: Rumah Utama, Kos, Apartemen"
+                    value={label}
+                    onChangeText={setLabel}
+                    pillBg={pillBg}
+                    textColor={textPrimary}
+                    labelColor={labelColor}
+                    placeholderColor={placeholderColor}
+                  />
+
+                  {/* Nama Penerima */}
+                  <FloatingLabelPillInput
+                    label="Nama penerima"
+                    hint="Cth: Budi Santoso"
                     value={recipientName}
                     onChangeText={setRecipientName}
-                    placeholder="Nama Lengkap Penerima"
-                    placeholderTextColor={theme.border}
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: theme.backgroundElement,
-                        color: theme.text,
-                        borderColor: theme.border,
-                      },
-                    ]}
+                    pillBg={pillBg}
+                    textColor={textPrimary}
+                    labelColor={labelColor}
+                    placeholderColor={placeholderColor}
                   />
-                </View>
 
-                <View style={[styles.fieldGroup, { flex: 1, minWidth: 240 }]}>
-                  <ThemedText type="smallBold" style={styles.fieldLabel}>
-                    Nomor HP / WhatsApp *
-                  </ThemedText>
-                  <TextInput
+                  {/* No Handphone Penerima */}
+                  <FloatingLabelPillInput
+                    label="No handphone penerima"
+                    hint="Cth: 08123456789"
                     value={phoneNumber}
                     onChangeText={setPhoneNumber}
-                    placeholder="08xxxxxxxxxx"
-                    placeholderTextColor={theme.border}
                     keyboardType="phone-pad"
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: theme.backgroundElement,
-                        color: theme.text,
-                        borderColor: theme.border,
-                      },
-                    ]}
+                    pillBg={pillBg}
+                    textColor={textPrimary}
+                    labelColor={labelColor}
+                    placeholderColor={placeholderColor}
                   />
                 </View>
-              </View>
 
-              {/* SECTION: DROPDOWN WILAYAH BERJENJANG */}
-              <View style={styles.dividerBox}>
-                <ThemedText type="smallBold" style={styles.dividerTitle}>
-                  📍 WILAYAH ADMINISTRATIF INDONESIA
-                </ThemedText>
-              </View>
+                {/* DIVIDER 1 */}
+                <View style={[styles.divider, { backgroundColor: dividerColor }]} />
 
-              {/* Row 1: Provinsi & Kota/Kabupaten */}
-              <View style={styles.rowTwoCols}>
-                {/* 1. Provinsi Picker */}
-                <View style={[styles.fieldGroup, { flex: 1, minWidth: 240 }]}>
-                  <ThemedText type="smallBold" style={styles.fieldLabel}>
-                    Provinsi *
-                  </ThemedText>
-                  <Pressable
-                    onPress={() => setShowProvincePicker(true)}
-                    style={({ pressed }) => [
-                      styles.pickerButton,
-                      {
-                        backgroundColor: theme.backgroundElement,
-                        borderColor: theme.border,
-                      },
-                      pressed && styles.pressed,
+                {/* SECTION 2: WILAYAH BERJENJANG & ALAMAT LENGKAP */}
+                <View style={styles.sectionGroup}>
+                  {/* Dropdown 1: Provinsi */}
+                  <View style={styles.dropdownWrapper}>
+                    {selectedProvince && (
+                      <View style={styles.floatingDropdownLabelWrapper}>
+                        <ThemedText style={[styles.floatingDropdownLabel, { color: labelColor }]}>
+                          Provinsi
+                        </ThemedText>
+                      </View>
+                    )}
+                    <Pressable
+                      onPress={() => setShowProvincePicker(true)}
+                      style={({ pressed }) => [
+                        styles.pillDropdown,
+                        { backgroundColor: pillBg },
+                        pressed && styles.buttonPressed,
+                      ]}
+                      accessibilityLabel="Pilih Provinsi"
+                    >
+                      <ThemedText
+                        style={[
+                          styles.dropdownText,
+                          { color: selectedProvince ? textPrimary : placeholderColor },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {selectedProvince ? selectedProvince.name : 'Provinsi'}
+                      </ThemedText>
+                      {Platform.OS === 'web' ? (
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={textPrimary}
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      ) : (
+                        <ThemedText style={{ color: textPrimary, fontSize: 13 }}>▼</ThemedText>
+                      )}
+                    </Pressable>
+                  </View>
+
+                  {/* Dropdown 2: Kota / Kabupaten */}
+                  <View style={styles.dropdownWrapper}>
+                    {selectedCity && (
+                      <View style={styles.floatingDropdownLabelWrapper}>
+                        <ThemedText style={[styles.floatingDropdownLabel, { color: labelColor }]}>
+                          Kota / Kabupaten
+                        </ThemedText>
+                      </View>
+                    )}
+                    <Pressable
+                      onPress={() => {
+                        if (!selectedProvince?.code) {
+                          if (Platform.OS === 'web') {
+                            window.alert('Silakan pilih Provinsi terlebih dahulu.');
+                          } else {
+                            Alert.alert('Perhatian', 'Silakan pilih Provinsi terlebih dahulu.');
+                          }
+                          return;
+                        }
+                        setShowCityPicker(true);
+                      }}
+                      style={({ pressed }) => [
+                        styles.pillDropdown,
+                        {
+                          backgroundColor: pillBg,
+                          opacity: selectedProvince ? 1 : 0.7,
+                        },
+                        pressed && styles.buttonPressed,
+                      ]}
+                      accessibilityLabel="Pilih Kota / Kabupaten"
+                    >
+                      <ThemedText
+                        style={[
+                          styles.dropdownText,
+                          { color: selectedCity ? textPrimary : placeholderColor },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {selectedCity ? selectedCity.name : 'Kota / Kabupaten'}
+                      </ThemedText>
+                      {Platform.OS === 'web' ? (
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={textPrimary}
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      ) : (
+                        <ThemedText style={{ color: textPrimary, fontSize: 13 }}>▼</ThemedText>
+                      )}
+                    </Pressable>
+                  </View>
+
+                  {/* Dropdown 3: Kecamatan */}
+                  <View style={styles.dropdownWrapper}>
+                    {selectedDistrict && (
+                      <View style={styles.floatingDropdownLabelWrapper}>
+                        <ThemedText style={[styles.floatingDropdownLabel, { color: labelColor }]}>
+                          Kecamatan
+                        </ThemedText>
+                      </View>
+                    )}
+                    <Pressable
+                      onPress={() => {
+                        if (!selectedCity?.code) {
+                          if (Platform.OS === 'web') {
+                            window.alert('Silakan pilih Kota/Kabupaten terlebih dahulu.');
+                          } else {
+                            Alert.alert('Perhatian', 'Silakan pilih Kota/Kabupaten terlebih dahulu.');
+                          }
+                          return;
+                        }
+                        setShowDistrictPicker(true);
+                      }}
+                      style={({ pressed }) => [
+                        styles.pillDropdown,
+                        {
+                          backgroundColor: pillBg,
+                          opacity: selectedCity ? 1 : 0.7,
+                        },
+                        pressed && styles.buttonPressed,
+                      ]}
+                      accessibilityLabel="Pilih Kecamatan"
+                    >
+                      <ThemedText
+                        style={[
+                          styles.dropdownText,
+                          { color: selectedDistrict ? textPrimary : placeholderColor },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {selectedDistrict ? selectedDistrict.name : 'Kecamatan'}
+                      </ThemedText>
+                      {Platform.OS === 'web' ? (
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={textPrimary}
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      ) : (
+                        <ThemedText style={{ color: textPrimary, fontSize: 13 }}>▼</ThemedText>
+                      )}
+                    </Pressable>
+                  </View>
+
+                  {/* Dropdown 4: Kelurahan / Desa */}
+                  <View style={styles.dropdownWrapper}>
+                    {selectedVillage && (
+                      <View style={styles.floatingDropdownLabelWrapper}>
+                        <ThemedText style={[styles.floatingDropdownLabel, { color: labelColor }]}>
+                          Kelurahan / Desa
+                        </ThemedText>
+                      </View>
+                    )}
+                    <Pressable
+                      onPress={() => {
+                        if (!selectedDistrict?.code) {
+                          if (Platform.OS === 'web') {
+                            window.alert('Silakan pilih Kecamatan terlebih dahulu.');
+                          } else {
+                            Alert.alert('Perhatian', 'Silakan pilih Kecamatan terlebih dahulu.');
+                          }
+                          return;
+                        }
+                        setShowVillagePicker(true);
+                      }}
+                      style={({ pressed }) => [
+                        styles.pillDropdown,
+                        {
+                          backgroundColor: pillBg,
+                          opacity: selectedDistrict ? 1 : 0.7,
+                        },
+                        pressed && styles.buttonPressed,
+                      ]}
+                      accessibilityLabel="Pilih Kelurahan / Desa"
+                    >
+                      <ThemedText
+                        style={[
+                          styles.dropdownText,
+                          { color: selectedVillage ? textPrimary : placeholderColor },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {selectedVillage ? selectedVillage.name : 'Kelurahan / Desa'}
+                      </ThemedText>
+                      {Platform.OS === 'web' ? (
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={textPrimary}
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      ) : (
+                        <ThemedText style={{ color: textPrimary, fontSize: 13 }}>▼</ThemedText>
+                      )}
+                    </Pressable>
+                  </View>
+
+                  {/* Kode Pos (Auto-filled from village or editable) */}
+                  <FloatingLabelPillInput
+                    label="Kode Pos"
+                    hint="Cth: 10230"
+                    value={postalCode}
+                    onChangeText={setPostalCode}
+                    keyboardType="numeric"
+                    pillBg={pillBg}
+                    textColor={textPrimary}
+                    labelColor={labelColor}
+                    placeholderColor={placeholderColor}
+                  />
+
+                  {/* Alamat Lengkap */}
+                  <FloatingLabelPillInput
+                    label="Alamat Lengkap"
+                    hint="Cth: Jl. Kebon Kacang No. 12, RT 01/RW 02"
+                    value={fullAddress}
+                    onChangeText={setFullAddress}
+                    multiline
+                    numberOfLines={2}
+                    pillBg={pillBg}
+                    textColor={textPrimary}
+                    labelColor={labelColor}
+                    placeholderColor={placeholderColor}
+                  />
+                </View>
+
+                {/* DIVIDER 2 */}
+                <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+                {/* SECTION 3: CATATAN */}
+                <View style={styles.sectionGroup}>
+                  <FloatingLabelPillInput
+                    label="Catatan"
+                    hint="Cth: Pagar hitam depan warung, bel masuk kanan"
+                    value={notes}
+                    onChangeText={setNotes}
+                    pillBg={pillBg}
+                    textColor={textPrimary}
+                    labelColor={labelColor}
+                    placeholderColor={placeholderColor}
+                  />
+                </View>
+
+                {/* DIVIDER 3 */}
+                <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+                {/* SECTION 4: JADIKAN UTAMA & TOMBOL SIMPAN */}
+                <View style={styles.sectionGroup}>
+                  {/* Switch Pill Toggle */}
+                  <View
+                    style={[
+                      styles.pillToggleContainer,
+                      { backgroundColor: pillBg },
                     ]}
                   >
                     <ThemedText
-                      type="default"
                       style={[
-                        styles.pickerValueText,
-                        !selectedProvince && { opacity: 0.5 },
+                        styles.toggleLabel,
+                        { color: placeholderColor },
                       ]}
-                      numberOfLines={1}
                     >
-                      {selectedProvince ? selectedProvince.name : 'Pilih Provinsi...'}
+                      Jadikan alamat utama
                     </ThemedText>
-                    <ThemedText style={{ opacity: 0.6, fontSize: 12 }}>▼</ThemedText>
-                  </Pressable>
-                </View>
+                    <Switch
+                      value={isPrimary}
+                      onValueChange={setIsPrimary}
+                      trackColor={{ false: '#9E9E9E', true: '#4B5563' }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
 
-                {/* 2. Kota/Kabupaten Picker */}
-                <View style={[styles.fieldGroup, { flex: 1, minWidth: 240 }]}>
-                  <ThemedText type="smallBold" style={styles.fieldLabel}>
-                    Kota / Kabupaten *
-                  </ThemedText>
+                  {/* Submit Button */}
                   <Pressable
-                    onPress={() => {
-                      if (!selectedProvince?.code) {
-                        Alert.alert('Perhatian', 'Silakan pilih Provinsi terlebih dahulu.');
-                        return;
-                      }
-                      setShowCityPicker(true);
-                    }}
+                    onPress={handleSubmit}
+                    disabled={isSubmitting}
                     style={({ pressed }) => [
-                      styles.pickerButton,
-                      {
-                        backgroundColor: theme.backgroundElement,
-                        borderColor: theme.border,
-                        opacity: selectedProvince?.code ? 1 : 0.6,
-                      },
-                      pressed && styles.pressed,
+                      styles.submitButton,
+                      { backgroundColor: submitBtnBg },
+                      isSubmitting && { opacity: 0.7 },
+                      pressed && styles.buttonPressed,
                     ]}
+                    accessibilityLabel="Simpan Alamat"
+                    accessibilityRole="button"
                   >
-                    <ThemedText
-                      type="default"
-                      style={[
-                        styles.pickerValueText,
-                        !selectedCity && { opacity: 0.5 },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {selectedCity ? selectedCity.name : 'Pilih Kota / Kab...'}
-                    </ThemedText>
-                    <ThemedText style={{ opacity: 0.6, fontSize: 12 }}>▼</ThemedText>
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <ThemedText style={styles.submitButtonText}>
+                        Simpan
+                      </ThemedText>
+                    )}
                   </Pressable>
                 </View>
               </View>
-
-              {/* Row 2: Kecamatan & Kelurahan/Desa */}
-              <View style={styles.rowTwoCols}>
-                {/* 3. Kecamatan Picker */}
-                <View style={[styles.fieldGroup, { flex: 1, minWidth: 240 }]}>
-                  <ThemedText type="smallBold" style={styles.fieldLabel}>
-                    Kecamatan *
-                  </ThemedText>
-                  <Pressable
-                    onPress={() => {
-                      if (!selectedCity?.code) {
-                        Alert.alert('Perhatian', 'Silakan pilih Kota/Kabupaten terlebih dahulu.');
-                        return;
-                      }
-                      setShowDistrictPicker(true);
-                    }}
-                    style={({ pressed }) => [
-                      styles.pickerButton,
-                      {
-                        backgroundColor: theme.backgroundElement,
-                        borderColor: theme.border,
-                        opacity: selectedCity?.code ? 1 : 0.6,
-                      },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <ThemedText
-                      type="default"
-                      style={[
-                        styles.pickerValueText,
-                        !selectedDistrict && { opacity: 0.5 },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {selectedDistrict ? selectedDistrict.name : 'Pilih Kecamatan...'}
-                    </ThemedText>
-                    <ThemedText style={{ opacity: 0.6, fontSize: 12 }}>▼</ThemedText>
-                  </Pressable>
-                </View>
-
-                {/* 4. Kelurahan / Desa Picker */}
-                <View style={[styles.fieldGroup, { flex: 1, minWidth: 240 }]}>
-                  <ThemedText type="smallBold" style={styles.fieldLabel}>
-                    Kelurahan / Desa
-                  </ThemedText>
-                  <Pressable
-                    onPress={() => {
-                      if (!selectedDistrict?.code) {
-                        Alert.alert('Perhatian', 'Silakan pilih Kecamatan terlebih dahulu.');
-                        return;
-                      }
-                      setShowVillagePicker(true);
-                    }}
-                    style={({ pressed }) => [
-                      styles.pickerButton,
-                      {
-                        backgroundColor: theme.backgroundElement,
-                        borderColor: theme.border,
-                        opacity: selectedDistrict?.code ? 1 : 0.6,
-                      },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <ThemedText
-                      type="default"
-                      style={[
-                        styles.pickerValueText,
-                        !selectedVillage && { opacity: 0.5 },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {selectedVillage ? selectedVillage.name : 'Pilih Kelurahan / Desa...'}
-                    </ThemedText>
-                    <ThemedText style={{ opacity: 0.6, fontSize: 12 }}>▼</ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Row 3: Kode Pos (Auto-filled) */}
-              <View style={styles.fieldGroup}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <ThemedText type="smallBold" style={styles.fieldLabel}>
-                    Kode Pos *
-                  </ThemedText>
-                  {postalCode ? (
-                    <ThemedText type="code" style={{ fontSize: 11, color: '#10B981' }}>
-                      ✓ Terisi otomatis dari master data
-                    </ThemedText>
-                  ) : null}
-                </View>
-                <TextInput
-                  value={postalCode}
-                  onChangeText={setPostalCode}
-                  placeholder="Kode pos (otomatis terisi saat memilih kelurahan)"
-                  placeholderTextColor={theme.border}
-                  keyboardType="numeric"
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: theme.backgroundElement,
-                      color: theme.text,
-                      borderColor: postalCode ? '#10B98180' : theme.border,
-                      borderWidth: postalCode ? 1.5 : 1,
-                    },
-                  ]}
-                />
-              </View>
-
-              {/* Full Address (Textarea) */}
-              <View style={styles.fieldGroup}>
-                <ThemedText type="smallBold" style={styles.fieldLabel}>
-                  Alamat Lengkap (Jalan, RT/RW, No. Rumah/Unit) *
-                </ThemedText>
-                <TextInput
-                  value={fullAddress}
-                  onChangeText={setFullAddress}
-                  placeholder="Nama Jalan, Nomor Rumah/Gedung, RT/RW, Blok/Unit"
-                  placeholderTextColor={theme.border}
-                  multiline
-                  numberOfLines={3}
-                  style={[
-                    styles.input,
-                    styles.textArea,
-                    {
-                      backgroundColor: theme.backgroundElement,
-                      color: theme.text,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                />
-              </View>
-
-              {/* Notes / Kurir Landmark */}
-              <View style={styles.fieldGroup}>
-                <ThemedText type="smallBold" style={styles.fieldLabel}>
-                  Catatan Kurir / Patokan Lokasi (Opsional)
-                </ThemedText>
-                <TextInput
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Contoh: Pagar hitam depan warung, bel masuk sebelah kanan"
-                  placeholderTextColor={theme.border}
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: theme.backgroundElement,
-                      color: theme.text,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                />
-              </View>
-
-              {/* Primary Address Toggle */}
-              <View
-                style={[
-                  styles.primaryToggleRow,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <View style={{ flex: 1, gap: 2 }}>
-                  <ThemedText type="smallBold">Jadikan Alamat Utama</ThemedText>
-                  <ThemedText type="small" style={{ opacity: 0.6, fontSize: 12 }}>
-                    Alamat utama akan otomatis dipilih saat checkout pesanan katering
-                  </ThemedText>
-                </View>
-                <Switch
-                  value={isPrimary}
-                  onValueChange={setIsPrimary}
-                  trackColor={{ false: theme.border, true: theme.primary }}
-                  thumbColor="#FFFFFF"
-                />
-              </View>
-
-              {/* Action Buttons */}
-              <View style={[styles.actionRow, { borderTopColor: theme.border }]}>
-                <Pressable
-                  onPress={() => router.back()}
-                  disabled={isSubmitting}
-                  style={({ pressed }) => [
-                    styles.cancelBtn,
-                    {
-                      backgroundColor: theme.backgroundElement,
-                      borderColor: theme.border,
-                    },
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <ThemedText type="smallBold">Batal</ThemedText>
-                </Pressable>
-
-                <Pressable
-                  onPress={handleSubmit}
-                  disabled={isSubmitting}
-                  style={({ pressed }) => [
-                    styles.saveBtn,
-                    { backgroundColor: theme.primary },
-                    isSubmitting && { opacity: 0.7 },
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <ThemedText type="smallBold" style={styles.saveBtnText}>
-                    {isSubmitting
-                      ? 'Menyimpan...'
-                      : isEditMode
-                      ? 'Simpan Perubahan'
-                      : 'Simpan Alamat Baru'}
-                  </ThemedText>
-                </Pressable>
-              </View>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
 
         {/* 1. Modal Picker Provinsi */}
         <SelectModalPicker
@@ -732,7 +750,7 @@ export default function AddressFormScreen() {
           onClose={() => setShowVillagePicker(false)}
         />
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -743,164 +761,192 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  scrollContent: {
-    maxWidth: MaxContentWidth,
+  mainWrapper: {
+    flex: 1,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    paddingBottom: BottomTabInset + 24,
-    gap: 12,
-  },
-  topNavRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    cursor: 'pointer' as any,
-  },
-  headerSection: {
-    gap: 4,
-    paddingVertical: 4,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 13,
-    opacity: 0.7,
-    lineHeight: 18,
-    maxWidth: 600,
-  },
-  formCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
-    gap: 14,
-  },
-  errorBox: {
-    backgroundColor: '#EF444415',
-    borderColor: '#EF444440',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-  },
-  errorText: {
-    color: '#EF4444',
-    fontSize: 12,
-  },
-  fieldGroup: {
-    gap: 6,
-  },
-  fieldLabel: {
-    fontSize: 12,
-    opacity: 0.8,
-  },
-  quickLabelRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 4,
-  },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 14,
-    borderWidth: 1,
-    cursor: 'pointer' as any,
-  },
-  input: {
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    fontSize: 16,
-  },
-  pickerButton: {
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    cursor: 'pointer' as any,
-  },
-  pickerValueText: {
-    fontSize: 14,
-    flex: 1,
-    marginRight: 8,
-  },
-  dividerBox: {
-    paddingVertical: 4,
-    marginTop: 4,
-  },
-  dividerTitle: {
-    fontSize: 11,
-    letterSpacing: 0.8,
-    opacity: 0.6,
-  },
-  textArea: {
-    height: 80,
-    paddingTop: 10,
-    paddingBottom: 10,
-    textAlignVertical: 'top',
-  },
-  rowTwoCols: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  primaryToggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    marginTop: 4,
-  },
-  cancelBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer' as any,
-  },
-  saveBtn: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer' as any,
-  },
-  saveBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
   },
   centerBox: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  pressed: {
-    opacity: 0.7,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    zIndex: 20,
+  },
+  headerBackBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    cursor: 'pointer' as any,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+      },
+      default: {
+        elevation: 3,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
+      },
+    }),
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  sheetContainer: {
+    marginTop: -30, // overlaps bottom part of the map seamlessly
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 48,
+    zIndex: 20,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 -4px 18px rgba(0, 0, 0, 0.12)',
+      },
+      default: {
+        elevation: 8,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+      },
+    }),
+  },
+  dragHandle: {
+    width: 48,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  sectionGroup: {
+    gap: 6,
+  },
+  pillInput: {
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontWeight: '500',
+    outlineStyle: 'none' as any,
+  },
+  multilineInput: {
+    minHeight: 52,
+    textAlignVertical: 'center',
+  },
+  pillDropdown: {
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    cursor: 'pointer' as any,
+  },
+  dropdownWrapper: {
+    width: '100%',
+    position: 'relative',
+    paddingTop: 16,
+  },
+  floatingDropdownLabelWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 18,
+    zIndex: 2,
+  },
+  floatingDropdownLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.15,
+  },
+  dropdownText: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+    marginRight: 8,
+  },
+  divider: {
+    height: 1,
+    marginVertical: 16,
+  },
+  pillToggleContainer: {
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 48,
+  },
+  toggleLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  submitButton: {
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+    cursor: 'pointer' as any,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      },
+      default: {
+        elevation: 4,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+      },
+    }),
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  buttonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
+  },
+  errorBox: {
+    backgroundColor: '#EF444422',
+    borderWidth: 1,
+    borderColor: '#EF444466',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12.5,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
