@@ -7,6 +7,7 @@
 
 ## 1. Core Principles & Vibe Coding Rules
 Sebagai AI Assistant, Anda HARUS mematuhi aturan berikut saat meng-generate kode di proyek ini:
+- **STRICTLY No Auto Push**: DILARANG KERAS melakukan `git push` ke repositori remote secara otomatis setelah melakukan perubahan atau commit. Tindakan `git push` HANYA boleh dijalankan jika diperintahkan secara eksplisit oleh pengguna.
 - **STRICTLY TypeScript**: Dilarang menggunakan tipe `any`. Semua Props, State, dan API Responses harus memiliki interface/type yang terdefinisi dengan jelas.
 - **Cross-Platform Readiness**: Setiap komponen UI harus diuji pemikirannya untuk berjalan di layar Mobile (sentuhan) dan Web (klik/mouse). Gunakan `Platform.OS` jika ada implementasi yang spesifik untuk Web atau Mobile.
 - **Component Pattern**: 
