@@ -9,12 +9,11 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useThemeContext } from '@/context/ThemeContext';
 import {
-  formatIndonesianDate,
   INDONESIAN_MONTH_NAMES,
   toDateKey,
 } from '@/features/order/dateUtils';
-import { useOrderPalette } from './orderPalette';
 
 interface MultiDateCalendarModalProps {
   visible: boolean;
@@ -23,7 +22,63 @@ interface MultiDateCalendarModalProps {
   onSaveDates: (newKeys: string[]) => void;
 }
 
-const CALENDAR_HEADERS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const WEEKDAY_HEADERS = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
+
+interface CalendarCell {
+  date: Date;
+  dateKey: string;
+  dayNum: number;
+  isCurrentMonth: boolean;
+  isPast: boolean;
+  isToday: boolean;
+}
+
+// Color theme tokens supporting light and dark modes
+const getCalendarTheme = (isDark: boolean) => ({
+  modalOverlayBg: isDark ? 'rgba(0, 0, 0, 0.75)' : 'rgba(15, 23, 42, 0.65)',
+  modalCardBg: isDark ? '#1E293B' : '#F8FAFC',
+  modalCardBorder: isDark ? '#334155' : 'transparent',
+
+  navCircleBg: isDark ? '#334155' : '#FFFFFF',
+  navCircleBorder: isDark ? '#475569' : '#E2E8F0',
+  navChevron: isDark ? '#F8FAFC' : '#0F172A',
+
+  headerSubtitle: isDark ? '#94A3B8' : '#94A3B8',
+  headerMainTitle: isDark ? '#F8FAFC' : '#0F172A',
+
+  calendarCardBg: isDark ? '#0F172A' : '#FFFFFF',
+  calendarCardBorder: isDark ? '#334155' : '#E2E8F0',
+
+  weekdayText: isDark ? '#64748B' : '#94A3B8',
+
+  dateTextNormal: isDark ? '#F8FAFC' : '#0F172A',
+  dateTextPast: isDark ? '#475569' : '#CBD5E1',
+  dateTextOtherMonth: isDark ? '#475569' : '#CBD5E1',
+
+  todayRingBorder: '#F59E0B',
+  todayBg: isDark ? '#0F172A' : '#FFFFFF',
+  todayText: isDark ? '#F59E0B' : '#0F172A',
+
+  selectedTileBg: isDark ? '#F8FAFC' : '#0F172A',
+  selectedTileText: isDark ? '#0F172A' : '#FFFFFF',
+  checkBadgeBg: '#F59E0B',
+  checkBadgeBorder: isDark ? '#0F172A' : '#FFFFFF',
+  checkBadgeIcon: '#0F172A',
+
+  quickSelectTitle: isDark ? '#94A3B8' : '#94A3B8',
+  quickPillBg: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FFFDF5',
+  quickPillBorder: '#F59E0B',
+  quickPillText: isDark ? '#FCD34D' : '#0F172A',
+
+  clearBtnBg: '#EF4444',
+  clearBtnText: '#FFFFFF',
+
+  footerDivider: isDark ? '#334155' : '#E2E8F0',
+  confirmBtnDisabledBg: isDark ? '#334155' : '#F1F5F9',
+  confirmBtnDisabledText: isDark ? '#64748B' : '#94A3B8',
+  confirmBtnActiveBg: '#F59E0B',
+  confirmBtnActiveText: '#0F172A',
+});
 
 export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
   visible,
@@ -31,7 +86,8 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
   onClose,
   onSaveDates,
 }) => {
-  const palette = useOrderPalette();
+  const { isDark } = useThemeContext();
+  const colors = useMemo(() => getCalendarTheme(isDark), [isDark]);
 
   // Temporary selection state while modal is open
   const [tempKeys, setTempKeys] = useState<string[]>([]);
@@ -54,12 +110,16 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
     }
   }, [visible, selectedDateKeys]);
 
+  const today = useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t;
+  }, []);
+
   const year = currentMonthDate.getFullYear();
   const month = currentMonthDate.getMonth();
 
-  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 is Sunday
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
+  // Navigation handlers
   const handlePrevMonth = () => {
     setCurrentMonthDate(new Date(year, month - 1, 1));
   };
@@ -68,6 +128,7 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
     setCurrentMonthDate(new Date(year, month + 1, 1));
   };
 
+  // Toggle selection for a specific date
   const handleToggleDate = (key: string) => {
     if (tempKeys.includes(key)) {
       setTempKeys(tempKeys.filter((k) => k !== key));
@@ -76,28 +137,92 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
     }
   };
 
+  // Quick Preset (+7 hari / +30 hari)
   const handleQuickPreset = (count: number) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
     const newKeys: string[] = [];
     for (let i = 0; i < count; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
       newKeys.push(toDateKey(d));
     }
-    setTempKeys(newKeys);
+    setTempKeys(newKeys.sort());
   };
 
+  // Clear all selections
+  const handleClearAll = () => {
+    setTempKeys([]);
+  };
+
+  // Confirm selection
   const handleSave = () => {
+    if (tempKeys.length === 0) return;
     onSaveDates(tempKeys);
     onClose();
   };
 
-  const today = useMemo(() => {
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    return t;
-  }, []);
+  // Generate 42 cells (6 rows x 7 days) with trailing and leading days
+  const calendarCells = useMemo<CalendarCell[]>(() => {
+    const cells: CalendarCell[] = [];
+
+    const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 is Sunday
+    const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    // 1. Trailing days from previous month
+    for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+      const dayNum = daysInPrevMonth - i;
+      const cellDate = new Date(year, month - 1, dayNum);
+      cellDate.setHours(0, 0, 0, 0);
+      const isPast = cellDate.getTime() < today.getTime();
+      const isToday = cellDate.getTime() === today.getTime();
+      cells.push({
+        date: cellDate,
+        dateKey: toDateKey(cellDate),
+        dayNum,
+        isCurrentMonth: false,
+        isPast,
+        isToday,
+      });
+    }
+
+    // 2. Days in current month
+    for (let dayNum = 1; dayNum <= daysInCurrentMonth; dayNum++) {
+      const cellDate = new Date(year, month, dayNum);
+      cellDate.setHours(0, 0, 0, 0);
+      const isPast = cellDate.getTime() < today.getTime();
+      const isToday = cellDate.getTime() === today.getTime();
+      cells.push({
+        date: cellDate,
+        dateKey: toDateKey(cellDate),
+        dayNum,
+        isCurrentMonth: true,
+        isPast,
+        isToday,
+      });
+    }
+
+    // 3. Leading days from next month (fill up to 42 cells = 6 weeks)
+    const remainingCells = 42 - cells.length;
+    for (let dayNum = 1; dayNum <= remainingCells; dayNum++) {
+      const cellDate = new Date(year, month + 1, dayNum);
+      cellDate.setHours(0, 0, 0, 0);
+      const isPast = cellDate.getTime() < today.getTime();
+      const isToday = cellDate.getTime() === today.getTime();
+      cells.push({
+        date: cellDate,
+        dateKey: toDateKey(cellDate),
+        dayNum,
+        isCurrentMonth: false,
+        isPast,
+        isToday,
+      });
+    }
+
+    return cells;
+  }, [year, month, today]);
+
+  const hasSelections = tempKeys.length > 0;
 
   return (
     <Modal
@@ -106,229 +231,344 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalCard, { backgroundColor: palette.cardBg }]}>
-          {/* Header */}
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1 }}>
-              <ThemedText style={[styles.modalTitle, { color: palette.cardTitle }]}>
-                Pilih Tanggal Katering
-              </ThemedText>
-              <ThemedText style={[styles.modalSubtitle, { color: palette.dayMenuSubtext }]}>
-                Pilih satu atau beberapa hari katering Anda
-              </ThemedText>
-            </View>
-            <Pressable
-              onPress={onClose}
-              style={({ pressed }) => [
-                styles.closeButton,
-                { backgroundColor: palette.iconBoxBg },
-                pressed && styles.pressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Tutup modal"
-              hitSlop={8}
-            >
-              <ThemedText style={[styles.closeIcon, { color: palette.iconColor }]}>✕</ThemedText>
-            </Pressable>
-          </View>
+      <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlayBg }]}>
+        {/* Backdrop tap to dismiss */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-          {/* Preset Buttons for Quick Selection: +7 Hari, +30 Hari, Hapus Semua */}
-          <View style={styles.presetRow}>
-            <Pressable
-              onPress={() => handleQuickPreset(7)}
-              style={({ pressed }) => [
-                styles.presetBtn,
-                { backgroundColor: palette.buttonBg },
-                pressed && styles.pressed,
-              ]}
-            >
-              <ThemedText style={[styles.presetBtnText, { color: palette.buttonText }]}>
-                +7 Hari
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              onPress={() => handleQuickPreset(30)}
-              style={({ pressed }) => [
-                styles.presetBtn,
-                { backgroundColor: palette.buttonBg },
-                pressed && styles.pressed,
-              ]}
-            >
-              <ThemedText style={[styles.presetBtnText, { color: palette.buttonText }]}>
-                +30 Hari
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              onPress={() => setTempKeys([])}
-              style={({ pressed }) => [
-                styles.presetBtn,
-                { backgroundColor: palette.buttonBg },
-                pressed && styles.pressed,
-              ]}
-            >
-              <ThemedText style={[styles.presetBtnText, { color: palette.buttonText }]}>
-                Hapus Semua
-              </ThemedText>
-            </Pressable>
-          </View>
+        <View
+          style={[
+            styles.modalCard,
+            {
+              backgroundColor: colors.modalCardBg,
+              borderColor: colors.modalCardBorder,
+              borderWidth: isDark ? 1 : 0,
+            },
+          ]}
+        >
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            contentContainerStyle={styles.cardContent}
+          >
+            {/* 1. Month Header with Circular Navigation Buttons */}
+            <View style={styles.headerRow}>
+              <Pressable
+                onPress={handlePrevMonth}
+                style={({ pressed }) => [
+                  styles.navCircleBtn,
+                  {
+                    backgroundColor: colors.navCircleBg,
+                    borderColor: colors.navCircleBorder,
+                  },
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Bulan sebelumnya"
+              >
+                {Platform.OS === 'web' ? (
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={colors.navChevron}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                ) : (
+                  <ThemedText style={[styles.navChevron, { color: colors.navChevron }]}>
+                    ‹
+                  </ThemedText>
+                )}
+              </Pressable>
 
-          {/* Month Navigation */}
-          <View style={styles.monthNavRow}>
-            <Pressable
-              onPress={handlePrevMonth}
-              style={({ pressed }) => [
-                styles.navArrowBtn,
-                { backgroundColor: palette.buttonBg },
-                pressed && styles.pressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Bulan sebelumnya"
-            >
-              <ThemedText style={[styles.navArrowText, { color: palette.buttonText }]}>‹</ThemedText>
-            </Pressable>
-
-            <ThemedText style={[styles.monthLabel, { color: palette.cardTitle }]}>
-              {INDONESIAN_MONTH_NAMES[month]} {year}
-            </ThemedText>
-
-            <Pressable
-              onPress={handleNextMonth}
-              style={({ pressed }) => [
-                styles.navArrowBtn,
-                { backgroundColor: palette.buttonBg },
-                pressed && styles.pressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Bulan berikutnya"
-            >
-              <ThemedText style={[styles.navArrowText, { color: palette.buttonText }]}>›</ThemedText>
-            </Pressable>
-          </View>
-
-          {/* Calendar Headers (Min, Sen, ...) */}
-          <View style={styles.daysHeaderRow}>
-            {CALENDAR_HEADERS.map((h, i) => (
-              <View key={h} style={styles.dayHeaderCell}>
+              <View style={styles.headerTitleBox}>
                 <ThemedText
-                  style={[
-                    styles.dayHeaderText,
-                    { color: i === 0 ? '#EF4444' : palette.dayMenuSubtext },
-                  ]}
+                  style={[styles.headerSubtitle, { color: colors.headerSubtitle }]}
                 >
-                  {h}
+                  PILIH TANGGAL
+                </ThemedText>
+                <ThemedText
+                  style={[styles.headerMainTitle, { color: colors.headerMainTitle }]}
+                >
+                  {INDONESIAN_MONTH_NAMES[month]} {year}
                 </ThemedText>
               </View>
-            ))}
-          </View>
 
-          {/* Calendar Grid */}
-          <View style={styles.grid}>
-            {/* Empty offset slots */}
-            {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-              <View key={`empty-${i}`} style={styles.dateCell} />
-            ))}
-
-            {/* Days 1 to N */}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const dayNum = i + 1;
-              const cellDate = new Date(year, month, dayNum);
-              cellDate.setHours(0, 0, 0, 0);
-              const key = toDateKey(cellDate);
-              const isPast = cellDate < today;
-              const isSelected = tempKeys.includes(key);
-
-              return (
-                <View key={key} style={styles.dateCell}>
-                  <Pressable
-                    onPress={() => !isPast && handleToggleDate(key)}
-                    disabled={isPast}
-                    style={({ pressed }) => [
-                      styles.dateTile,
-                      {
-                        backgroundColor: isSelected
-                          ? palette.buttonActiveBg
-                          : isPast
-                          ? 'transparent'
-                          : palette.dayBodyBg,
-                        borderColor: isSelected
-                          ? palette.buttonActiveBg
-                          : palette.dashedDivider,
-                        opacity: isPast ? 0.35 : 1,
-                      },
-                      pressed && !isPast && styles.pressed,
-                    ]}
+              <Pressable
+                onPress={handleNextMonth}
+                style={({ pressed }) => [
+                  styles.navCircleBtn,
+                  {
+                    backgroundColor: colors.navCircleBg,
+                    borderColor: colors.navCircleBorder,
+                  },
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Bulan berikutnya"
+              >
+                {Platform.OS === 'web' ? (
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={colors.navChevron}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    <ThemedText
-                      style={[
-                        styles.dateNumText,
-                        {
-                          color: isSelected
-                            ? palette.buttonActiveText
-                            : isPast
-                            ? palette.dayMenuSubtext
-                            : palette.dayMenuText,
-                          fontWeight: isSelected ? '800' : '600',
-                        },
-                      ]}
-                    >
-                      {dayNum}
-                    </ThemedText>
-                  </Pressable>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* Footer & Actions */}
-          <View style={[styles.footer, { borderTopColor: palette.dashedDivider }]}>
-            <View style={styles.selectionInfo}>
-              <ThemedText style={[styles.selectionCount, { color: palette.cardTitle }]}>
-                {tempKeys.length} Hari Terpilih
-              </ThemedText>
-              <ThemedText style={[styles.selectionHint, { color: palette.dayMenuSubtext }]}>
-                {tempKeys.length === 0
-                  ? 'Pilih minimal 1 hari'
-                  : 'Siap untuk pemesanan'}
-              </ThemedText>
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                ) : (
+                  <ThemedText style={[styles.navChevron, { color: colors.navChevron }]}>
+                    ›
+                  </ThemedText>
+                )}
+              </Pressable>
             </View>
 
-            <View style={styles.footerButtons}>
+            {/* 2. Calendar Grid Card Container */}
+            <View
+              style={[
+                styles.calendarCard,
+                {
+                  backgroundColor: colors.calendarCardBg,
+                  borderColor: colors.calendarCardBorder,
+                },
+              ]}
+            >
+              {/* Weekday Row (M, S, S, R, K, J, S) */}
+              <View style={styles.weekdayRow}>
+                {WEEKDAY_HEADERS.map((h, i) => (
+                  <View key={`header-${i}`} style={styles.weekdayCell}>
+                    <ThemedText
+                      style={[styles.weekdayText, { color: colors.weekdayText }]}
+                    >
+                      {h}
+                    </ThemedText>
+                  </View>
+                ))}
+              </View>
+
+              {/* 42 Calendar Cells (6 rows x 7 columns) */}
+              <View style={styles.grid}>
+                {calendarCells.map((cell) => {
+                  const isSelected = tempKeys.includes(cell.dateKey);
+                  const isSelectable = !cell.isPast;
+
+                  return (
+                    <View key={cell.dateKey} style={styles.dateCell}>
+                      <Pressable
+                        onPress={() => isSelectable && handleToggleDate(cell.dateKey)}
+                        disabled={!isSelectable}
+                        style={({ pressed }) => [
+                          styles.dateTile,
+                          isSelected && [
+                            styles.dateTileSelected,
+                            { backgroundColor: colors.selectedTileBg },
+                          ],
+                          cell.isToday &&
+                            !isSelected && [
+                              styles.dateTileToday,
+                              {
+                                backgroundColor: colors.todayBg,
+                                borderColor: colors.todayRingBorder,
+                              },
+                            ],
+                          pressed && isSelectable && styles.pressed,
+                        ]}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.dateNumText,
+                            { color: colors.dateTextNormal },
+                            isSelected && {
+                              color: colors.selectedTileText,
+                              fontWeight: '500',
+                            },
+                            cell.isToday &&
+                              !isSelected && {
+                                color: colors.todayText,
+                                fontWeight: '500',
+                              },
+                            cell.isPast && {
+                              color: colors.dateTextPast,
+                              fontWeight: '400',
+                            },
+                            !cell.isCurrentMonth &&
+                              !isSelected &&
+                              !cell.isPast && {
+                                color: colors.dateTextOtherMonth,
+                                fontWeight: '400',
+                              },
+                          ]}
+                        >
+                          {cell.dayNum}
+                        </ThemedText>
+
+                        {/* Top-Right Amber Badge with Checkmark */}
+                        {isSelected && (
+                          <View
+                            style={[
+                              styles.checkBadge,
+                              {
+                                backgroundColor: colors.checkBadgeBg,
+                                borderColor: colors.checkBadgeBorder,
+                              },
+                            ]}
+                          >
+                            {Platform.OS === 'web' ? (
+                              <svg
+                                width="8"
+                                height="8"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke={colors.checkBadgeIcon}
+                                strokeWidth="3.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            ) : (
+                              <ThemedText
+                                style={[
+                                  styles.checkBadgeText,
+                                  { color: colors.checkBadgeIcon },
+                                ]}
+                              >
+                                ✓
+                              </ThemedText>
+                            )}
+                          </View>
+                        )}
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 3. Quick Select Section */}
+            <View style={styles.quickSelectSection}>
+              <ThemedText
+                style={[styles.quickSelectTitle, { color: colors.quickSelectTitle }]}
+              >
+                PILIHAN CEPAT
+              </ThemedText>
+
+              {/* Row with +7 hari and +30 hari */}
+              <View style={styles.quickSelectRow}>
+                <Pressable
+                  onPress={() => handleQuickPreset(7)}
+                  style={({ pressed }) => [
+                    styles.quickPillBtn,
+                    {
+                      backgroundColor: colors.quickPillBg,
+                      borderColor: colors.quickPillBorder,
+                    },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <ThemedText
+                    style={[styles.quickPillBtnText, { color: colors.quickPillText }]}
+                  >
+                    +7 hari
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => handleQuickPreset(30)}
+                  style={({ pressed }) => [
+                    styles.quickPillBtn,
+                    {
+                      backgroundColor: colors.quickPillBg,
+                      borderColor: colors.quickPillBorder,
+                    },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <ThemedText
+                    style={[styles.quickPillBtnText, { color: colors.quickPillText }]}
+                  >
+                    +30 hari
+                  </ThemedText>
+                </Pressable>
+              </View>
+
+              {/* Red Clear All Selected Dates Button */}
               <Pressable
-                onPress={onClose}
+                onPress={handleClearAll}
                 style={({ pressed }) => [
-                  styles.cancelBtn,
-                  { backgroundColor: palette.buttonBg },
+                  styles.clearBtn,
+                  { backgroundColor: colors.clearBtnBg },
                   pressed && styles.pressed,
                 ]}
               >
-                <ThemedText style={[styles.cancelBtnText, { color: palette.buttonText }]}>
-                  Batal
+                {Platform.OS === 'web' ? (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={colors.clearBtnText}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                ) : (
+                  <ThemedText
+                    style={[
+                      styles.clearBtnIconText,
+                      { color: colors.clearBtnText },
+                    ]}
+                  >
+                    ✕
+                  </ThemedText>
+                )}
+                <ThemedText
+                  style={[styles.clearBtnText, { color: colors.clearBtnText }]}
+                >
+                  Hapus semua tanggal terpilih
                 </ThemedText>
               </Pressable>
+            </View>
 
+            {/* 4. Bottom Main Action CTA Button ("Terapkan" - BOLD) */}
+            <View
+              style={[
+                styles.footerSection,
+                { borderTopColor: colors.footerDivider },
+              ]}
+            >
               <Pressable
                 onPress={handleSave}
-                disabled={tempKeys.length === 0}
+                disabled={!hasSelections}
                 style={({ pressed }) => [
-                  styles.saveBtn,
+                  styles.confirmBtn,
                   {
-                    backgroundColor:
-                      tempKeys.length > 0
-                        ? palette.buttonActiveBg
-                        : palette.checkoutBtnDisabledBg,
+                    backgroundColor: hasSelections
+                      ? colors.confirmBtnActiveBg
+                      : colors.confirmBtnDisabledBg,
                   },
-                  pressed && tempKeys.length > 0 && styles.pressed,
+                  hasSelections && pressed && styles.pressed,
                 ]}
               >
                 <ThemedText
                   style={[
-                    styles.saveBtnText,
+                    styles.confirmBtnText,
                     {
-                      color:
-                        tempKeys.length > 0
-                          ? palette.buttonActiveText
-                          : palette.checkoutBtnDisabledText,
+                      color: hasSelections
+                        ? colors.confirmBtnActiveText
+                        : colors.confirmBtnDisabledText,
                     },
                   ]}
                 >
@@ -336,7 +576,7 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
                 </ThemedText>
               </Pressable>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -346,7 +586,6 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
@@ -354,103 +593,109 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: 28,
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.25,
-        shadowRadius: 16,
+        shadowRadius: 24,
       },
       android: {
-        elevation: 8,
+        elevation: 12,
       },
       web: {
-        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.25)',
-      },
+        boxShadow: '0 20px 45px rgba(0, 0, 0, 0.35)',
+      } as any,
     }),
+  },
+  cardContent: {
+    padding: 20,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+  navCircleBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        cursor: 'pointer',
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.06)',
+      } as any,
+    }),
+  },
+  navChevron: {
+    fontSize: 22,
+    fontWeight: '400',
+    lineHeight: 24,
+  },
+  headerTitleBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  headerSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  headerMainTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     letterSpacing: -0.2,
   },
-  modalSubtitle: {
+  calendarCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingTop: 16,
+    paddingBottom: 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)',
+      } as any,
+    }),
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  weekdayCell: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekdayText: {
     fontSize: 12,
-    marginTop: 2,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-    cursor: 'pointer' as any,
-  },
-  closeIcon: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  presetRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 14,
-  },
-  presetBtn: {
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer' as any,
-  },
-  presetBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  monthNavRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  navArrowBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer' as any,
-  },
-  navArrowText: {
-    fontSize: 18,
-    fontWeight: '800',
-    lineHeight: 20,
-  },
-  monthLabel: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  daysHeaderRow: {
-    flexDirection: 'row',
-    marginBottom: 6,
-  },
-  dayHeaderCell: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  dayHeaderText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   grid: {
     flexDirection: 'row',
@@ -459,67 +704,120 @@ const styles = StyleSheet.create({
   dateCell: {
     width: `${100 / 7}%`,
     aspectRatio: 1,
-    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 2,
   },
   dateTile: {
-    flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer' as any,
+    position: 'relative',
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+      } as any,
+    }),
   },
+  dateTileToday: {
+    borderWidth: 2,
+  },
+  dateTileSelected: {},
   dateNumText: {
-    fontSize: 13,
-  },
-  footer: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  selectionInfo: {
-    flex: 1,
-  },
-  selectionCount: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '400',
   },
-  selectionHint: {
-    fontSize: 11,
-  },
-  footerButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  cancelBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+  checkBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 15,
+    height: 15,
+    borderRadius: 7.5,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer' as any,
+    zIndex: 10,
   },
-  cancelBtnText: {
+  checkBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 10,
+  },
+  quickSelectSection: {
+    marginTop: 18,
+  },
+  quickSelectTitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 1,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  quickSelectRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 10,
+  },
+  quickPillBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      web: { cursor: 'pointer' } as any,
+    }),
+  },
+  quickPillBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  clearBtn: {
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    ...Platform.select({
+      web: { cursor: 'pointer' } as any,
+    }),
+  },
+  clearBtnIconText: {
     fontSize: 13,
     fontWeight: '700',
   },
-  saveBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+  clearBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  footerSection: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+  },
+  confirmBtn: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer' as any,
+    ...Platform.select({
+      web: { cursor: 'pointer' } as any,
+    }),
   },
-  saveBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
+  confirmBtnText: {
+    fontSize: 14,
+    letterSpacing: -0.2,
+    fontWeight: '800', // Bold as requested
   },
   pressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.96 }],
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
   },
 });
