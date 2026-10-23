@@ -1,12 +1,17 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Dimensions,
+  Easing,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { useThemeContext } from '@/context/ThemeContext';
@@ -14,6 +19,8 @@ import {
   INDONESIAN_MONTH_NAMES,
   toDateKey,
 } from '@/features/order/dateUtils';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height || 750;
 
 interface MultiDateCalendarModalProps {
   visible: boolean;
@@ -74,6 +81,10 @@ const getCalendarTheme = (isDark: boolean) => ({
   clearBtnText: '#FFFFFF',
 
   footerDivider: isDark ? '#334155' : '#E2E8F0',
+  cancelBtnBg: isDark ? '#334155' : '#F1F5F9',
+  cancelBtnBorder: isDark ? '#475569' : '#CBD5E1',
+  cancelBtnText: isDark ? '#F8FAFC' : '#475569',
+
   confirmBtnDisabledBg: isDark ? '#334155' : '#F1F5F9',
   confirmBtnDisabledText: isDark ? '#64748B' : '#94A3B8',
   confirmBtnActiveBg: '#F59E0B',
@@ -86,29 +97,75 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
   onClose,
   onSaveDates,
 }) => {
+  const insets = useSafeAreaInsets();
   const { isDark } = useThemeContext();
   const colors = useMemo(() => getCalendarTheme(isDark), [isDark]);
+
+  // Bottom Sheet animation states
+  const [modalVisible, setModalVisible] = useState(visible);
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const isClosingRef = useRef(false);
 
   // Temporary selection state while modal is open
   const [tempKeys, setTempKeys] = useState<string[]>([]);
   const [currentMonthDate, setCurrentMonthDate] = useState<Date>(() => new Date());
 
-  // Synchronize initial state when modal opens
-  React.useEffect(() => {
+  // Synchronize initial state and trigger slide up/down animation
+  useEffect(() => {
     if (visible) {
+      isClosingRef.current = false;
+      setModalVisible(true);
       setTempKeys([...selectedDateKeys]);
       if (selectedDateKeys.length > 0) {
         // Center calendar on first selected date or today
         const first = new Date(selectedDateKeys[0]);
         if (!isNaN(first.getTime())) {
           setCurrentMonthDate(new Date(first.getFullYear(), first.getMonth(), 1));
-          return;
+        } else {
+          const now = new Date();
+          setCurrentMonthDate(new Date(now.getFullYear(), now.getMonth(), 1));
         }
+      } else {
+        const now = new Date();
+        setCurrentMonthDate(new Date(now.getFullYear(), now.getMonth(), 1));
       }
-      const now = new Date();
-      setCurrentMonthDate(new Date(now.getFullYear(), now.getMonth(), 1));
+
+      translateY.setValue(SCREEN_HEIGHT);
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    } else if (modalVisible && !isClosingRef.current) {
+      isClosingRef.current = true;
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }).start(() => {
+        isClosingRef.current = false;
+        setModalVisible(false);
+      });
     }
   }, [visible, selectedDateKeys]);
+
+  const handleClose = () => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start(() => {
+      isClosingRef.current = false;
+      setModalVisible(false);
+      onClose();
+    });
+  };
 
   const today = useMemo(() => {
     const t = new Date();
@@ -119,14 +176,107 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
   const year = currentMonthDate.getFullYear();
   const month = currentMonthDate.getMonth();
 
+  // Horizontal Slide / Swipe Animation states
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const isTransitioningRef = useRef(false);
+
+  const calendarOpacity = useMemo(() => {
+    return slideAnim.interpolate({
+      inputRange: [-150, 0, 150],
+      outputRange: [0.65, 1, 0.65],
+      extrapolate: 'clamp',
+    });
+  }, [slideAnim]);
+
+  // Directional month transition
+  const changeMonth = (delta: number) => {
+    if (isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
+
+    const exitTo = delta > 0 ? -120 : 120;
+    const enterFrom = delta > 0 ? 120 : -120;
+
+    Animated.timing(slideAnim, {
+      toValue: exitTo,
+      duration: 120,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start(() => {
+      setCurrentMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+      slideAnim.setValue(enterFrom);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 150,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }).start(() => {
+        isTransitioningRef.current = false;
+      });
+    });
+  };
+
   // Navigation handlers
   const handlePrevMonth = () => {
-    setCurrentMonthDate(new Date(year, month - 1, 1));
+    changeMonth(-1);
   };
 
   const handleNextMonth = () => {
-    setCurrentMonthDate(new Date(year, month + 1, 1));
+    changeMonth(1);
   };
+
+  // PanResponder to enable horizontal swipe/slide left and right across the calendar
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return (
+            Math.abs(gestureState.dx) > 10 &&
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2
+          );
+        },
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+          return (
+            Math.abs(gestureState.dx) > 10 &&
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2
+          );
+        },
+        onPanResponderGrant: () => {
+          slideAnim.stopAnimation();
+        },
+        onPanResponderMove: (_, gestureState) => {
+          slideAnim.setValue(gestureState.dx);
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const threshold = 35;
+          const velocity = gestureState.vx;
+
+          if (gestureState.dx < -threshold || velocity < -0.2) {
+            // Swiped left -> Next month
+            changeMonth(1);
+          } else if (gestureState.dx > threshold || velocity > 0.2) {
+            // Swiped right -> Previous month
+            changeMonth(-1);
+          } else {
+            // Did not cross threshold: spring back to 0
+            Animated.spring(slideAnim, {
+              toValue: 0,
+              bounciness: 4,
+              useNativeDriver: Platform.OS !== 'web',
+            }).start();
+          }
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            bounciness: 4,
+            useNativeDriver: Platform.OS !== 'web',
+          }).start();
+        },
+      }),
+    [slideAnim]
+  );
 
   // Toggle selection for a specific date
   const handleToggleDate = (key: string) => {
@@ -158,7 +308,7 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
   const handleSave = () => {
     if (tempKeys.length === 0) return;
     onSaveDates(tempKeys);
-    onClose();
+    handleClose();
   };
 
   // Generate 42 cells (6 rows x 7 days) with trailing and leading days
@@ -224,31 +374,58 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
 
   const hasSelections = tempKeys.length > 0;
 
+  if (!modalVisible && !visible) return null;
+
   return (
     <Modal
-      visible={visible}
+      visible={modalVisible}
       transparent
-      animationType="fade"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
       <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlayBg }]}>
         {/* Backdrop tap to dismiss */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={handleClose}
+          accessibilityRole="button"
+          accessibilityLabel="Tutup pemilihan tanggal"
+        />
 
-        <View
+        <Animated.View
           style={[
-            styles.modalCard,
+            styles.bottomSheetCard,
             {
               backgroundColor: colors.modalCardBg,
               borderColor: colors.modalCardBorder,
               borderWidth: isDark ? 1 : 0,
+              transform: [{ translateY }],
             },
           ]}
         >
+          {/* Drag Handle Indicator */}
+          <Pressable
+            onPress={handleClose}
+            style={styles.dragHandleContainer}
+            accessibilityRole="button"
+            accessibilityLabel="Tutup pemilihan tanggal"
+            hitSlop={8}
+          >
+            <View
+              style={[
+                styles.dragHandle,
+                { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)' },
+              ]}
+            />
+          </Pressable>
+
           <ScrollView
             showsVerticalScrollIndicator={false}
             bounces={false}
-            contentContainerStyle={styles.cardContent}
+            contentContainerStyle={[
+              styles.cardContent,
+              { paddingBottom: Math.max(insets.bottom, 24) },
+            ]}
           >
             {/* 1. Month Header with Circular Navigation Buttons */}
             <View style={styles.headerRow}>
@@ -332,16 +509,26 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
               </Pressable>
             </View>
 
-            {/* 2. Calendar Grid Card Container */}
-            <View
+            {/* 2. Swipeable Calendar Grid Card Container */}
+            <Animated.View
+              {...panResponder.panHandlers}
               style={[
-                styles.calendarCard,
+                styles.calendarSwipeWrapper,
                 {
-                  backgroundColor: colors.calendarCardBg,
-                  borderColor: colors.calendarCardBorder,
+                  transform: [{ translateX: slideAnim }],
+                  opacity: calendarOpacity,
                 },
               ]}
             >
+              <View
+                style={[
+                  styles.calendarCard,
+                  {
+                    backgroundColor: colors.calendarCardBg,
+                    borderColor: colors.calendarCardBorder,
+                  },
+                ]}
+              >
               {/* Weekday Row (M, S, S, R, K, J, S) */}
               <View style={styles.weekdayRow}>
                 {WEEKDAY_HEADERS.map((h, i) => (
@@ -453,6 +640,7 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
                 })}
               </View>
             </View>
+          </Animated.View>
 
             {/* 3. Quick Select Section */}
             <View style={styles.quickSelectSection}>
@@ -542,42 +730,71 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
               </Pressable>
             </View>
 
-            {/* 4. Bottom Main Action CTA Button ("Terapkan" - BOLD) */}
+            {/* 4. Bottom Action Buttons: Batal (1) : Terapkan (3) */}
             <View
               style={[
                 styles.footerSection,
                 { borderTopColor: colors.footerDivider },
               ]}
             >
-              <Pressable
-                onPress={handleSave}
-                disabled={!hasSelections}
-                style={({ pressed }) => [
-                  styles.confirmBtn,
-                  {
-                    backgroundColor: hasSelections
-                      ? colors.confirmBtnActiveBg
-                      : colors.confirmBtnDisabledBg,
-                  },
-                  hasSelections && pressed && styles.pressed,
-                ]}
-              >
-                <ThemedText
-                  style={[
-                    styles.confirmBtnText,
+              <View style={styles.footerRow}>
+                {/* Tombol Batal (Flex 1) */}
+                <Pressable
+                  onPress={handleClose}
+                  style={({ pressed }) => [
+                    styles.cancelBtn,
                     {
-                      color: hasSelections
-                        ? colors.confirmBtnActiveText
-                        : colors.confirmBtnDisabledText,
+                      backgroundColor: colors.cancelBtnBg,
+                      borderColor: colors.cancelBtnBorder,
                     },
+                    pressed && styles.pressed,
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Batalkan pemilihan tanggal"
                 >
-                  Terapkan
-                </ThemedText>
-              </Pressable>
+                  <ThemedText
+                    style={[
+                      styles.cancelBtnText,
+                      { color: colors.cancelBtnText },
+                    ]}
+                  >
+                    Batal
+                  </ThemedText>
+                </Pressable>
+
+                {/* Tombol Terapkan (Flex 3) */}
+                <Pressable
+                  onPress={handleSave}
+                  disabled={!hasSelections}
+                  style={({ pressed }) => [
+                    styles.confirmBtn,
+                    {
+                      backgroundColor: hasSelections
+                        ? colors.confirmBtnActiveBg
+                        : colors.confirmBtnDisabledBg,
+                    },
+                    hasSelections && pressed && styles.pressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Terapkan tanggal terpilih"
+                >
+                  <ThemedText
+                    style={[
+                      styles.confirmBtnText,
+                      {
+                        color: hasSelections
+                          ? colors.confirmBtnActiveText
+                          : colors.confirmBtnDisabledText,
+                      },
+                    ]}
+                  >
+                    Terapkan
+                  </ThemedText>
+                </Pressable>
+              </View>
             </View>
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -586,32 +803,50 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    padding: 16,
   },
-  modalCard: {
+  bottomSheetCard: {
     width: '100%',
-    maxWidth: 420,
-    borderRadius: 28,
+    maxWidth: 768,
+    maxHeight: '88%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
+        shadowOffset: { width: 0, height: -6 },
         shadowOpacity: 0.25,
-        shadowRadius: 24,
+        shadowRadius: 16,
       },
       android: {
-        elevation: 12,
+        elevation: 16,
       },
       web: {
-        boxShadow: '0 20px 45px rgba(0, 0, 0, 0.35)',
+        boxShadow: '0 -6px 35px rgba(0, 0, 0, 0.35)',
       } as any,
     }),
   },
+  dragHandleContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 12,
+    paddingBottom: 6,
+    ...Platform.select({
+      web: { cursor: 'pointer' } as any,
+    }),
+  },
+  dragHandle: {
+    width: 52,
+    height: 5,
+    borderRadius: 2.5,
+  },
   cardContent: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 8,
   },
   headerRow: {
     flexDirection: 'row',
@@ -663,6 +898,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.2,
   },
+  calendarSwipeWrapper: {
+    width: '100%',
+  },
   calendarCard: {
     borderRadius: 22,
     borderWidth: 1,
@@ -681,6 +919,10 @@ const styles = StyleSheet.create({
       },
       web: {
         boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        touchAction: 'pan-y',
+        cursor: 'grab',
       } as any,
     }),
   },
@@ -801,8 +1043,29 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     borderTopWidth: 1,
   },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      web: { cursor: 'pointer' } as any,
+    }),
+  },
+  cancelBtnText: {
+    fontSize: 14,
+    letterSpacing: -0.2,
+    fontWeight: '600',
+  },
   confirmBtn: {
-    width: '100%',
+    flex: 3,
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
