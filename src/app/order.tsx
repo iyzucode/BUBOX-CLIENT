@@ -24,6 +24,7 @@ import { MaxContentWidth } from '@/constants/theme';
 import { useGetMainCategories, useGetWeeklyMenu } from '@/features/menu/useMenu';
 import { CategoryId, CATEGORY_KEYWORDS, useOrderCart } from '@/features/order/useOrderCart';
 import { Menu } from '@/types/menu';
+import { useCartStore } from '@/store/useCartStore';
 
 export default function OrderScreen() {
   const router = useRouter();
@@ -42,6 +43,7 @@ export default function OrderScreen() {
     categoryQuantities,
     activeCategories,
     cart,
+    allMenusMap,
     grandTotal,
     totalItemsCount,
     handleSetCategoryQuantity,
@@ -65,6 +67,8 @@ export default function OrderScreen() {
     }));
   };
 
+  const setOrderData = useCartStore((s) => s.setOrderData);
+
   // Checkout submission handler
   const handleProceed = () => {
     if (orderDates.length === 0) {
@@ -83,25 +87,20 @@ export default function OrderScreen() {
       return;
     }
 
-    Alert.alert(
-      'Konfirmasi Pesanan MPASI',
-      `Jadwal Katering: ${orderDates.length} Hari\n` +
-        `Total Porsi: ${totalItemsCount} Porsi\n` +
-        `Total Pembayaran: Rp ${grandTotal.toLocaleString('id-ID')}\n\n` +
-        'Lanjutkan proses pesanan?',
-      [
-        { text: 'Periksa Kembali', style: 'cancel' },
-        {
-          text: 'Ya, Lanjutkan',
-          onPress: () => {
-            Alert.alert(
-              'Pesanan Diterima',
-              'Terima kasih! Pesanan katering MPASI Luanna Anda sedang diproses.'
-            );
-          },
-        },
-      ]
-    );
+    // Convert allMenusMap to Record<string, Menu>
+    const menusRecord: Record<string, Menu> = {};
+    allMenusMap.forEach((m, id) => {
+      menusRecord[id] = m;
+    });
+
+    setOrderData({
+      selectedDateKeys,
+      categoryQuantities,
+      cart,
+      allMenus: menusRecord,
+    });
+
+    router.push('/checkout');
   };
 
   // Helper to get available menus for a specific dayOfWeek filtered by active categories
