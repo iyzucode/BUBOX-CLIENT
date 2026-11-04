@@ -23,12 +23,15 @@ const CUSTOMER_NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Beranda', path: '/' },
   { id: 'leads', label: 'Data Leads', path: '/order' },
   { id: 'activity', label: 'Activity', path: '/explore' },
+  { id: 'orders', label: 'Pesanan Saya', path: '/orders' },
   { id: 'profile', label: 'Profile', path: '/profile' },
 ];
 
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'admin-dashboard', label: 'Ringkasan', path: '/admin' },
+  { id: 'admin-orders', label: 'Pesanan Harian', path: '/admin/orders' },
   { id: 'admin-menu', label: 'Kelola Menu', path: '/admin/menu' },
+  { id: 'admin-settings', label: 'Cutoff & Bayar', path: '/admin/settings' },
   { id: 'back-customer', label: 'Web Customer', path: '/' },
 ];
 
@@ -40,6 +43,25 @@ interface SidebarIconProps {
 
 const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => {
   if (Platform.OS === 'web') {
+    if (name === 'orders' || name === 'admin-orders') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 2h12v20l-3-2-3 2-3-2-3 2z" />
+          <line x1="9" y1="7" x2="15" y2="7" />
+          <line x1="9" y1="11" x2="15" y2="11" />
+          <line x1="9" y1="15" x2="13" y2="15" />
+        </svg>
+      );
+    }
+    if (name === 'admin-settings') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="13" r="8" />
+          <polyline points="12 9 12 13 15 15" />
+          <line x1="9" y1="2" x2="15" y2="2" />
+        </svg>
+      );
+    }
     if (name === 'home') {
       return (
         <svg
@@ -191,8 +213,11 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
     leads: '📚',
     activity: '📊',
     profile: '👤',
+    orders: '🧾',
     'admin-dashboard': '📊',
     'admin-menu': '🍲',
+    'admin-orders': '🧾',
+    'admin-settings': '⏰',
     'back-customer': '🌐',
     'go-admin': '⚙️',
   };

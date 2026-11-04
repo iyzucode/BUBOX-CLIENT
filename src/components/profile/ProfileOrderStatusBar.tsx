@@ -45,8 +45,7 @@ export const ProfileOrderStatusBar: React.FC = () => {
   ];
 
   const handleStatusPress = (statusId: string) => {
-    // Navigate to order page or history
-    router.push('/order');
+    router.push({ pathname: '/orders', params: { tab: statusId } });
   };
 
   return (

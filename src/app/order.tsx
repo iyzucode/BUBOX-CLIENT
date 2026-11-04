@@ -23,6 +23,8 @@ import { useOrderPalette } from '@/components/order/orderPalette';
 import { MaxContentWidth } from '@/constants/theme';
 import { useGetMainCategories, useGetWeeklyMenu } from '@/features/menu/useMenu';
 import { CategoryId, CATEGORY_KEYWORDS, useOrderCart } from '@/features/order/useOrderCart';
+import { useOrderCutoffInfo } from '@/features/order/useOrders';
+import { showAlert } from '@/utils/alert';
 import { Menu } from '@/types/menu';
 import { useCartStore } from '@/store/useCartStore';
 
@@ -35,6 +37,8 @@ export default function OrderScreen() {
   // 1. Fetch weekly menu and main categories from API
   const { data: weeklyData, isLoading, isError, refetch } = useGetWeeklyMenu();
   const { data: mainCategories } = useGetMainCategories();
+  // Batas tanggal kirim (cutoff H-N jam X) dari pengaturan admin di server
+  const { data: cutoffInfo } = useOrderCutoffInfo();
 
   // 2. Cart & Selection Logic (default: empty dates)
   const {
@@ -83,6 +87,17 @@ export default function OrderScreen() {
       Alert.alert(
         'Porsi Belum Dipilih',
         'Silakan pilih minimal 1 porsi menu MPASI sebelum melanjutkan pemesanan.'
+      );
+      return;
+    }
+
+    // Tanggal yang terpilih sebelum cutoff lewat (halaman dibuka lama) harus diganti dulu
+    const earliest = cutoffInfo?.earliestDeliveryDate;
+    const passed = earliest ? selectedDateKeys.filter((k) => k < earliest) : [];
+    if (passed.length > 0) {
+      showAlert(
+        'Batas Pemesanan Lewat',
+        `Tanggal ${passed.join(', ')} sudah melewati batas pemesanan (H-${cutoffInfo?.cutoffDaysBefore} pukul ${cutoffInfo?.cutoffTime}). Hapus atau ganti tanggalnya.`
       );
       return;
     }
@@ -249,6 +264,8 @@ export default function OrderScreen() {
         selectedDateKeys={selectedDateKeys}
         onClose={() => setIsCalendarOpen(false)}
         onSaveDates={handleUpdateSelectedDates}
+        minDateKey={cutoffInfo?.earliestDeliveryDate}
+        maxDateKey={cutoffInfo?.latestDeliveryDate}
       />
 
       {/* 6. MODAL: MENU DETAIL / NUTRITION INFO */}

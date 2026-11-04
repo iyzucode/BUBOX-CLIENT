@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   StyleSheet,
@@ -8,27 +9,21 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { useCartStore } from '@/store/useCartStore';
+import { useCheckoutTotals } from '@/features/order/useCheckoutTotals';
 import { useCheckoutPalette } from './checkoutPalette';
 
 interface CheckoutStickyFooterProps {
-  onPayPress?: () => void;
+  onPayPress: () => void;
+  isSubmitting?: boolean;
 }
 
 export const CheckoutStickyFooter: React.FC<CheckoutStickyFooterProps> = ({
   onPayPress,
+  isSubmitting = false,
 }) => {
   const insets = useSafeAreaInsets();
   const palette = useCheckoutPalette();
-
-  const grandTotal = useCartStore((s) => s.getGrandTotal());
-
-  const handlePress = () => {
-    if (onPayPress) {
-      onPayPress();
-    }
-    // Kept inert for this UI phase per user requirement
-  };
+  const { grandTotal } = useCheckoutTotals();
 
   return (
     <View
@@ -52,20 +47,27 @@ export const CheckoutStickyFooter: React.FC<CheckoutStickyFooterProps> = ({
           </ThemedText>
         </View>
 
-        {/* Right: Bayar Button (Inert for now) */}
+        {/* Right: Bayar via QRIS */}
         <Pressable
-          onPress={handlePress}
+          onPress={onPayPress}
+          disabled={isSubmitting}
           style={({ pressed }) => [
             styles.payBtn,
             {
               backgroundColor: palette.payBtnBg,
-              opacity: pressed ? 0.8 : 1,
+              opacity: isSubmitting ? 0.6 : pressed ? 0.8 : 1,
             },
           ]}
+          accessibilityRole="button"
+          accessibilityLabel="Bayar dengan QRIS"
         >
-          <ThemedText style={[styles.payBtnText, { color: palette.payBtnText }]}>
-            Bayar
-          </ThemedText>
+          {isSubmitting ? (
+            <ActivityIndicator size="small" color={palette.payBtnText} />
+          ) : (
+            <ThemedText style={[styles.payBtnText, { color: palette.payBtnText }]}>
+              Bayar QRIS
+            </ThemedText>
+          )}
         </Pressable>
       </View>
     </View>
@@ -115,7 +117,8 @@ const styles = StyleSheet.create({
   },
   payBtn: {
     height: 44,
-    paddingHorizontal: 36,
+    minWidth: 140,
+    paddingHorizontal: 28,
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',

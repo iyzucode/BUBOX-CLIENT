@@ -146,6 +146,42 @@ export default function AdminDashboardScreen() {
               </Pressable>
 
               <Pressable
+                onPress={() => router.push('/admin/orders')}
+                style={({ pressed }) => [
+                  styles.actionCard,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: theme.primaryLight || '#FFF0E8' }]}>
+                  <ThemedText style={{ fontSize: 24 }}>🧾</ThemedText>
+                </View>
+                <View style={styles.actionInfo}>
+                  <ThemedText style={[styles.actionTitle, { color: theme.secondary }]}>Pesanan Harian</ThemedText>
+                  <ThemedText style={styles.actionDesc}>Rekap dapur, update status masak & antar, force majeure.</ThemedText>
+                </View>
+                <ThemedText style={[styles.actionArrow, { color: theme.primary }]}>➔</ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/admin/settings')}
+                style={({ pressed }) => [
+                  styles.actionCard,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: '#F1F5F9' }]}>
+                  <ThemedText style={{ fontSize: 24 }}>⏰</ThemedText>
+                </View>
+                <View style={styles.actionInfo}>
+                  <ThemedText style={[styles.actionTitle, { color: theme.secondary }]}>Cutoff & Pembayaran</ThemedText>
+                  <ThemedText style={styles.actionDesc}>Jam batas pesan (H-N), batas waktu bayar QRIS, ongkir.</ThemedText>
+                </View>
+                <ThemedText style={[styles.actionArrow, { color: '#64748B' }]}>➔</ThemedText>
+              </Pressable>
+
+              <Pressable
                 onPress={() => router.push('/')}
                 style={({ pressed }) => [
                   styles.actionCard,

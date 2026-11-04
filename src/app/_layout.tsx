@@ -38,10 +38,15 @@ function RootLayoutContent() {
             <Stack.Screen name="addresses" />
             <Stack.Screen name="address-form" />
             <Stack.Screen name="explore" />
+            <Stack.Screen name="payment" />
+            <Stack.Screen name="orders" />
+            <Stack.Screen name="order-detail" />
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="admin/index" />
             <Stack.Screen name="admin/menu" />
             <Stack.Screen name="admin/menu-form" />
+            <Stack.Screen name="admin/orders" />
+            <Stack.Screen name="admin/settings" />
           </Stack>
         </View>
       </View>

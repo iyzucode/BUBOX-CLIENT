@@ -11,22 +11,70 @@ import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { CheckoutHeader } from '@/components/checkout/CheckoutHeader';
 import { CheckoutStickyFooter } from '@/components/checkout/CheckoutStickyFooter';
-import { CouponCard } from '@/components/checkout/CouponCard';
 import { FulfillmentMethodCard } from '@/components/checkout/FulfillmentMethodCard';
 import { OrderItemsSummaryCard } from '@/components/checkout/OrderItemsSummaryCard';
 import { PaymentDetailCard } from '@/components/checkout/PaymentDetailCard';
 import { useCheckoutPalette } from '@/components/checkout/checkoutPalette';
+import { useCreateOrder } from '@/features/order/useOrders';
+import { getApiErrorMessage } from '@/services/apiError';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useCartStore } from '@/store/useCartStore';
+import { showAlert } from '@/utils/alert';
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const palette = useCheckoutPalette();
 
+  const token = useAuthStore((s) => s.token);
   const selectedDateKeys = useCartStore((s) => s.selectedDateKeys);
   const getTotalItemsCount = useCartStore((s) => s.getTotalItemsCount);
   const totalItemsCount = getTotalItemsCount();
+  const fulfillmentType = useCartStore((s) => s.fulfillmentType);
+  const selectedAddressId = useCartStore((s) => s.selectedAddressId);
+  const notes = useCartStore((s) => s.notes);
+  const buildOrderDays = useCartStore((s) => s.buildOrderDays);
+  const clearCart = useCartStore((s) => s.clearCart);
+
+  const createOrder = useCreateOrder();
 
   const isCartEmpty = selectedDateKeys.length === 0 || totalItemsCount === 0;
+
+  const handlePay = () => {
+    if (!token) {
+      showAlert('Masuk Dulu', 'Silakan masuk ke akun Anda untuk melanjutkan pembayaran.');
+      router.push('/login');
+      return;
+    }
+
+    if (fulfillmentType === 'DELIVERY' && !selectedAddressId) {
+      showAlert('Alamat Belum Dipilih', 'Tambahkan atau pilih alamat pengantaran terlebih dahulu.');
+      return;
+    }
+
+    const days = buildOrderDays();
+    if (days.length === 0) {
+      showAlert('Keranjang Kosong', 'Belum ada menu yang dipilih.');
+      return;
+    }
+
+    createOrder.mutate(
+      {
+        fulfillmentType,
+        addressId: fulfillmentType === 'DELIVERY' ? selectedAddressId : null,
+        notes: notes.trim() || null,
+        days,
+      },
+      {
+        onSuccess: (order) => {
+          clearCart();
+          router.replace({ pathname: '/payment', params: { id: order.orderId } });
+        },
+        onError: (error) => {
+          showAlert('Pesanan Gagal Dibuat', getApiErrorMessage(error, 'Terjadi kesalahan saat membuat pesanan.'));
+        },
+      }
+    );
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: palette.pageBg }]}>
@@ -72,19 +120,16 @@ export default function CheckoutScreen() {
               {/* Card 2: Pesananmu Summary (Berdasarkan: Hari / Kategori) */}
               <OrderItemsSummaryCard />
 
-              {/* Card 3: Kupon / Voucher Promo */}
-              <CouponCard />
-
-              {/* Card 4: Detail Pembayaran Breakdown */}
+              {/* Card 3: Detail Pembayaran Breakdown (kupon di-hold untuk v1) */}
               <PaymentDetailCard />
             </>
           )}
         </View>
       </ScrollView>
 
-      {/* 3. Sticky Bottom Footer (Inert Bayar button) */}
+      {/* 3. Sticky Bottom Footer: Bayar QRIS */}
       {!isCartEmpty ? (
-        <CheckoutStickyFooter />
+        <CheckoutStickyFooter onPayPress={handlePay} isSubmitting={createOrder.isPending} />
       ) : null}
     </View>
   );

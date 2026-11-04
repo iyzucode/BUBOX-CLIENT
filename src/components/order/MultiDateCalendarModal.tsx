@@ -17,6 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useThemeContext } from '@/context/ThemeContext';
 import {
   INDONESIAN_MONTH_NAMES,
+  parseDateKey,
   toDateKey,
 } from '@/features/order/dateUtils';
 
@@ -27,6 +28,10 @@ interface MultiDateCalendarModalProps {
   selectedDateKeys: string[];
   onClose: () => void;
   onSaveDates: (newKeys: string[]) => void;
+  /** Tanggal kirim paling awal yang boleh dipilih (dari cutoff server), format yyyy-MM-dd. */
+  minDateKey?: string;
+  /** Tanggal kirim paling akhir yang boleh dipilih, format yyyy-MM-dd. */
+  maxDateKey?: string;
 }
 
 const WEEKDAY_HEADERS = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
@@ -96,6 +101,8 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
   selectedDateKeys,
   onClose,
   onSaveDates,
+  minDateKey,
+  maxDateKey,
 }) => {
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeContext();
@@ -172,6 +179,14 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
     t.setHours(0, 0, 0, 0);
     return t;
   }, []);
+
+  // Batas pilih tanggal dari cutoff server; tanpa info server, minimal hari ini
+  const minDate = useMemo(() => {
+    const fromServer = minDateKey ? parseDateKey(minDateKey) : null;
+    return fromServer && fromServer.getTime() > today.getTime() ? fromServer : today;
+  }, [minDateKey, today]);
+
+  const maxDate = useMemo(() => (maxDateKey ? parseDateKey(maxDateKey) : null), [maxDateKey]);
 
   const year = currentMonthDate.getFullYear();
   const month = currentMonthDate.getMonth();
@@ -289,11 +304,12 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
 
   // Quick Preset (+7 hari / +30 hari)
   const handleQuickPreset = (count: number) => {
-    const start = new Date(today);
+    const start = new Date(minDate);
     const newKeys: string[] = [];
     for (let i = 0; i < count; i++) {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
+      if (maxDate && d.getTime() > maxDate.getTime()) break;
       newKeys.push(toDateKey(d));
     }
     setTempKeys(newKeys.sort());
@@ -324,7 +340,7 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
       const dayNum = daysInPrevMonth - i;
       const cellDate = new Date(year, month - 1, dayNum);
       cellDate.setHours(0, 0, 0, 0);
-      const isPast = cellDate.getTime() < today.getTime();
+      const isPast = cellDate.getTime() < minDate.getTime() || (maxDate !== null && cellDate.getTime() > maxDate.getTime());
       const isToday = cellDate.getTime() === today.getTime();
       cells.push({
         date: cellDate,
@@ -340,7 +356,7 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
     for (let dayNum = 1; dayNum <= daysInCurrentMonth; dayNum++) {
       const cellDate = new Date(year, month, dayNum);
       cellDate.setHours(0, 0, 0, 0);
-      const isPast = cellDate.getTime() < today.getTime();
+      const isPast = cellDate.getTime() < minDate.getTime() || (maxDate !== null && cellDate.getTime() > maxDate.getTime());
       const isToday = cellDate.getTime() === today.getTime();
       cells.push({
         date: cellDate,
@@ -357,7 +373,7 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
     for (let dayNum = 1; dayNum <= remainingCells; dayNum++) {
       const cellDate = new Date(year, month + 1, dayNum);
       cellDate.setHours(0, 0, 0, 0);
-      const isPast = cellDate.getTime() < today.getTime();
+      const isPast = cellDate.getTime() < minDate.getTime() || (maxDate !== null && cellDate.getTime() > maxDate.getTime());
       const isToday = cellDate.getTime() === today.getTime();
       cells.push({
         date: cellDate,
@@ -370,7 +386,7 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
     }
 
     return cells;
-  }, [year, month, today]);
+  }, [year, month, today, minDate, maxDate]);
 
   const hasSelections = tempKeys.length > 0;
 

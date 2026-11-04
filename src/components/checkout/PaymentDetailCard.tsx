@@ -6,18 +6,12 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { useCartStore } from '@/store/useCartStore';
+import { useCheckoutTotals } from '@/features/order/useCheckoutTotals';
 import { useCheckoutPalette } from './checkoutPalette';
 
 export const PaymentDetailCard: React.FC = () => {
   const palette = useCheckoutPalette();
-
-  const fulfillmentType = useCartStore((s) => s.fulfillmentType);
-  const appliedCoupon = useCartStore((s) => s.appliedCoupon);
-  const subtotal = useCartStore((s) => s.getSubtotal());
-  const deliveryFee = useCartStore((s) => s.getDeliveryFee());
-  const discount = useCartStore((s) => s.getDiscountAmount());
-  const grandTotal = useCartStore((s) => s.getGrandTotal());
+  const { subtotal, deliveryFee, grandTotal } = useCheckoutTotals();
 
   return (
     <View style={[styles.card, { backgroundColor: palette.cardBg }]}>
@@ -42,25 +36,19 @@ export const PaymentDetailCard: React.FC = () => {
           Biaya Pengantaran
         </ThemedText>
         <ThemedText style={[styles.value, { color: palette.financeValue }]}>
-          {deliveryFee === 0
-            ? fulfillmentType === 'PICKUP'
-              ? 'Gratis'
-              : 'Gratis'
-            : `Rp ${deliveryFee.toLocaleString('id-ID')}`}
+          {deliveryFee === 0 ? 'Gratis' : `Rp ${deliveryFee.toLocaleString('id-ID')}`}
         </ThemedText>
       </View>
 
-      {/* 4. Diskon Kupon (if applied) */}
-      {appliedCoupon && discount > 0 ? (
-        <View style={styles.detailRow}>
-          <ThemedText style={[styles.label, { color: palette.financeLabel }]}>
-            Diskon Kupon ({appliedCoupon.code})
-          </ThemedText>
-          <ThemedText style={[styles.value, styles.discountValue]}>
-            -Rp {discount.toLocaleString('id-ID')}
-          </ThemedText>
-        </View>
-      ) : null}
+      {/* 4. Metode Pembayaran */}
+      <View style={styles.detailRow}>
+        <ThemedText style={[styles.label, { color: palette.financeLabel }]}>
+          Metode Pembayaran
+        </ThemedText>
+        <ThemedText style={[styles.value, { color: palette.financeValue }]}>
+          QRIS
+        </ThemedText>
+      </View>
 
       {/* 5. Divider */}
       <View style={[styles.divider, { backgroundColor: palette.dividerColor }]} />
@@ -116,9 +104,6 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 13,
     fontWeight: '500',
-  },
-  discountValue: {
-    color: '#10B981',
   },
   divider: {
     height: 1,
