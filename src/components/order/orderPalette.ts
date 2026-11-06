@@ -52,6 +52,8 @@ export interface OrderPalette {
   // Sticky checkout footer
   checkoutBarBg: string;
   checkoutBarBorder: string;
+  checkoutGlassBg: string;
+  checkoutGlassBorder: string;
   checkoutSubtext: string;
   checkoutTotalText: string;
   checkoutBtnBg: string;
@@ -104,6 +106,8 @@ export const OrderPalettes: { light: OrderPalette; dark: OrderPalette } = {
 
     checkoutBarBg: '#FFFFFF',
     checkoutBarBorder: '#E5E7EB',
+    checkoutGlassBg: 'rgba(255, 255, 255, 0.72)',
+    checkoutGlassBorder: 'rgba(15, 23, 42, 0.08)',
     checkoutSubtext: '#64748B',
     checkoutTotalText: '#111827',
     checkoutBtnBg: '#F97316',
@@ -154,6 +158,8 @@ export const OrderPalettes: { light: OrderPalette; dark: OrderPalette } = {
 
     checkoutBarBg: '#111722',
     checkoutBarBorder: 'rgba(255, 255, 255, 0.08)',
+    checkoutGlassBg: 'rgba(17, 23, 34, 0.72)',
+    checkoutGlassBorder: 'rgba(255, 255, 255, 0.12)',
     checkoutSubtext: '#94A3B8',
     checkoutTotalText: '#F8FAFC',
     checkoutBtnBg: '#F97316',

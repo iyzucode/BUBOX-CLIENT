@@ -18,6 +18,7 @@ import { PaymentMethodCard } from '@/components/checkout/PaymentMethodCard';
 import { PromoCodeCard } from '@/components/checkout/PromoCodeCard';
 import { useCheckoutPalette } from '@/components/checkout/checkoutPalette';
 import { useCreateOrder } from '@/features/order/useOrders';
+import { useScrollActivity } from '@/hooks/use-scroll-activity';
 import { getApiErrorMessage } from '@/services/apiError';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCartStore } from '@/store/useCartStore';
@@ -38,6 +39,7 @@ export default function CheckoutScreen() {
   const clearCart = useCartStore((s) => s.clearCart);
 
   const createOrder = useCreateOrder();
+  const { isScrolling, onScroll } = useScrollActivity();
 
   const isCartEmpty = selectedDateKeys.length === 0 || totalItemsCount === 0;
 
@@ -88,6 +90,8 @@ export default function CheckoutScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
         <View style={styles.mainContainer}>
           {isCartEmpty ? (
@@ -137,7 +141,11 @@ export default function CheckoutScreen() {
 
       {/* 3. Sticky Bottom Footer: Bayar QRIS */}
       {!isCartEmpty ? (
-        <CheckoutStickyFooter onPayPress={handlePay} isSubmitting={createOrder.isPending} />
+        <CheckoutStickyFooter
+          onPayPress={handlePay}
+          isSubmitting={createOrder.isPending}
+          compact={isScrolling}
+        />
       ) : null}
     </View>
   );

@@ -52,6 +52,8 @@ export interface CheckoutPalette {
   // Sticky bottom footer
   footerBg: string;
   footerBorder: string;
+  footerGlassBg: string;
+  footerGlassBorder: string;
   footerTotalLabel: string;
   footerTotalAmount: string;
   payBtnBg: string;
@@ -111,6 +113,8 @@ export const CheckoutPalettes: { light: CheckoutPalette; dark: CheckoutPalette }
     // Sticky bottom
     footerBg: '#D8D8D8',
     footerBorder: '#BDBDBD',
+    footerGlassBg: 'rgba(255, 255, 255, 0.72)',
+    footerGlassBorder: 'rgba(15, 23, 42, 0.08)',
     footerTotalLabel: '#616161',
     footerTotalAmount: '#111827',
     payBtnBg: '#9E9E9E',
@@ -168,6 +172,8 @@ export const CheckoutPalettes: { light: CheckoutPalette; dark: CheckoutPalette }
     // Sticky bottom
     footerBg: '#1E293B',
     footerBorder: '#334155',
+    footerGlassBg: 'rgba(30, 41, 59, 0.72)',
+    footerGlassBorder: 'rgba(255, 255, 255, 0.12)',
     footerTotalLabel: '#94A3B8',
     footerTotalAmount: '#F8FAFC',
     payBtnBg: '#334155',

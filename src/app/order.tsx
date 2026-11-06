@@ -17,6 +17,7 @@ import { MenuDetailModal } from '@/components/order/MenuDetailModal';
 import { MultiDateCalendarModal } from '@/components/order/MultiDateCalendarModal';
 import { OrderCategoryCard } from '@/components/order/OrderCategoryCard';
 import { OrderCheckoutBar } from '@/components/order/OrderCheckoutBar';
+import { useScrollActivity } from '@/hooks/use-scroll-activity';
 import { OrderDateCard } from '@/components/order/OrderDateCard';
 import { OrderHeroHeader } from '@/components/order/OrderHeroHeader';
 import { useOrderPalette } from '@/components/order/orderPalette';
@@ -32,6 +33,7 @@ export default function OrderScreen() {
   const router = useRouter();
   const palette = useOrderPalette();
   const insets = useSafeAreaInsets();
+  const { isScrolling, onScroll } = useScrollActivity();
   const stickyTop = insets.top > 0 ? insets.top : 0;
 
   // 1. Fetch weekly menu and main categories from API
@@ -171,6 +173,8 @@ export default function OrderScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
         {/* 1. HERO HEADER IMAGE (~200px) WITH CLOSE 'X' & 'PESAN MENU LUANNA' */}
         <OrderHeroHeader />
@@ -256,6 +260,7 @@ export default function OrderScreen() {
         activeDaysCount={orderDates.length}
         grandTotal={grandTotal}
         onProceed={handleProceed}
+        compact={isScrolling}
       />
 
       {/* 5. MODAL: MULTI-DATE CALENDAR */}
