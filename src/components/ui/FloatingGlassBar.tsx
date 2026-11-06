@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Platform, StyleSheet, View } from 'react-native';
+import { Animated, Platform, StyleSheet } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -33,6 +33,8 @@ interface FloatingGlassBarProps {
   lerp: Lerp;
   backgroundColor: string;
   borderColor: string;
+  /** false: bar turun keluar layar dan tidak bisa disentuh. Default true. */
+  visible?: boolean;
   children: React.ReactNode;
 }
 
@@ -44,12 +46,35 @@ export const FloatingGlassBar: React.FC<FloatingGlassBarProps> = ({
   lerp,
   backgroundColor,
   borderColor,
+  visible = true,
   children,
 }) => {
   const insets = useSafeAreaInsets();
 
+  // 0 = tampil, 1 = tersembunyi (geser ke bawah + transparan)
+  const [hidden] = useState(() => new Animated.Value(visible ? 0 : 1));
+  useEffect(() => {
+    Animated.spring(hidden, {
+      toValue: visible ? 0 : 1,
+      useNativeDriver: false,
+      speed: 14,
+      bounciness: visible ? 6 : 0,
+    }).start();
+  }, [visible, hidden]);
+
   return (
-    <View pointerEvents="box-none" style={[styles.wrapper, { bottom: Math.max(insets.bottom, 12) }]}>
+    <Animated.View
+      pointerEvents={visible ? 'box-none' : 'none'}
+      aria-hidden={!visible}
+      style={[
+        styles.wrapper,
+        {
+          bottom: Math.max(insets.bottom, 12),
+          opacity: hidden.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+          transform: [{ translateY: hidden.interpolate({ inputRange: [0, 1], outputRange: [0, 120] }) }],
+        },
+      ]}
+    >
       <Animated.View
         style={[
           styles.bar,
@@ -67,7 +92,7 @@ export const FloatingGlassBar: React.FC<FloatingGlassBarProps> = ({
         {useNativeGlass ? <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} /> : null}
         {children}
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 };
 

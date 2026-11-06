@@ -703,47 +703,42 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
                     +30 hari
                   </ThemedText>
                 </Pressable>
-              </View>
 
-              {/* Red Clear All Selected Dates Button */}
-              <Pressable
-                onPress={handleClearAll}
-                style={({ pressed }) => [
-                  styles.clearBtn,
-                  { backgroundColor: colors.clearBtnBg },
-                  pressed && styles.pressed,
-                ]}
-              >
-                {Platform.OS === 'web' ? (
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={colors.clearBtnText}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                ) : (
-                  <ThemedText
-                    style={[
-                      styles.clearBtnIconText,
-                      { color: colors.clearBtnText },
-                    ]}
-                  >
-                    ✕
-                  </ThemedText>
-                )}
-                <ThemedText
-                  style={[styles.clearBtnText, { color: colors.clearBtnText }]}
+                {/* Hapus semua tanggal terpilih (ikon tong sampah) */}
+                <Pressable
+                  onPress={handleClearAll}
+                  accessibilityRole="button"
+                  accessibilityLabel="Hapus semua tanggal terpilih"
+                  style={({ pressed }) => [
+                    styles.clearBtn,
+                    { backgroundColor: colors.clearBtnBg },
+                    pressed && styles.pressed,
+                  ]}
                 >
-                  Hapus semua tanggal terpilih
-                </ThemedText>
-              </Pressable>
+                  {Platform.OS === 'web' ? (
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={colors.clearBtnText}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
+                      <path d="M5.5 6l1 13.5A1.5 1.5 0 0 0 8 21h8a1.5 1.5 0 0 0 1.5-1.5L18.5 6" />
+                      <path d="M10 10.5v6M14 10.5v6" />
+                    </svg>
+                  ) : (
+                    <ThemedText style={[styles.clearBtnIconText, { color: colors.clearBtnText }]}>
+                      🗑
+                    </ThemedText>
+                  )}
+                </Pressable>
+              </View>
             </View>
 
             {/* 4. Bottom Action Buttons: Batal (1) : Terapkan (3) */}
@@ -1016,8 +1011,7 @@ const styles = StyleSheet.create({
   },
   quickSelectRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 10,
+    gap: 10,
   },
   quickPillBtn: {
     flex: 1,
@@ -1035,24 +1029,17 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   clearBtn: {
-    width: '100%',
-    paddingVertical: 12,
+    width: 52,
     borderRadius: 14,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     ...Platform.select({
       web: { cursor: 'pointer' } as any,
     }),
   },
   clearBtnIconText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  clearBtnText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 18,
+    lineHeight: 22,
   },
   footerSection: {
     marginTop: 18,

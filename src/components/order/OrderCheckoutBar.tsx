@@ -55,6 +55,7 @@ export const OrderCheckoutBar: React.FC<OrderCheckoutBarProps> = ({
       lerp={lerp}
       backgroundColor={palette.checkoutGlassBg}
       borderColor={palette.checkoutGlassBorder}
+      visible={isEnabled}
     >
       {/* Kiri: total & ringkasan */}
       <View style={styles.leftCol}>
