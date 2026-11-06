@@ -1,40 +1,60 @@
 import '@/global.css';
 import { DimensionValue, Platform } from 'react-native';
 
+/**
+ * Palet brand BUBOX
+ *   Brand Orange  #EE4D2D  aksi utama (tombol, pilihan aktif)
+ *   Brand Red     #D0011B  hover/pressed, aksen, harga & peringatan
+ *   Brand Navy    #113366  teks utama, header, elemen sekunder
+ * Light mode memakai turunan terang dari ketiganya; dark mode berbasis hitam/abu netral
+ * dengan oranye sebagai satu-satunya warna aksen.
+ */
+export const Brand = {
+  orange: '#EE4D2D',
+  red: '#D0011B',
+  navy: '#113366',
+} as const;
+
 export const Colors = {
   light: {
-    text: '#1E293B',
-    textSecondary: '#64748B',
-    background: '#F8F9FA',
-    backgroundElement: '#F1F5F9',
-    backgroundSelected: '#FFF0E8',
-    primary: '#F36F21',
-    primaryHover: '#D95305',
-    primaryLight: '#FFF0E8',
-    secondary: '#005B64',
-    secondaryHover: '#004850',
-    border: '#E5E7EB',
+    text: Brand.navy,
+    textSecondary: '#5A6B86',
+    background: '#FFF7F5',
+    backgroundElement: '#FDEEEA',
+    backgroundSelected: '#FDE3DC',
+    primary: Brand.orange,
+    primaryHover: Brand.red,
+    primaryLight: '#FDE8E3',
+    onPrimary: '#FFFFFF',
+    secondary: Brand.navy,
+    secondaryHover: '#0B2447',
+    secondaryLight: '#E7ECF5',
+    accent: Brand.red,
+    border: '#F2DCD5',
     card: '#FFFFFF',
-    success: '#10B981',
+    success: '#16A34A',
     warning: '#F59E0B',
-    danger: '#EF4444',
+    danger: Brand.red,
   },
   dark: {
-    text: '#F8FAFC',
-    textSecondary: '#94A3B8',
-    background: '#0B0F17',
-    backgroundElement: '#141A23',
-    backgroundSelected: '#2A1F18',
-    primary: '#F36F21',
-    primaryHover: '#FA823D',
-    primaryLight: '#3D2214',
-    secondary: '#007A87',
-    secondaryHover: '#0097A7',
-    border: '#ffffff15',
-    card: '#111722',
-    success: '#10B981',
+    text: '#F4F4F5',
+    textSecondary: '#A1A1AA',
+    background: '#0A0A0A',
+    backgroundElement: '#18181B',
+    backgroundSelected: '#2A1712',
+    primary: Brand.orange,
+    primaryHover: '#FF6B4D',
+    primaryLight: '#2E1610',
+    onPrimary: '#FFFFFF',
+    secondary: '#A1B4D9',
+    secondaryHover: '#C3D0EA',
+    secondaryLight: '#232326',
+    accent: '#FF5A6A',
+    border: '#FFFFFF14',
+    card: '#141416',
+    success: '#22C55E',
     warning: '#F59E0B',
-    danger: '#EF4444',
+    danger: '#FF5A6A',
   },
 } as const;
 

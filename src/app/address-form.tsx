@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useCustomerLayout } from '@/hooks/use-customer-layout';
+import { Brand } from '@/constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -220,14 +221,14 @@ export default function AddressFormScreen() {
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   // Theming colors according to user design
-  const headerBg = isDark ? '#1E2229' : '#555A63';
-  const sheetBg = isDark ? '#262A32' : '#D9D9D9';
-  const pillBg = isDark ? '#374151' : '#B8B8B8';
-  const textPrimary = isDark ? '#F9FAFB' : '#111827';
-  const placeholderColor = isDark ? '#9CA3AF' : '#6B7280';
-  const labelColor = isDark ? '#D1D5DB' : '#6B7280';
-  const dividerColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#BFBFBF';
-  const submitBtnBg = isDark ? '#4B5563' : '#666666';
+  const headerBg = isDark ? '#141416' : Brand.navy;
+  const sheetBg = isDark ? '#18181B' : '#FFF7F5';
+  const pillBg = isDark ? '#232326' : '#FDEEEA';
+  const textPrimary = isDark ? '#F4F4F5' : Brand.navy;
+  const placeholderColor = isDark ? '#71717A' : '#8A96AC';
+  const labelColor = isDark ? '#A1A1AA' : '#5A6B86';
+  const dividerColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#F2DCD5';
+  const submitBtnBg = Brand.orange;
 
   if (isEditMode && isLoadingDetail) {
     return (
@@ -274,7 +275,7 @@ export default function AddressFormScreen() {
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               ) : (
-                <ThemedText style={{ fontSize: 16, color: '#111827', fontWeight: 'bold' }}>
+                <ThemedText style={{ fontSize: 16, color: Brand.navy, fontWeight: 'bold' }}>
                   ❮
                 </ThemedText>
               )}
@@ -657,7 +658,7 @@ export default function AddressFormScreen() {
                     <Switch
                       value={isPrimary}
                       onValueChange={setIsPrimary}
-                      trackColor={{ false: '#9E9E9E', true: '#4B5563' }}
+                      trackColor={{ false: isDark ? '#3F3F46' : '#CBD5E1', true: Brand.orange }}
                       thumbColor="#FFFFFF"
                     />
                   </View>

@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { CUSTOMER_MAX_WIDTH, useCustomerLayout } from '@/hooks/use-customer-layout';
+import { Brand } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -104,7 +105,7 @@ export const ProfileBottomSheetModal: React.FC<ProfileBottomSheetModalProps> = (
       : '@noname';
 
   // Card background: Solid sleek slate gray matching reference image
-  const sheetBg = palette.isDark ? '#2D3748' : '#6B7280';
+  const sheetBg = palette.isDark ? '#18181B' : Brand.navy;
 
   return (
     <Modal

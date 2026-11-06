@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { Brand } from '@/constants/theme';
 import { MaxContentWidth } from '@/constants/theme';
 import { useOrderPalette } from './orderPalette';
 
@@ -96,7 +97,7 @@ const styles = StyleSheet.create({
     height: 220,
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#1E293B',
+    backgroundColor: Brand.navy,
   },
   heroImage: {
     width: '100%',

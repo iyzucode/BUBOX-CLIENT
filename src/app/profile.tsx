@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useCustomerLayout } from '@/hooks/use-customer-layout';
+import { Brand } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
@@ -292,7 +293,7 @@ const styles = StyleSheet.create({
     }),
   },
   guestLoginBtn: {
-    backgroundColor: '#F36F21',
+    backgroundColor: Brand.orange,
   },
   guestLoginText: {
     color: '#FFFFFF',
@@ -347,7 +348,7 @@ const styles = StyleSheet.create({
   dialogOkBtn: {
     marginTop: 6,
     alignSelf: 'flex-end',
-    backgroundColor: '#F36F21',
+    backgroundColor: Brand.orange,
     paddingVertical: 8,
     paddingHorizontal: 18,
     borderRadius: 10,

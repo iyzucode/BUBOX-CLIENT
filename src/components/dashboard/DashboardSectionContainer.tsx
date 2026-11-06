@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Brand } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 interface DashboardSectionContainerProps {
@@ -98,13 +99,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Brand.navy,
     letterSpacing: -0.4,
   },
   lastUpdateText: {
     fontSize: 11,
     fontStyle: 'italic',
-    color: '#64748B',
+    color: '#5A6B86',
   },
   containerCard: {
     width: '100%',
@@ -143,11 +144,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#334155',
+    color: Brand.navy,
   },
   emptySubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: '#5A6B86',
     textAlign: 'center',
     maxWidth: 380,
     lineHeight: 18,

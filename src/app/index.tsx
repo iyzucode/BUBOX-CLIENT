@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useCustomerLayout } from '@/hooks/use-customer-layout';
+import { Brand } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -194,7 +195,7 @@ export default function HomeScreen() {
           <View
             style={[
               styles.blueprintCardLarge,
-              { backgroundColor: isDark ? '#374151' : '#D1D5DB' },
+              { backgroundColor: isDark ? '#232326' : '#FDE8E3' },
             ]}
           />
         </View>
@@ -208,19 +209,19 @@ export default function HomeScreen() {
             <View
               style={[
                 styles.blueprintCardColumn,
-                { backgroundColor: isDark ? '#374151' : '#D1D5DB' },
+                { backgroundColor: isDark ? '#232326' : '#FDE8E3' },
               ]}
             />
             <View
               style={[
                 styles.blueprintCardColumn,
-                { backgroundColor: isDark ? '#374151' : '#D1D5DB' },
+                { backgroundColor: isDark ? '#232326' : '#FDE8E3' },
               ]}
             />
             <View
               style={[
                 styles.blueprintCardColumn,
-                { backgroundColor: isDark ? '#374151' : '#D1D5DB' },
+                { backgroundColor: isDark ? '#232326' : '#FDE8E3' },
               ]}
             />
           </View>
@@ -234,7 +235,7 @@ export default function HomeScreen() {
           <View
             style={[
               styles.blueprintCardLarge,
-              { backgroundColor: isDark ? '#374151' : '#D1D5DB' },
+              { backgroundColor: isDark ? '#232326' : '#FDE8E3' },
             ]}
           />
         </View>
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderBottomLeftRadius: 36,
     borderBottomRightRadius: 36,
-    backgroundColor: '#0F172A',
+    backgroundColor: Brand.navy,
     pointerEvents: 'none' as any,
     ...Platform.select({
       web: {
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
     }),
   },
   pesanButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.orange,
     paddingVertical: 9,
     paddingHorizontal: 36,
     borderRadius: 24,
@@ -413,7 +414,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.96 }],
   },
   pesanButtonText: {
-    color: '#111827',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },

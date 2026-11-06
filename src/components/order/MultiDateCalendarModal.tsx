@@ -48,52 +48,52 @@ interface CalendarCell {
 // Color theme tokens supporting light and dark modes
 const getCalendarTheme = (isDark: boolean) => ({
   modalOverlayBg: isDark ? 'rgba(0, 0, 0, 0.75)' : 'rgba(15, 23, 42, 0.65)',
-  modalCardBg: isDark ? '#1E293B' : '#F8FAFC',
-  modalCardBorder: isDark ? '#334155' : 'transparent',
+  modalCardBg: isDark ? '#18181B' : '#FFF7F5',
+  modalCardBorder: isDark ? '#27272A' : 'transparent',
 
-  navCircleBg: isDark ? '#334155' : '#FFFFFF',
-  navCircleBorder: isDark ? '#475569' : '#E2E8F0',
-  navChevron: isDark ? '#F8FAFC' : '#0F172A',
+  navCircleBg: isDark ? '#27272A' : '#FFFFFF',
+  navCircleBorder: isDark ? '#3F3F46' : '#F2DCD5',
+  navChevron: isDark ? '#F4F4F5' : '#113366',
 
-  headerSubtitle: isDark ? '#94A3B8' : '#94A3B8',
-  headerMainTitle: isDark ? '#F8FAFC' : '#0F172A',
+  headerSubtitle: isDark ? '#A1A1AA' : '#EE4D2D',
+  headerMainTitle: isDark ? '#F4F4F5' : '#113366',
 
-  calendarCardBg: isDark ? '#0F172A' : '#FFFFFF',
-  calendarCardBorder: isDark ? '#334155' : '#E2E8F0',
+  calendarCardBg: isDark ? '#0A0A0A' : '#FFFFFF',
+  calendarCardBorder: isDark ? '#27272A' : '#F2DCD5',
 
-  weekdayText: isDark ? '#64748B' : '#94A3B8',
+  weekdayText: isDark ? '#71717A' : '#5A6B86',
 
-  dateTextNormal: isDark ? '#F8FAFC' : '#0F172A',
-  dateTextPast: isDark ? '#475569' : '#CBD5E1',
-  dateTextOtherMonth: isDark ? '#475569' : '#CBD5E1',
+  dateTextNormal: isDark ? '#F4F4F5' : '#113366',
+  dateTextPast: isDark ? '#3F3F46' : '#D7C7C2',
+  dateTextOtherMonth: isDark ? '#3F3F46' : '#D7C7C2',
 
-  todayRingBorder: '#F59E0B',
-  todayBg: isDark ? '#0F172A' : '#FFFFFF',
-  todayText: isDark ? '#F59E0B' : '#0F172A',
+  todayRingBorder: '#EE4D2D',
+  todayBg: isDark ? '#0A0A0A' : '#FFFFFF',
+  todayText: isDark ? '#FF8A70' : '#EE4D2D',
 
-  selectedTileBg: isDark ? '#F8FAFC' : '#0F172A',
-  selectedTileText: isDark ? '#0F172A' : '#FFFFFF',
-  checkBadgeBg: '#F59E0B',
-  checkBadgeBorder: isDark ? '#0F172A' : '#FFFFFF',
-  checkBadgeIcon: '#0F172A',
+  selectedTileBg: '#EE4D2D',
+  selectedTileText: '#FFFFFF',
+  checkBadgeBg: '#113366',
+  checkBadgeBorder: isDark ? '#0A0A0A' : '#FFFFFF',
+  checkBadgeIcon: '#FFFFFF',
 
-  quickSelectTitle: isDark ? '#94A3B8' : '#94A3B8',
-  quickPillBg: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FFFDF5',
-  quickPillBorder: '#F59E0B',
-  quickPillText: isDark ? '#FCD34D' : '#0F172A',
+  quickSelectTitle: isDark ? '#A1A1AA' : '#5A6B86',
+  quickPillBg: isDark ? '#2E1610' : '#FDE8E3',
+  quickPillBorder: '#EE4D2D',
+  quickPillText: isDark ? '#FF8A70' : '#D0011B',
 
-  clearBtnBg: '#EF4444',
+  clearBtnBg: '#D0011B',
   clearBtnText: '#FFFFFF',
 
-  footerDivider: isDark ? '#334155' : '#E2E8F0',
-  cancelBtnBg: isDark ? '#334155' : '#F1F5F9',
-  cancelBtnBorder: isDark ? '#475569' : '#CBD5E1',
-  cancelBtnText: isDark ? '#F8FAFC' : '#475569',
+  footerDivider: isDark ? '#27272A' : '#F2DCD5',
+  cancelBtnBg: isDark ? '#27272A' : '#FFFFFF',
+  cancelBtnBorder: isDark ? '#3F3F46' : '#F2DCD5',
+  cancelBtnText: isDark ? '#F4F4F5' : '#113366',
 
-  confirmBtnDisabledBg: isDark ? '#334155' : '#F1F5F9',
-  confirmBtnDisabledText: isDark ? '#64748B' : '#94A3B8',
-  confirmBtnActiveBg: '#F59E0B',
-  confirmBtnActiveText: '#0F172A',
+  confirmBtnDisabledBg: isDark ? '#27272A' : '#F2DCD5',
+  confirmBtnDisabledText: isDark ? '#71717A' : '#B48F86',
+  confirmBtnActiveBg: '#EE4D2D',
+  confirmBtnActiveText: '#FFFFFF',
 });
 
 export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({

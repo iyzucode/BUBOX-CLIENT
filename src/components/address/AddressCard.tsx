@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import { Brand } from '@/constants/theme';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Address } from '@/types/address';
 
@@ -19,7 +20,7 @@ interface AddressCardProps {
   isSelected?: boolean;
 }
 
-const SELECTED_COLOR = '#F36F21';
+const SELECTED_COLOR = Brand.orange;
 
 export const AddressCard: React.FC<AddressCardProps> = ({
   address,
@@ -56,7 +57,7 @@ export const AddressCard: React.FC<AddressCardProps> = ({
     }
   };
 
-  const popoverTextColor = isDark ? '#F3F4F6' : '#111827';
+  const popoverTextColor = isDark ? '#F4F4F5' : Brand.navy;
 
   const handleDeletePress = () => {
     handleCloseMenu();
@@ -109,9 +110,9 @@ export const AddressCard: React.FC<AddressCardProps> = ({
         style={({ pressed }) => [
           styles.card,
           {
-            backgroundColor: isDark ? '#262A32' : '#D9D9D9',
+            backgroundColor: isDark ? '#18181B' : '#FFFFFF',
             // Border selalu ada (transparan) agar ukuran kartu tidak bergeser saat dipilih
-            borderColor: isSelected ? SELECTED_COLOR : 'transparent',
+            borderColor: isSelected ? SELECTED_COLOR : isDark ? '#27272A' : '#F2DCD5',
           },
           selectable && styles.cardSelectable,
           selectable && pressed && styles.cardPressed,
@@ -146,7 +147,7 @@ export const AddressCard: React.FC<AddressCardProps> = ({
             <ThemedText
               style={[
                 styles.labelText,
-                { color: isDark ? '#F3F4F6' : '#111827' },
+                { color: isDark ? '#F4F4F5' : Brand.navy },
               ]}
             >
               {address.label}
@@ -169,14 +170,14 @@ export const AddressCard: React.FC<AddressCardProps> = ({
                 height="20"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                color={isDark ? '#E5E7EB' : '#111827'}
+                color={isDark ? '#E4E4E7' : Brand.navy}
               >
                 <circle cx="5" cy="12" r="2.2" />
                 <circle cx="12" cy="12" r="2.2" />
                 <circle cx="19" cy="12" r="2.2" />
               </svg>
             ) : (
-              <ThemedText style={[styles.dotsText, { color: isDark ? '#E5E7EB' : '#111827' }]}>
+              <ThemedText style={[styles.dotsText, { color: isDark ? '#E4E4E7' : Brand.navy }]}>
                 •••
               </ThemedText>
             )}
@@ -187,7 +188,7 @@ export const AddressCard: React.FC<AddressCardProps> = ({
         <View
           style={[
             styles.divider,
-            { backgroundColor: isDark ? '#3E4552' : '#B8B8B8' },
+            { backgroundColor: isDark ? '#232326' : '#FDEEEA' },
           ]}
         />
 
@@ -196,7 +197,7 @@ export const AddressCard: React.FC<AddressCardProps> = ({
           <ThemedText
             style={[
               styles.recipientName,
-              { color: isDark ? '#F9FAFB' : '#111827' },
+              { color: isDark ? '#F4F4F5' : Brand.navy },
             ]}
           >
             {address.recipientName}
@@ -205,7 +206,7 @@ export const AddressCard: React.FC<AddressCardProps> = ({
           <ThemedText
             style={[
               styles.phoneText,
-              { color: isDark ? '#E5E7EB' : '#1F2937' },
+              { color: isDark ? '#E4E4E7' : Brand.navy },
             ]}
           >
             {address.phoneNumber}
@@ -214,7 +215,7 @@ export const AddressCard: React.FC<AddressCardProps> = ({
           <ThemedText
             style={[
               styles.addressText,
-              { color: isDark ? '#D1D5DB' : '#374151' },
+              { color: isDark ? '#A1A1AA' : '#5A6B86' },
             ]}
           >
             {formattedAddress}
@@ -225,7 +226,7 @@ export const AddressCard: React.FC<AddressCardProps> = ({
             <ThemedText
               style={[
                 styles.notesText,
-                { color: isDark ? '#FFFFFF' : '#111827' },
+                { color: isDark ? '#FFFFFF' : Brand.navy },
               ]}
             >
               {address.notes}
@@ -246,7 +247,7 @@ export const AddressCard: React.FC<AddressCardProps> = ({
               style={[
                 styles.popoverMenu,
                 {
-                  backgroundColor: isDark ? '#374151' : '#9CA3AF',
+                  backgroundColor: isDark ? '#232326' : '#FFFFFF',
                 },
               ]}
             >
@@ -381,7 +382,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   primaryBadge: {
-    backgroundColor: '#5C5C5C',
+    backgroundColor: Brand.navy,
     paddingHorizontal: 16,
     paddingVertical: 5,
     borderRadius: 8,
@@ -438,7 +439,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 6,
-    backgroundColor: '#5C5C5C',
+    backgroundColor: Brand.navy,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -541,7 +542,7 @@ const styles = StyleSheet.create({
   popoverItemText: {
     fontSize: 12.5,
     fontWeight: '600',
-    color: '#111827',
+    color: Brand.navy,
   },
   popoverDivider: {
     height: 1,

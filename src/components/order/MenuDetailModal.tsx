@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Brand } from '@/constants/theme';
 import { CUSTOMER_MAX_WIDTH } from '@/hooks/use-customer-layout';
 import { Menu } from '@/types/menu';
 import { useOrderPalette } from './orderPalette';
@@ -267,7 +268,7 @@ const styles = StyleSheet.create({
     height: 185,
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#FDE8E3',
   },
   image: {
     width: '100%',

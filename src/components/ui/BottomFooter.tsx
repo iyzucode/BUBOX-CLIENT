@@ -9,6 +9,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { Brand } from '@/constants/theme';
 import { MaxContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -225,7 +226,7 @@ export const BottomFooter: React.FC = () => {
         {tabs.map((tab) => {
           const active = isTabActive(tab.path);
           const activeColor = theme.primary;
-          const inactiveColor = '#94A3B8';
+          const inactiveColor = theme.textSecondary;
           const itemColor = active ? activeColor : inactiveColor;
 
           return (

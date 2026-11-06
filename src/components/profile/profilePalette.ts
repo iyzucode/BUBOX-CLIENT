@@ -1,4 +1,4 @@
-import { useTheme } from '@/hooks/use-theme';
+import { Brand } from '@/constants/theme';
 import { useThemeStore } from '@/store/useThemeStore';
 
 export interface ProfilePalette {
@@ -31,71 +31,67 @@ export interface ProfilePalette {
   logoutText: string;
 }
 
+const DARK: ProfilePalette = {
+  isDark: true,
+  screenBg: '#0A0A0A',
+  cardBg: '#18181B',
+  cardBorder: 'rgba(255, 255, 255, 0.08)',
+  cardTitle: '#F4F4F5',
+  cardSubtext: '#A1A1AA',
+  divider: 'rgba(255, 255, 255, 0.1)',
+  actionBoxBg: '#232326',
+  actionBoxBorder: 'rgba(255, 255, 255, 0.08)',
+  actionIconColor: '#FF8A70',
+  actionLabel: '#D4D4D8',
+  closeBtnBg: '#FFFFFF',
+  closeBtnIcon: '#0A0A0A',
+  heroOverlay: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 60%, rgba(10,10,10,0.95) 100%)',
+  heroTitle: '#FFFFFF',
+  avatarBorder: '#18181B',
+  menuItemBg: 'transparent',
+  menuItemHover: 'rgba(255, 255, 255, 0.04)',
+  menuIconColor: '#F4F4F5',
+  menuTextColor: '#F4F4F5',
+  chevronColor: '#A1A1AA',
+  switchTrackOff: '#3F3F46',
+  switchTrackOn: Brand.orange,
+  switchThumb: '#FFFFFF',
+  logoutBg: '#18181B',
+  logoutBorder: 'rgba(255, 255, 255, 0.08)',
+  logoutText: '#FF5A6A',
+};
+
+const LIGHT: ProfilePalette = {
+  isDark: false,
+  screenBg: '#FFF7F5',
+  cardBg: '#FFFFFF',
+  cardBorder: '#F2DCD5',
+  cardTitle: Brand.navy,
+  cardSubtext: '#5A6B86',
+  divider: '#F2DCD5',
+  actionBoxBg: '#FDE8E3',
+  actionBoxBorder: 'rgba(238, 77, 45, 0.12)',
+  actionIconColor: Brand.orange,
+  actionLabel: Brand.navy,
+  closeBtnBg: '#FFFFFF',
+  closeBtnIcon: Brand.navy,
+  heroOverlay: 'linear-gradient(180deg, rgba(17,51,102,0.55) 0%, rgba(17,51,102,0.1) 60%, rgba(255,247,245,0.95) 100%)',
+  heroTitle: '#FFFFFF',
+  avatarBorder: '#FFFFFF',
+  menuItemBg: 'transparent',
+  menuItemHover: 'rgba(238, 77, 45, 0.05)',
+  menuIconColor: Brand.navy,
+  menuTextColor: Brand.navy,
+  chevronColor: '#5A6B86',
+  switchTrackOff: '#CBD5E1',
+  switchTrackOn: Brand.orange,
+  switchThumb: '#FFFFFF',
+  logoutBg: '#FFFFFF',
+  logoutBorder: '#F2DCD5',
+  logoutText: Brand.red,
+};
+
 export function useProfilePalette(): ProfilePalette {
-  const theme = useTheme();
-  const themeMode = useThemeStore((s) => s.themeMode);
-  const isDark = themeMode === 'dark';
-
-  if (isDark) {
-    return {
-      isDark: true,
-      screenBg: '#0B0F17',
-      cardBg: '#1A2230',
-      cardBorder: 'rgba(255, 255, 255, 0.08)',
-      cardTitle: '#F8FAFC',
-      cardSubtext: '#94A3B8',
-      divider: 'rgba(255, 255, 255, 0.1)',
-      actionBoxBg: '#242F42',
-      actionBoxBorder: 'rgba(255, 255, 255, 0.08)',
-      actionIconColor: '#F8FAFC',
-      actionLabel: '#CBD5E1',
-      closeBtnBg: '#FFFFFF',
-      closeBtnIcon: '#111827',
-      heroOverlay: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 60%, rgba(11,15,23,0.95) 100%)',
-      heroTitle: '#FFFFFF',
-      avatarBorder: '#1A2230',
-      menuItemBg: 'transparent',
-      menuItemHover: 'rgba(255, 255, 255, 0.04)',
-      menuIconColor: '#F1F5F9',
-      menuTextColor: '#F1F5F9',
-      chevronColor: '#94A3B8',
-      switchTrackOff: '#334155',
-      switchTrackOn: '#F36F21',
-      switchThumb: '#FFFFFF',
-      logoutBg: '#1A2230',
-      logoutBorder: 'rgba(255, 255, 255, 0.08)',
-      logoutText: '#F8FAFC',
-    };
-  }
-
-  // Light Mode matching user reference design
-  return {
-    isDark: false,
-    screenBg: '#F3F4F6',
-    cardBg: '#E2E5EB',
-    cardBorder: 'rgba(0, 0, 0, 0.04)',
-    cardTitle: '#111827',
-    cardSubtext: '#6B7280',
-    divider: '#D1D5DB',
-    actionBoxBg: '#FFFFFF',
-    actionBoxBorder: 'rgba(0, 0, 0, 0.06)',
-    actionIconColor: '#111827',
-    actionLabel: '#374151',
-    closeBtnBg: '#FFFFFF',
-    closeBtnIcon: '#111827',
-    heroOverlay: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.1) 60%, rgba(243,244,246,0.95) 100%)',
-    heroTitle: '#FFFFFF',
-    avatarBorder: '#E2E5EB',
-    menuItemBg: 'transparent',
-    menuItemHover: 'rgba(0, 0, 0, 0.03)',
-    menuIconColor: '#111827',
-    menuTextColor: '#111827',
-    chevronColor: '#4B5563',
-    switchTrackOff: '#9CA3AF',
-    switchTrackOn: '#374151',
-    switchThumb: '#FFFFFF',
-    logoutBg: '#E2E5EB',
-    logoutBorder: 'rgba(0, 0, 0, 0.04)',
-    logoutText: '#111827',
-  };
+  const isDark = useThemeStore((s) => s.themeMode) === 'dark';
+  return isDark ? DARK : LIGHT;
 }

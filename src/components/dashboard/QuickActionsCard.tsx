@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Brand } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export interface QuickActionButtonItem {
@@ -284,7 +285,7 @@ const styles = StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#EF4444',
+    backgroundColor: Brand.red,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
@@ -300,7 +301,7 @@ const styles = StyleSheet.create({
   buttonLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#334155',
+    color: Brand.navy,
     textAlign: 'center',
     lineHeight: 16,
   },

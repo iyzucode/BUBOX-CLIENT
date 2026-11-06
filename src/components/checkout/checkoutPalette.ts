@@ -62,122 +62,122 @@ export interface CheckoutPalette {
 
 export const CheckoutPalettes: { light: CheckoutPalette; dark: CheckoutPalette } = {
   light: {
-    pageBg: '#EFEFEF',
-    headerBg: '#6B7280',
+    pageBg: '#FFF7F5',
+    headerBg: '#113366',
     headerText: '#FFFFFF',
     backBtnBg: '#FFFFFF',
-    backBtnIcon: '#111827',
+    backBtnIcon: '#113366',
 
     // Section cards matching wireframe
-    cardBg: '#D8D8D8',
-    cardBorder: 'transparent',
-    cardTitle: '#111827',
-    cardSubtext: '#4B5563',
+    cardBg: '#FFFFFF',
+    cardBorder: '#F2DCD5',
+    cardTitle: '#113366',
+    cardSubtext: '#5A6B86',
 
     // Option pills
-    optionBg: '#BDBDBD',
-    optionBorder: 'transparent',
-    optionActiveBg: '#9E9E9E',
-    optionActiveBorder: '#616161',
-    optionText: '#111827',
-    optionSubtext: '#424242',
-    optionIconColor: '#111827',
+    optionBg: '#FFF7F5',
+    optionBorder: '#F2DCD5',
+    optionActiveBg: '#FDE8E3',
+    optionActiveBorder: '#EE4D2D',
+    optionText: '#113366',
+    optionSubtext: '#5A6B86',
+    optionIconColor: '#EE4D2D',
 
     // Nested address/outlet box
-    nestedBoxBg: '#B0B0B0',
+    nestedBoxBg: '#E7ECF5',
     nestedBoxBorder: 'transparent',
-    actionPillBtnBg: '#616161',
+    actionPillBtnBg: '#113366',
     actionPillBtnText: '#FFFFFF',
 
     // Segmented toggle
-    segmentedBg: '#9E9E9E',
-    segmentedActiveBg: '#757575',
-    segmentedText: '#212121',
+    segmentedBg: '#E7ECF5',
+    segmentedActiveBg: '#113366',
+    segmentedText: '#113366',
     segmentedActiveText: '#FFFFFF',
-    segmentedLabel: '#FFFFFF',
+    segmentedLabel: '#5A6B86',
 
     // Promo input
-    inputBg: '#9E9E9E',
-    inputBorder: 'transparent',
-    inputText: '#111827',
-    inputPlaceholder: '#424242',
+    inputBg: '#FFF7F5',
+    inputBorder: '#F2DCD5',
+    inputText: '#113366',
+    inputPlaceholder: '#9AA6BA',
 
     // Dividers
-    dividerColor: '#BDBDBD',
+    dividerColor: '#F2DCD5',
 
     // Financial rows
-    financeLabel: '#424242',
-    financeValue: '#111827',
-    financeTotal: '#111827',
+    financeLabel: '#5A6B86',
+    financeValue: '#113366',
+    financeTotal: '#113366',
 
     // Sticky bottom
-    footerBg: '#D8D8D8',
-    footerBorder: '#BDBDBD',
+    footerBg: '#FFFFFF',
+    footerBorder: '#F2DCD5',
     footerGlassBg: 'rgba(255, 255, 255, 0.72)',
-    footerGlassBorder: 'rgba(15, 23, 42, 0.08)',
-    footerTotalLabel: '#616161',
-    footerTotalAmount: '#111827',
-    payBtnBg: '#9E9E9E',
-    payBtnText: '#111827',
+    footerGlassBorder: 'rgba(17, 51, 102, 0.10)',
+    footerTotalLabel: '#5A6B86',
+    footerTotalAmount: '#113366',
+    payBtnBg: '#EE4D2D',
+    payBtnText: '#FFFFFF',
   },
   dark: {
-    pageBg: '#0F172A',
-    headerBg: '#1E293B',
-    headerText: '#F8FAFC',
-    backBtnBg: '#334155',
-    backBtnIcon: '#F8FAFC',
+    pageBg: '#0A0A0A',
+    headerBg: '#141416',
+    headerText: '#F4F4F5',
+    backBtnBg: '#2E2E33',
+    backBtnIcon: '#F4F4F5',
 
     // Section cards in dark mode
-    cardBg: '#1E293B',
-    cardBorder: '#334155',
-    cardTitle: '#F8FAFC',
-    cardSubtext: '#94A3B8',
+    cardBg: '#18181B',
+    cardBorder: '#27272A',
+    cardTitle: '#F4F4F5',
+    cardSubtext: '#A1A1AA',
 
     // Option pills
-    optionBg: '#273549',
-    optionBorder: '#334155',
-    optionActiveBg: '#334155',
-    optionActiveBorder: '#F59E0B',
-    optionText: '#F8FAFC',
-    optionSubtext: '#94A3B8',
-    optionIconColor: '#F8FAFC',
+    optionBg: '#232326',
+    optionBorder: '#2E2E33',
+    optionActiveBg: '#2E1610',
+    optionActiveBorder: '#EE4D2D',
+    optionText: '#F4F4F5',
+    optionSubtext: '#A1A1AA',
+    optionIconColor: '#FF8A70',
 
     // Nested address/outlet box
-    nestedBoxBg: '#273549',
-    nestedBoxBorder: '#334155',
-    actionPillBtnBg: '#475569',
-    actionPillBtnText: '#F8FAFC',
+    nestedBoxBg: '#232326',
+    nestedBoxBorder: '#2E2E33',
+    actionPillBtnBg: '#3F3F46',
+    actionPillBtnText: '#F4F4F5',
 
     // Segmented toggle
-    segmentedBg: '#334155',
-    segmentedActiveBg: '#475569',
-    segmentedText: '#94A3B8',
-    segmentedActiveText: '#F8FAFC',
-    segmentedLabel: '#94A3B8',
+    segmentedBg: '#27272A',
+    segmentedActiveBg: '#EE4D2D',
+    segmentedText: '#A1A1AA',
+    segmentedActiveText: '#FFFFFF',
+    segmentedLabel: '#A1A1AA',
 
     // Promo input
-    inputBg: '#334155',
-    inputBorder: '#475569',
-    inputText: '#F8FAFC',
-    inputPlaceholder: '#64748B',
+    inputBg: '#232326',
+    inputBorder: '#3F3F46',
+    inputText: '#F4F4F5',
+    inputPlaceholder: '#71717A',
 
     // Dividers
-    dividerColor: '#334155',
+    dividerColor: '#27272A',
 
     // Financial rows
-    financeLabel: '#94A3B8',
-    financeValue: '#F8FAFC',
-    financeTotal: '#F8FAFC',
+    financeLabel: '#A1A1AA',
+    financeValue: '#F4F4F5',
+    financeTotal: '#F4F4F5',
 
     // Sticky bottom
-    footerBg: '#1E293B',
-    footerBorder: '#334155',
-    footerGlassBg: 'rgba(30, 41, 59, 0.72)',
+    footerBg: '#141416',
+    footerBorder: '#27272A',
+    footerGlassBg: 'rgba(24, 24, 27, 0.72)',
     footerGlassBorder: 'rgba(255, 255, 255, 0.12)',
-    footerTotalLabel: '#94A3B8',
-    footerTotalAmount: '#F8FAFC',
-    payBtnBg: '#334155',
-    payBtnText: '#F8FAFC',
+    footerTotalLabel: '#A1A1AA',
+    footerTotalAmount: '#F4F4F5',
+    payBtnBg: '#EE4D2D',
+    payBtnText: '#FFFFFF',
   },
 };
 

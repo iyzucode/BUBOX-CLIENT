@@ -1,6 +1,7 @@
 import React from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useThemeStore } from '@/store/useThemeStore';
+import { Brand } from '@/constants/theme';
 import { useProfilePalette } from './profilePalette';
 
 interface ProfileThemeSwitchProps {
@@ -24,7 +25,7 @@ export const ProfileThemeSwitch: React.FC<ProfileThemeSwitchProps> = ({
         styles.trackBase,
         isLarge ? styles.trackLarge : styles.trackMedium,
         {
-          backgroundColor: isDark ? '#374151' : '#9CA3AF',
+          backgroundColor: isDark ? '#3F3F46' : Brand.orange,
         },
         pressed && styles.pressed,
       ]}

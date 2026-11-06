@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Brand } from '@/constants/theme';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -101,7 +102,7 @@ export const DashboardBannerHeader: React.FC<DashboardBannerHeaderProps> = ({
               )}
 
               {notificationCount > 0 && (
-                <View style={[styles.badgeDot, { backgroundColor: '#EF4444' }]} />
+                <View style={[styles.badgeDot, { backgroundColor: Brand.red }]} />
               )}
             </Pressable>
           </View>
@@ -116,7 +117,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 210,
     overflow: 'hidden',
-    backgroundColor: '#1E293B',
+    backgroundColor: Brand.navy,
   },
   bannerImage: {
     width: '100%',

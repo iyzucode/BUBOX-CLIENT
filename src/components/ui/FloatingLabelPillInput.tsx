@@ -11,6 +11,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import { Brand } from '@/constants/theme';
 
 export interface FloatingLabelPillInputProps {
   label: string;
@@ -37,10 +38,10 @@ export const FloatingLabelPillInput: React.FC<FloatingLabelPillInputProps> = ({
   keyboardType = 'default',
   multiline = false,
   numberOfLines = 1,
-  pillBg = '#B8B8B8',
-  textColor = '#111827',
-  labelColor = '#6B7280',
-  placeholderColor = '#737373',
+  pillBg = '#FDEEEA',
+  textColor = Brand.navy,
+  labelColor = '#5A6B86',
+  placeholderColor = '#8A96AC',
   containerStyle,
   inputStyle,
   editable = true,

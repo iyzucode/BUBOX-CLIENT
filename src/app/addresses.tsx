@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useCustomerLayout } from '@/hooks/use-customer-layout';
+import { Brand } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -116,7 +117,7 @@ export default function AddressesScreen() {
     <ThemedView
       style={[
         styles.container,
-        { backgroundColor: isDark ? '#111827' : '#FFFFFF' },
+        { backgroundColor: isDark ? '#0A0A0A' : '#FFF7F5' },
       ]}
     >
       {/* 1. CUSTOM TOP HEADER (Dark Grey Bar with Circle 'X' & 'Alamat' Text) */}
@@ -125,7 +126,7 @@ export default function AddressesScreen() {
           styles.headerBar,
           {
             paddingTop: headerPaddingTop,
-            backgroundColor: isDark ? '#1F2937' : '#616161',
+            backgroundColor: isDark ? '#141416' : Brand.navy,
           },
         ]}
       >
@@ -185,7 +186,7 @@ export default function AddressesScreen() {
         {isLoading ? (
           <View style={styles.centerBox}>
             <ActivityIndicator size="large" color={theme.primary} />
-            <ThemedText style={[styles.loadingText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+            <ThemedText style={[styles.loadingText, { color: isDark ? '#A1A1AA' : '#5A6B86' }]}>
               Memuat daftar alamat...
             </ThemedText>
           </View>
@@ -194,8 +195,8 @@ export default function AddressesScreen() {
             style={[
               styles.stateCard,
               {
-                backgroundColor: isDark ? '#1F2937' : '#F3F4F6',
-                borderColor: isDark ? '#374151' : '#E5E7EB',
+                backgroundColor: isDark ? '#18181B' : '#FFFFFF',
+                borderColor: isDark ? '#27272A' : '#F2DCD5',
               },
             ]}
           >
@@ -203,7 +204,7 @@ export default function AddressesScreen() {
             <ThemedText style={[styles.stateTitle, { color: theme.text }]}>
               Gagal Memuat Alamat
             </ThemedText>
-            <ThemedText style={[styles.stateDesc, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+            <ThemedText style={[styles.stateDesc, { color: isDark ? '#A1A1AA' : '#5A6B86' }]}>
               {error?.response?.data?.message || 'Terjadi kesalahan saat memuat data alamat.'}
             </ThemedText>
             <Pressable
@@ -222,8 +223,8 @@ export default function AddressesScreen() {
             style={[
               styles.stateCard,
               {
-                backgroundColor: isDark ? '#1F2937' : '#F3F4F6',
-                borderColor: isDark ? '#374151' : '#E5E7EB',
+                backgroundColor: isDark ? '#18181B' : '#FFFFFF',
+                borderColor: isDark ? '#27272A' : '#F2DCD5',
               },
             ]}
           >
@@ -233,7 +234,7 @@ export default function AddressesScreen() {
             <ThemedText style={[styles.stateTitle, { color: theme.text }]}>
               Belum Ada Alamat Tersimpan
             </ThemedText>
-            <ThemedText style={[styles.stateDesc, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+            <ThemedText style={[styles.stateDesc, { color: isDark ? '#A1A1AA' : '#5A6B86' }]}>
               Tambahkan alamat rumah atau pengantaran katering si kecil dengan menekan tombol Tambah baru di bawah.
             </ThemedText>
           </View>
@@ -291,7 +292,7 @@ export default function AddressesScreen() {
           onPress={handleOpenAdd}
           style={({ pressed }) => [
             styles.stickyAddButton,
-            { backgroundColor: isDark ? '#374151' : '#D9D9D9' },
+            { backgroundColor: Brand.orange },
             pressed && styles.buttonPressed,
           ]}
           accessibilityLabel="Tambah Alamat Baru"
@@ -300,7 +301,7 @@ export default function AddressesScreen() {
           <ThemedText
             style={[
               styles.stickyAddText,
-              { color: isDark ? '#F9FAFB' : '#111827' },
+              { color: '#FFFFFF' },
             ]}
           >
             Tambah baru
@@ -373,7 +374,7 @@ const styles = StyleSheet.create({
   closeIconText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: Brand.navy,
   },
   headerTitle: {
     color: '#FFFFFF',
