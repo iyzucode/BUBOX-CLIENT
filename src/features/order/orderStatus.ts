@@ -9,7 +9,7 @@ interface StatusMeta {
 }
 
 export const ORDER_STATUS_META: Record<OrderStatusCode, StatusMeta> = {
-  AWAITING_PAYMENT: { label: 'Menunggu Bayar', icon: '⏳', tone: 'warning' },
+  AWAITING_PAYMENT: { label: 'Belum Bayar', icon: '⏳', tone: 'warning' },
   PAID: { label: 'Dibayar', icon: '✓', tone: 'info' },
   IN_PROGRESS: { label: 'Diproses', icon: '🍲', tone: 'info' },
   COMPLETED: { label: 'Selesai', icon: '✓', tone: 'success' },

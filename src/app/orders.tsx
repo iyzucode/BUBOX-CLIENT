@@ -5,33 +5,39 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
-import { StatusBadge } from '@/components/order/StatusBadge';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { CheckoutHeader } from '@/components/checkout/CheckoutHeader';
+import { CheckoutPalette, useCheckoutPalette } from '@/components/checkout/checkoutPalette';
+import { useGetWeeklyMenu } from '@/features/menu/useMenu';
 import {
   ACTIVE_ORDER_STATUSES,
   CANCELLED_ORDER_STATUSES,
-  formatDateRange,
+  ORDER_STATUS_META,
   formatRupiah,
+  formatShortDate,
 } from '@/features/order/orderStatus';
 import { useMyOrders } from '@/features/order/useOrders';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuthStore } from '@/store/useAuthStore';
 import { OrderSummary } from '@/types/order';
 
+const FALLBACK_IMAGE = require('@/assets/images/baby-puree-fallback.jpg');
+
 export type OrdersTab = 'all' | 'unpaid' | 'active' | 'completed' | 'cancelled';
 
 const TABS: { id: OrdersTab; label: string }[] = [
   { id: 'all', label: 'Semua' },
-  { id: 'unpaid', label: '⏳ Belum Bayar' },
-  { id: 'active', label: '🍲 Aktif' },
-  { id: 'completed', label: '✓ Selesai' },
-  { id: 'cancelled', label: '✕ Batal' },
+  { id: 'unpaid', label: 'Belum Bayar' },
+  { id: 'active', label: 'Aktif' },
+  { id: 'completed', label: 'Selesai' },
+  { id: 'cancelled', label: 'Dibatalkan' },
 ];
 
 function matchesTab(order: OrderSummary, tab: OrdersTab): boolean {
@@ -51,13 +57,28 @@ function matchesTab(order: OrderSummary, tab: OrdersTab): boolean {
 
 export default function MyOrdersScreen() {
   const router = useRouter();
+  const palette = useCheckoutPalette();
   const theme = useTheme();
   const params = useLocalSearchParams<{ tab?: OrdersTab }>();
   const token = useAuthStore((s) => s.token);
-  const [tab, setTab] = useState<OrdersTab>(params.tab && TABS.some((t) => t.id === params.tab) ? params.tab : 'all');
+  const [tab, setTab] = useState<OrdersTab>(
+    params.tab && TABS.some((t) => t.id === params.tab) ? params.tab : 'all'
+  );
 
   const { data: orders, isLoading, isRefetching, refetch } = useMyOrders();
   const filtered = useMemo(() => (orders ?? []).filter((o) => matchesTab(o, tab)), [orders, tab]);
+
+  // Foto menu diambil dari jadwal menu mingguan yang sudah di-cache (tanpa membebani API daftar order)
+  const { data: weeklyMenu } = useGetWeeklyMenu();
+  const menuImages = useMemo(() => {
+    const map = new Map<string, string>();
+    weeklyMenu?.days.forEach((day) =>
+      [...day.mainMenus, ...day.secondaryMenus].forEach((m) => {
+        if (m.imageUrl) map.set(m.id, m.imageUrl);
+      })
+    );
+    return map;
+  }, [weeklyMenu]);
 
   const openOrder = (order: OrderSummary) => {
     if (order.statusCode === 'AWAITING_PAYMENT') {
@@ -67,51 +88,47 @@ export default function MyOrdersScreen() {
     }
   };
 
-  if (!token) {
-    return (
-      <View style={[styles.root, { backgroundColor: theme.background }]}>
-        <ScreenHeader title="Pesanan Saya" fallbackHref="/profile" />
-        <View style={styles.empty}>
-          <ThemedText style={[styles.emptyText, { color: theme.textSecondary }]}>🔒 Masuk untuk melihat pesanan</ThemedText>
-          <Pressable onPress={() => router.push('/login')} style={[styles.primaryBtn, { backgroundColor: theme.primary }]}>
-            <ThemedText style={styles.primaryBtnText}>Masuk</ThemedText>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
+  const renderEmpty = (message: string, actionLabel: string, onPress: () => void) => (
+    <View style={styles.empty}>
+      <ThemedText style={[styles.emptyText, { color: palette.cardSubtext }]}>{message}</ThemedText>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [styles.emptyBtn, { backgroundColor: palette.actionPillBtnBg }, pressed && styles.pressed]}
+      >
+        <ThemedText style={[styles.emptyBtnText, { color: palette.actionPillBtnText }]}>{actionLabel}</ThemedText>
+      </Pressable>
+    </View>
+  );
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Pesanan Saya" fallbackHref="/profile" />
+    <View style={[styles.root, { backgroundColor: palette.pageBg }]}>
+      <CheckoutHeader title="Pesanan Saya" fallbackHref="/profile" />
 
-      <View style={[styles.tabsWrap, { borderBottomColor: theme.border, backgroundColor: theme.card }]}>
-        <FlatList
-          horizontal
-          data={TABS}
-          keyExtractor={(t) => t.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabs}
-          renderItem={({ item }) => {
+      {/* Tab status */}
+      <View style={[styles.tabBar, { backgroundColor: palette.cardBg }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
+          {TABS.map((item) => {
             const active = item.id === tab;
             return (
               <Pressable
+                key={item.id}
                 onPress={() => setTab(item.id)}
-                style={[
-                  styles.tab,
-                  { backgroundColor: active ? theme.primary : theme.backgroundElement },
-                ]}
+                style={[styles.tab, { borderBottomColor: active ? theme.primary : 'transparent' }]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
               >
-                <ThemedText style={[styles.tabText, { color: active ? '#FFFFFF' : theme.text }]}>
+                <ThemedText style={[styles.tabText, { color: active ? theme.primary : palette.cardTitle }]}>
                   {item.label}
                 </ThemedText>
               </Pressable>
             );
-          }}
-        />
+          })}
+        </ScrollView>
       </View>
 
-      {isLoading ? (
+      {!token ? (
+        renderEmpty('Masuk untuk melihat pesanan', 'Masuk', () => router.push('/login'))
+      ) : isLoading ? (
         <View style={styles.empty}>
           <ActivityIndicator size="large" color={theme.primary} />
         </View>
@@ -121,38 +138,14 @@ export default function MyOrdersScreen() {
           keyExtractor={(o) => o.id}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <ThemedText style={[styles.emptyText, { color: theme.textSecondary }]}>🧾 Belum ada pesanan</ThemedText>
-              <Pressable onPress={() => router.push('/order')} style={[styles.primaryBtn, { backgroundColor: theme.primary }]}>
-                <ThemedText style={styles.primaryBtnText}>🍲 Pesan Sekarang</ThemedText>
-              </Pressable>
-            </View>
-          }
+          ListEmptyComponent={renderEmpty('Belum ada pesanan', 'Pesan Sekarang', () => router.push('/order'))}
           renderItem={({ item }) => (
-            <Pressable
+            <OrderCard
+              order={item}
+              imageUrl={item.firstMenuId ? menuImages.get(item.firstMenuId) : undefined}
+              palette={palette}
               onPress={() => openOrder(item)}
-              style={({ pressed }) => [
-                styles.card,
-                { backgroundColor: theme.card, borderColor: theme.border },
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={styles.cardTop}>
-                <ThemedText style={[styles.orderNumber, { color: theme.text }]}>{item.orderNumber}</ThemedText>
-                <StatusBadge kind="order" status={item.statusCode} size="sm" />
-              </View>
-              <View style={styles.cardBottom}>
-                <ThemedText style={[styles.meta, { color: theme.textSecondary }]}>
-                  🗓️ {formatDateRange(item.firstDeliveryDate, item.lastDeliveryDate)} · {item.daysCount} hari ·{' '}
-                  {item.fulfillmentType === 'DELIVERY' ? '🛵' : '🏪'}
-                </ThemedText>
-                <ThemedText style={[styles.total, { color: theme.text }]}>{formatRupiah(item.grandTotal)}</ThemedText>
-              </View>
-              {item.statusCode === 'AWAITING_PAYMENT' ? (
-                <ThemedText style={[styles.payNow, { color: theme.primary }]}>Bayar QRIS →</ThemedText>
-              ) : null}
-            </Pressable>
+            />
           )}
         />
       )}
@@ -160,34 +153,149 @@ export default function MyOrdersScreen() {
   );
 }
 
+interface OrderCardProps {
+  order: OrderSummary;
+  imageUrl?: string;
+  palette: CheckoutPalette;
+  onPress: () => void;
+}
+
+const OrderCard: React.FC<OrderCardProps> = ({ order, imageUrl, palette, onPress }) => {
+  const otherItems = Math.max(0, order.itemLinesCount - 1);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, { backgroundColor: palette.cardBg }, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel={`Pesanan ${order.orderNumber}`}
+    >
+      {/* Header: nomor order + status */}
+      <View style={styles.cardHeader}>
+        <ThemedText style={[styles.orderNumber, { color: palette.cardTitle }]} numberOfLines={1}>
+          {order.orderNumber}
+        </ThemedText>
+        <View style={[styles.statusPill, { backgroundColor: palette.optionBg }]}>
+          <ThemedText style={[styles.statusText, { color: palette.cardTitle }]}>
+            {ORDER_STATUS_META[order.statusCode]?.label ?? order.statusCode}
+          </ThemedText>
+        </View>
+      </View>
+
+      <View style={[styles.divider, { backgroundColor: palette.optionActiveBorder }]} />
+
+      {/* Isi: foto, menu, tanggal kirim */}
+      <View style={styles.cardBody}>
+        <Image
+          source={imageUrl ? { uri: imageUrl } : FALLBACK_IMAGE}
+          placeholder={FALLBACK_IMAGE}
+          style={[styles.thumb, { backgroundColor: palette.optionBg }]}
+          contentFit="cover"
+        />
+        <View style={styles.bodyCol}>
+          <ThemedText style={[styles.menuName, { color: palette.cardTitle }]} numberOfLines={1}>
+            {order.firstMenuName ?? 'Menu MPASI'}
+          </ThemedText>
+          {otherItems > 0 ? (
+            <ThemedText style={[styles.moreItems, { color: palette.cardSubtext }]}>
+              + {otherItems} produk lainnya
+            </ThemedText>
+          ) : null}
+
+          <View style={styles.datesRow}>
+            <ThemedText style={[styles.daysCount, { color: palette.cardTitle }]} numberOfLines={1}>
+              {order.daysCount} hari
+            </ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+              {order.deliveryDates.map((date) => (
+                <View key={date} style={[styles.chip, { backgroundColor: palette.optionBg }]}>
+                  <ThemedText style={[styles.chipText, { color: palette.cardTitle }]}>{formatShortDate(date)}</ThemedText>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </View>
+
+      <View style={[styles.divider, { backgroundColor: palette.optionActiveBorder }]} />
+
+      {/* Footer: total */}
+      <View style={styles.cardFooter}>
+        <ThemedText style={[styles.totalLabel, { color: palette.cardTitle }]}>Total Pembayaran</ThemedText>
+        <ThemedText style={[styles.totalValue, { color: palette.cardTitle }]}>{formatRupiah(order.grandTotal)}</ThemedText>
+      </View>
+    </Pressable>
+  );
+};
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  tabsWrap: { borderBottomWidth: 1 },
-  tabs: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  tabBar: {},
+  tabRow: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    gap: 4,
+  },
   tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 2,
     ...Platform.select({ web: { cursor: 'pointer' } }),
   },
-  tabText: { fontSize: 13, fontWeight: '600' },
-  list: { padding: 16, gap: 12, maxWidth: 720, width: '100%', alignSelf: 'center' },
+  tabText: { fontSize: 15, fontWeight: '500' },
+  list: {
+    padding: 16,
+    gap: 16,
+    maxWidth: 600,
+    width: '100%',
+    alignSelf: 'center',
+  },
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 14,
-    gap: 8,
+    borderRadius: 14,
+    overflow: 'hidden',
     ...Platform.select({ web: { cursor: 'pointer' } }),
   },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  orderNumber: { fontSize: 14, fontWeight: '700' },
-  meta: { fontSize: 12, flex: 1 },
-  total: { fontSize: 15, fontWeight: '800' },
-  payNow: { fontSize: 13, fontWeight: '700' },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  orderNumber: { fontSize: 12, flex: 1 },
+  statusPill: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 10 },
+  statusText: { fontSize: 11 },
+  divider: { height: 1 },
+  cardBody: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  thumb: { width: 104, height: 104, borderRadius: 10 },
+  bodyCol: { flex: 1, minWidth: 0, gap: 2, paddingTop: 6 },
+  menuName: { fontSize: 15, fontWeight: '500' },
+  moreItems: { fontSize: 11 },
+  datesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  daysCount: { fontSize: 11, flexShrink: 0 },
+  chips: { gap: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 4, borderRadius: 999 },
+  chipText: { fontSize: 11 },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  totalLabel: { fontSize: 14 },
+  totalValue: { fontSize: 14, fontWeight: '500' },
   empty: { paddingVertical: 60, alignItems: 'center', gap: 14 },
   emptyText: { fontSize: 15 },
-  primaryBtn: { paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12 },
-  primaryBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  pressed: { opacity: 0.8 },
+  emptyBtn: { paddingHorizontal: 20, paddingVertical: 11, borderRadius: 20 },
+  emptyBtnText: { fontSize: 14, fontWeight: '500' },
+  pressed: { opacity: 0.85 },
 });

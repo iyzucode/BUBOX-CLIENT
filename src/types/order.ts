@@ -107,6 +107,10 @@ export interface OrderSummary {
   createdAt: string;
   customerName: string;
   customerEmail: string;
+  deliveryDates: string[]; // yyyy-MM-dd, urut naik
+  itemLinesCount: number; // jumlah baris item (menu × hari)
+  firstMenuId: string | null;
+  firstMenuName: string | null;
 }
 
 export interface PagedResult<T> {

@@ -5,16 +5,31 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Href, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { useCheckoutPalette } from './checkoutPalette';
 
-export const CheckoutHeader: React.FC = () => {
+interface CheckoutHeaderProps {
+  title?: string;
+  /** Tujuan tombol kembali bila tidak ada riwayat navigasi (mis. halaman dibuka langsung dari URL). */
+  fallbackHref?: Href;
+}
+
+/** Header abu-abu bergaya wireframe: tombol kembali bulat di kiri, judul di kanan. */
+export const CheckoutHeader: React.FC<CheckoutHeaderProps> = ({ title = 'Checkout', fallbackHref = '/' }) => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const palette = useCheckoutPalette();
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace(fallbackHref);
+    }
+  };
 
   const topPadding = insets.top > 0 ? insets.top + 10 : 16;
 
@@ -31,7 +46,7 @@ export const CheckoutHeader: React.FC = () => {
       <View style={styles.contentRow}>
         {/* Left Circular Back Button */}
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           style={({ pressed }) => [
             styles.backBtn,
             { backgroundColor: palette.backBtnBg },
@@ -62,7 +77,7 @@ export const CheckoutHeader: React.FC = () => {
 
         {/* Right Title: Checkout */}
         <ThemedText style={[styles.title, { color: palette.headerText }]}>
-          Checkout
+          {title}
         </ThemedText>
       </View>
     </View>
