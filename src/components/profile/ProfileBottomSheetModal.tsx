@@ -8,9 +8,9 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from 'react-native';
+import { CUSTOMER_MAX_WIDTH, useCustomerLayout } from '@/hooks/use-customer-layout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -34,7 +34,7 @@ export const ProfileBottomSheetModal: React.FC<ProfileBottomSheetModalProps> = (
 }) => {
   const router = useRouter();
   const palette = useProfilePalette();
-  const { width } = useWindowDimensions();
+  const { width } = useCustomerLayout();
   const insets = useSafeAreaInsets();
   const isMobile = width <= 768;
 
@@ -128,7 +128,8 @@ export const ProfileBottomSheetModal: React.FC<ProfileBottomSheetModalProps> = (
             styles.sheetCard,
             {
               backgroundColor: sheetBg,
-              maxWidth: isMobile ? '100%' : 500,
+              // Modal digambar di atas seluruh jendela: batasi selebar kolom customer (768px)
+              maxWidth: CUSTOMER_MAX_WIDTH,
               paddingBottom: isMobile && insets.bottom > 0 ? insets.bottom : 0,
               transform: [{ translateY }],
             },

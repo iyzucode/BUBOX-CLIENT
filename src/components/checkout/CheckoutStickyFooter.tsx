@@ -59,13 +59,13 @@ export const CheckoutStickyFooter: React.FC<CheckoutStickyFooterProps> = ({
             },
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Bayar dengan QRIS"
+          accessibilityLabel="Bayar pesanan"
         >
           {isSubmitting ? (
             <ActivityIndicator size="small" color={palette.payBtnText} />
           ) : (
             <ThemedText style={[styles.payBtnText, { color: palette.payBtnText }]}>
-              Bayar QRIS
+              Bayar
             </ThemedText>
           )}
         </Pressable>
@@ -95,7 +95,6 @@ const styles = StyleSheet.create({
     }),
   },
   content: {
-    maxWidth: 600,
     width: '100%',
     alignSelf: 'center',
     flexDirection: 'row',

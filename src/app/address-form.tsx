@@ -9,9 +9,9 @@ import {
   StyleSheet,
   Switch,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
+import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -41,7 +41,7 @@ interface SelectedRegion {
 export default function AddressFormScreen() {
   const { isDark } = useThemeContext();
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width } = useCustomerLayout();
   const isDesktop = width > 768;
 
   const { id } = useLocalSearchParams<{ id?: string }>();

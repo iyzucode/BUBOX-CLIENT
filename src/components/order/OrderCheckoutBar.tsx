@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   },
   totalPrice: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '500',
     letterSpacing: -0.3,
   },
   summaryText: {
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   proceedButtonText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '500',
     letterSpacing: 0.2,
   },
   pressed: {

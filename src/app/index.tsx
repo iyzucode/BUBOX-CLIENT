@@ -7,9 +7,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from 'react-native';
+import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -29,7 +29,7 @@ export default function HomeScreen() {
   const { theme, isDark } = useThemeContext();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const insets = useSafeAreaInsets();
-  const { width, height: windowHeight } = useWindowDimensions();
+  const { width, height: windowHeight } = useCustomerLayout();
   const isDesktop = width > 768;
 
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);

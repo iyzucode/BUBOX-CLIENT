@@ -911,7 +911,7 @@ const styles = StyleSheet.create({
   },
   headerMainTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '500',
     letterSpacing: -0.2,
   },
   calendarSwipeWrapper: {
@@ -1001,7 +1001,7 @@ const styles = StyleSheet.create({
   },
   checkBadgeText: {
     fontSize: 9,
-    fontWeight: '700',
+    fontWeight: '500',
     lineHeight: 10,
   },
   quickSelectSection: {
@@ -1048,7 +1048,7 @@ const styles = StyleSheet.create({
   },
   clearBtnIconText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   clearBtnText: {
     fontSize: 14,
@@ -1078,7 +1078,7 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     fontSize: 14,
     letterSpacing: -0.2,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   confirmBtn: {
     flex: 3,
@@ -1093,7 +1093,7 @@ const styles = StyleSheet.create({
   confirmBtnText: {
     fontSize: 14,
     letterSpacing: -0.2,
-    fontWeight: '800', // Bold as requested
+    fontWeight: '500', // Bold as requested
   },
   pressed: {
     opacity: 0.8,

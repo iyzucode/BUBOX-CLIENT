@@ -14,7 +14,12 @@ interface AddressCardProps {
   isMenuOpen?: boolean;
   onToggleMenu?: () => void;
   onCloseMenu?: () => void;
+  /** Mode pilih (dari Checkout): kartu bisa diklik untuk memilih alamat pengantaran. */
+  onSelect?: (address: Address) => void;
+  isSelected?: boolean;
 }
+
+const SELECTED_COLOR = '#F36F21';
 
 export const AddressCard: React.FC<AddressCardProps> = ({
   address,
@@ -26,7 +31,10 @@ export const AddressCard: React.FC<AddressCardProps> = ({
   isMenuOpen: isMenuOpenProp,
   onToggleMenu,
   onCloseMenu,
+  onSelect,
+  isSelected = false,
 }) => {
+  const selectable = !!onSelect;
   const { isDark } = useThemeContext();
   const [internalMenuOpen, setInternalMenuOpen] = useState(false);
   const isControlled = typeof isMenuOpenProp === 'boolean';
@@ -94,15 +102,24 @@ export const AddressCard: React.FC<AddressCardProps> = ({
         </View>
       )}
 
-      {/* 2. Main Card Body */}
-      <View
-        style={[
+      {/* 2. Main Card Body (bisa diklik saat mode pilih alamat) */}
+      <Pressable
+        onPress={() => onSelect?.(address)}
+        disabled={!selectable}
+        style={({ pressed }) => [
           styles.card,
           {
             backgroundColor: isDark ? '#262A32' : '#D9D9D9',
+            // Border selalu ada (transparan) agar ukuran kartu tidak bergeser saat dipilih
+            borderColor: isSelected ? SELECTED_COLOR : 'transparent',
           },
+          selectable && styles.cardSelectable,
+          selectable && pressed && styles.cardPressed,
           isMenuOpen && { zIndex: 1000 },
         ]}
+        accessibilityRole={selectable ? 'radio' : undefined}
+        aria-checked={selectable ? isSelected : undefined}
+        accessibilityLabel={selectable ? `Pilih alamat ${address.label}` : undefined}
       >
         {/* Header Bar: Location Pin Icon + Label + Three Dots Button */}
         <View style={styles.headerRow}>
@@ -345,7 +362,7 @@ export const AddressCard: React.FC<AddressCardProps> = ({
             </View>
           </>
         )}
-      </View>
+      </Pressable>
     </View>
   );
 };
@@ -377,7 +394,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.8,
   },
+  cardSelectable: {
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
+  },
+  cardPressed: {
+    opacity: 0.85,
+  },
   card: {
+    borderWidth: 2,
     borderRadius: 18,
     paddingHorizontal: 18,
     paddingTop: 14,

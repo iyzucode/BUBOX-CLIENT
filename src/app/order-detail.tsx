@@ -178,7 +178,7 @@ export default function OrderDetailScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { padding: 16, gap: 12, paddingBottom: 40, maxWidth: 720, width: '100%', alignSelf: 'center' },
+  scroll: { padding: 16, gap: 12, paddingBottom: 40, width: '100%', alignSelf: 'center' },
   center: { paddingVertical: 60, alignItems: 'center', gap: 14 },
   card: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 8 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },

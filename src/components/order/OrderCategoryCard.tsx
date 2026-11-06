@@ -197,6 +197,8 @@ export const OrderCategoryCard: React.FC<OrderCategoryCardProps> = ({
   );
 };
 
+const CATEGORY_ROW_HEIGHT = 52;
+
 const styles = StyleSheet.create({
   card: {
     borderRadius: 20,
@@ -217,7 +219,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '500',
     letterSpacing: -0.2,
   },
   categoryList: {
@@ -228,9 +230,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Tinggi tombol dikunci sama untuk keadaan aktif & nonaktif agar daftar tidak "melompat"
   categoryBtn: {
     width: '100%',
-    paddingVertical: 13,
+    height: CATEGORY_ROW_HEIGHT,
     paddingHorizontal: 20,
     borderRadius: 12,
     alignItems: 'center',
@@ -241,17 +244,16 @@ const styles = StyleSheet.create({
   },
   categoryBtnText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   categoryActiveRow: {
     width: '100%',
-    paddingVertical: 8,
+    height: CATEGORY_ROW_HEIGHT,
     paddingHorizontal: 14,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 50,
   },
   activeLeftInfo: {
     flex: 1,
@@ -262,15 +264,18 @@ const styles = StyleSheet.create({
     }),
   },
   activeNameContainer: {
-    gap: 2,
+    gap: 1,
   },
+  // lineHeight eksplisit: bawaan ThemedText (24) membuat dua baris melebihi tinggi tombol
   activeCategoryName: {
     fontSize: 15,
-    fontWeight: '700',
+    lineHeight: 19,
+    fontWeight: '500',
     letterSpacing: -0.2,
   },
   portionSubtext: {
     fontSize: 11,
+    lineHeight: 14,
     fontWeight: '500',
     letterSpacing: 0.1,
   },
@@ -299,7 +304,7 @@ const styles = StyleSheet.create({
   },
   stepperActionIcon: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '500',
     lineHeight: 20,
   },
   portionCountBadge: {
@@ -311,7 +316,7 @@ const styles = StyleSheet.create({
   portionCountText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '500',
   },
   stepperPressed: {
     opacity: 0.8,

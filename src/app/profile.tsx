@@ -6,9 +6,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from 'react-native';
+import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
@@ -39,7 +39,7 @@ import {
 export default function ProfileScreen() {
   const palette = useProfilePalette();
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width } = useCustomerLayout();
   const isMobile = width <= 768;
 
   const user = useAuthStore((state) => state.user);

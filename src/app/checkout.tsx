@@ -14,6 +14,8 @@ import { CheckoutStickyFooter } from '@/components/checkout/CheckoutStickyFooter
 import { FulfillmentMethodCard } from '@/components/checkout/FulfillmentMethodCard';
 import { OrderItemsSummaryCard } from '@/components/checkout/OrderItemsSummaryCard';
 import { PaymentDetailCard } from '@/components/checkout/PaymentDetailCard';
+import { PaymentMethodCard } from '@/components/checkout/PaymentMethodCard';
+import { PromoCodeCard } from '@/components/checkout/PromoCodeCard';
 import { useCheckoutPalette } from '@/components/checkout/checkoutPalette';
 import { useCreateOrder } from '@/features/order/useOrders';
 import { getApiErrorMessage } from '@/services/apiError';
@@ -120,7 +122,13 @@ export default function CheckoutScreen() {
               {/* Card 2: Pesananmu Summary (Berdasarkan: Hari / Kategori) */}
               <OrderItemsSummaryCard />
 
-              {/* Card 3: Detail Pembayaran Breakdown (kupon di-hold untuk v1) */}
+              {/* Card 3: Metode Pembayaran (QRIS; Tunai belum tersedia) */}
+              <PaymentMethodCard />
+
+              {/* Card 4: Kode Promo (tampilan saja, belum terhubung ke backend) */}
+              <PromoCodeCard />
+
+              {/* Card 5: Detail Pembayaran Breakdown */}
               <PaymentDetailCard />
             </>
           )}
@@ -148,7 +156,6 @@ const styles = StyleSheet.create({
     paddingBottom: 110,
   },
   mainContainer: {
-    maxWidth: 600,
     width: '100%',
     alignSelf: 'center',
     gap: 16,

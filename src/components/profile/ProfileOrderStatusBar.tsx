@@ -63,6 +63,19 @@ export const ProfileOrderStatusBar: React.FC = () => {
         <ThemedText style={[styles.headerTitle, { color: palette.cardTitle }]}>
           Pesanan Saya
         </ThemedText>
+
+        {/* Lihat semua pesanan (tab "Semua") */}
+        <Pressable
+          onPress={() => router.push({ pathname: '/orders', params: { tab: 'all' } })}
+          style={({ pressed }) => [styles.historyLink, pressed && styles.pressed]}
+          accessibilityRole="link"
+          accessibilityLabel="Lihat riwayat pesanan"
+          hitSlop={8}
+        >
+          <ThemedText style={[styles.historyLinkText, { color: palette.cardTitle }]}>
+            Lihat riwayat pesanan ›
+          </ThemedText>
+        </Pressable>
       </View>
 
       {/* Divider */}
@@ -119,6 +132,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  historyLink: {
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  historyLinkText: {
+    fontSize: 12,
+    fontWeight: '400',
   },
   headerTitle: {
     fontSize: 13,

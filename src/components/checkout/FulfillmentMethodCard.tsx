@@ -47,7 +47,7 @@ export const FulfillmentMethodCard: React.FC = () => {
   };
 
   const handleEditAddress = () => {
-    router.push('/addresses');
+    router.push({ pathname: '/addresses', params: { mode: 'select' } });
   };
 
   const isDelivery = fulfillmentType === 'DELIVERY';

@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '500',
     letterSpacing: -0.2,
   },
   chipsRowContainer: {
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   },
   summaryChipText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '500',
     letterSpacing: -0.2,
   },
   chipsScrollView: {
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   },
   dateChipText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   actionBtn: {
     width: '100%',
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   pressed: {
     opacity: 0.85,

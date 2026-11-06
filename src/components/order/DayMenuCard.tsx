@@ -7,10 +7,15 @@ import {
   View,
 } from 'react-native';
 
+import { Image } from 'expo-image';
+
 import { ThemedText } from '@/components/themed-text';
 import { DateEntry } from '@/features/order/useOrderCart';
 import { Menu } from '@/types/menu';
+import { ConfirmRemoveButton } from './ConfirmRemoveButton';
 import { useOrderPalette } from './orderPalette';
+
+const FALLBACK_IMAGE = require('@/assets/images/baby-puree-fallback.jpg');
 
 interface DayMenuCardProps {
   dateEntry: DateEntry;
@@ -36,6 +41,7 @@ export const DayMenuCard: React.FC<DayMenuCardProps> = ({
   onOpenDetailModal,
 }) => {
   const palette = useOrderPalette();
+  const hasSelectedItems = Object.values(dayCart).some((qty) => qty > 0);
 
   return (
     <View style={styles.cardWrapper}>
@@ -54,7 +60,7 @@ export const DayMenuCard: React.FC<DayMenuCardProps> = ({
           accessibilityRole="button"
           accessibilityLabel={`Buka tutup menu ${dateEntry.formattedFull}`}
         >
-          <ThemedText style={[styles.headerDateText, { color: palette.dayHeaderText }]}>
+          <ThemedText style={[styles.headerDateText, { color: palette.dayHeaderText }]} numberOfLines={1}>
             {dateEntry.formattedFull}
           </ThemedText>
         </Pressable>
@@ -84,22 +90,14 @@ export const DayMenuCard: React.FC<DayMenuCardProps> = ({
             </ThemedText>
           </Pressable>
 
-          {/* Remove Day [X] */}
-          <Pressable
-            onPress={onRemoveDay}
-            style={({ pressed }) => [
-              styles.circleBtn,
-              { backgroundColor: palette.dayActionBtnBg },
-              pressed && styles.pressed,
-            ]}
-            accessibilityRole="button"
+          {/* Remove Day [X]: minta konfirmasi bila sudah ada menu yang dipilih */}
+          <ConfirmRemoveButton
+            requireConfirm={hasSelectedItems}
+            onConfirm={onRemoveDay}
+            backgroundColor={palette.dayActionBtnBg}
+            color={palette.dayActionBtnIcon}
             accessibilityLabel={`Hapus hari ${dateEntry.formattedFull}`}
-            hitSlop={6}
-          >
-            <ThemedText style={[styles.closeIcon, { color: palette.dayActionBtnIcon }]}>
-              ✕
-            </ThemedText>
-          </Pressable>
+          />
         </View>
       </View>
 
@@ -124,83 +122,91 @@ export const DayMenuCard: React.FC<DayMenuCardProps> = ({
                   </ThemedText>
                 </View>
               ) : (
-                availableMenus.map((menu) => {
+                availableMenus.map((menu, index) => {
                   const currentQty = dayCart[menu.id] || 0;
-                  const isUtama = menu.menuType === 'UTAMA';
 
                   return (
-                    <View key={menu.id} style={styles.menuItemRow}>
-                      {/* Left: Dish info (click to view details) */}
+                    <View
+                      key={menu.id}
+                      style={[
+                        styles.menuItemRow,
+                        // Garis tipis pemisah antarmenu (tidak untuk menu pertama)
+                        index > 0 && [styles.menuItemSeparator, { borderTopColor: palette.dashedDivider }],
+                      ]}
+                    >
+                      {/* Atas: Dish info selebar penuh (click to view details) */}
                       <Pressable
                         onPress={() => onOpenDetailModal(menu)}
                         style={styles.menuInfoPressable}
                         accessibilityRole="button"
                         accessibilityLabel={`Lihat rincian ${menu.name}`}
                       >
-                        <View style={styles.menuTitleRow}>
-                          <ThemedText style={{ fontSize: 13 }}>
-                            {isUtama ? '🍲' : '🥗'}
-                          </ThemedText>
+                        {/* Foto 1:1 setinggi 1 baris nama + 1 baris harga (tetap walau nama 2 baris) */}
+                        <Image
+                          source={menu.imageUrl ? { uri: menu.imageUrl } : FALLBACK_IMAGE}
+                          placeholder={FALLBACK_IMAGE}
+                          style={[styles.menuThumb, { backgroundColor: palette.stepperBg }]}
+                          contentFit="cover"
+                          accessibilityLabel={menu.name}
+                        />
+                        <View style={styles.menuTextCol}>
                           <ThemedText
                             style={[styles.menuName, { color: palette.dayMenuText }]}
-                            numberOfLines={1}
+                            numberOfLines={2}
                           >
                             {menu.name}
                           </ThemedText>
+                          <ThemedText
+                            style={[styles.menuPrice, { color: palette.dayMenuSubtext }]}
+                          >
+                            ↳ Rp{Number(menu.price).toLocaleString('id-ID')}
+                          </ThemedText>
                         </View>
-                        <ThemedText
-                          style={[styles.menuPrice, { color: palette.dayMenuSubtext }]}
-                        >
-                          ↳ Rp{Number(menu.price).toLocaleString('id-ID')}
-                        </ThemedText>
                       </Pressable>
 
-                      {/* Right: Quantity Stepper */}
+                      {/* Bawah, rata kanan: Quantity Stepper (− dan jumlah hanya tampil bila porsi > 0) */}
                       <View style={styles.qtyControlRow}>
-                        <Pressable
-                          onPress={() => onUpdateQty(menu.id, -1)}
-                          disabled={currentQty === 0}
-                          style={({ pressed }) => [
-                            styles.stepperBtn,
-                            {
-                              borderColor: palette.stepperBorder,
-                              backgroundColor: palette.stepperBg,
-                              opacity: currentQty === 0 ? 0.35 : 1,
-                            },
-                            pressed && currentQty > 0 && styles.pressed,
-                          ]}
-                          accessibilityLabel="Kurangi porsi"
-                        >
-                          <ThemedText
-                            style={[styles.stepperBtnText, { color: palette.stepperText }]}
-                          >
-                            −
-                          </ThemedText>
-                        </Pressable>
+                        {currentQty > 0 ? (
+                          <>
+                            <Pressable
+                              onPress={() => onUpdateQty(menu.id, -1)}
+                              style={({ pressed }) => [
+                                styles.stepperBtn,
+                                {
+                                  borderColor: palette.stepperBorder,
+                                  backgroundColor: palette.stepperBg,
+                                },
+                                pressed && styles.pressed,
+                              ]}
+                              accessibilityLabel="Kurangi porsi"
+                            >
+                              <ThemedText
+                                style={[styles.stepperBtnText, { color: palette.stepperText }]}
+                              >
+                                −
+                              </ThemedText>
+                            </Pressable>
 
-                        <TextInput
-                          style={[
-                            styles.qtyInput,
-                            {
-                              borderColor:
-                                currentQty > 0
-                                  ? palette.stepperActiveBorder
-                                  : palette.stepperBorder,
-                              backgroundColor:
-                                currentQty > 0
-                                  ? palette.stepperActiveBg
-                                  : palette.stepperBg,
-                              color:
-                                currentQty > 0
-                                  ? palette.stepperActiveText
-                                  : palette.stepperText,
-                            },
-                          ]}
-                          keyboardType="numeric"
-                          value={String(currentQty)}
-                          onChangeText={(val) => onUpdateQty(menu.id, val)}
-                          selectTextOnFocus
-                        />
+                            <TextInput
+                              style={[
+                                styles.qtyInput,
+                                {
+                                  borderColor: palette.stepperActiveBorder,
+                                  backgroundColor: palette.stepperActiveBg,
+                                  color: palette.stepperActiveText,
+                                },
+                              ]}
+                              keyboardType="numeric"
+                              value={String(currentQty)}
+                              // Isi kosong diabaikan agar input tidak langsung hilang saat angka dihapus untuk diganti
+                              onChangeText={(val) => {
+                                if (val.trim() !== '') onUpdateQty(menu.id, val);
+                              }}
+                              selectTextOnFocus
+                              accessibilityLabel="Jumlah porsi"
+                            />
+                          </>
+                        ) : null}
 
                         <Pressable
                           onPress={() => onUpdateQty(menu.id, 1)}
@@ -258,6 +264,12 @@ export const DayMenuCard: React.FC<DayMenuCardProps> = ({
   );
 };
 
+// Tinggi foto = 1 baris nama + jarak + 1 baris harga (nama 2 baris tidak mengubah ukuran foto)
+const MENU_NAME_LINE_HEIGHT = 20;
+const MENU_PRICE_LINE_HEIGHT = 16;
+const MENU_TEXT_GAP = 2;
+const MENU_THUMB_SIZE = MENU_NAME_LINE_HEIGHT + MENU_TEXT_GAP + MENU_PRICE_LINE_HEIGHT; // 38
+
 const styles = StyleSheet.create({
   cardWrapper: {
     borderRadius: 18,
@@ -282,7 +294,7 @@ const styles = StyleSheet.create({
   },
   headerDateText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '500',
     letterSpacing: -0.2,
   },
   actionButtonsRow: {
@@ -302,7 +314,7 @@ const styles = StyleSheet.create({
   },
   triangleIcon: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '500',
     marginTop: -1,
   },
   triangleRotated: {
@@ -310,7 +322,7 @@ const styles = StyleSheet.create({
   },
   closeIcon: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '500',
   },
   body: {
     paddingHorizontal: 16,
@@ -331,48 +343,57 @@ const styles = StyleSheet.create({
     }),
   },
   menuItemsList: {
-    gap: 10,
+    gap: 0, // jarak antarmenu diatur oleh padding + garis pemisah di menuItemRow
   },
   emptyNotice: {
     paddingVertical: 12,
   },
   emptyNoticeText: {
     fontSize: 13,
-    fontStyle: 'italic',
   },
+  // Baris menu: info (foto + nama + harga) selebar penuh, stepper di bawahnya rata kanan
   menuItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 4,
+    flexDirection: 'column',
+    gap: 6,
+    paddingVertical: 10,
+  },
+  menuItemSeparator: {
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   menuInfoPressable: {
     flex: 1,
     minWidth: 0,
-    gap: 2,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
     ...Platform.select({
       web: { cursor: 'pointer' },
     }),
   },
-  menuTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  menuThumb: {
+    width: MENU_THUMB_SIZE,
+    height: MENU_THUMB_SIZE, // 1:1
+    borderRadius: 8,
+  },
+  menuTextCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: MENU_TEXT_GAP,
   },
   menuName: {
     fontSize: 14,
-    fontWeight: '600',
-    flex: 1,
+    lineHeight: MENU_NAME_LINE_HEIGHT,
+    fontWeight: '500',
   },
   menuPrice: {
     fontSize: 12,
+    lineHeight: MENU_PRICE_LINE_HEIGHT,
     fontWeight: '500',
-    paddingLeft: 20,
   },
   qtyControlRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-end',
     gap: 6,
   },
   stepperBtn: {
@@ -388,7 +409,7 @@ const styles = StyleSheet.create({
   },
   stepperBtnText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '500',
     lineHeight: 18,
   },
   qtyInput: {
@@ -398,7 +419,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     textAlign: 'center',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '500',
     padding: 0,
   },
   dashedDivider: {
@@ -412,7 +433,7 @@ const styles = StyleSheet.create({
   },
   subtotalText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '500',
     letterSpacing: -0.2,
   },
   pressed: {

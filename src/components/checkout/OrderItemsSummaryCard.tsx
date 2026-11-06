@@ -5,6 +5,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { formatIndonesianDate, parseDateKey } from '@/features/order/dateUtils';
@@ -12,6 +13,18 @@ import { useCartStore } from '@/store/useCartStore';
 import { useCheckoutPalette } from './checkoutPalette';
 
 type GroupByMode = 'HARI' | 'KATEGORI';
+
+const FALLBACK_IMAGE = require('@/assets/images/baby-puree-fallback.jpg');
+
+/** Foto menu kecil; memakai gambar cadangan bila menu belum punya foto. */
+const MenuThumb: React.FC<{ imageUrl: string | null; bg: string }> = ({ imageUrl, bg }) => (
+  <Image
+    source={imageUrl ? { uri: imageUrl } : FALLBACK_IMAGE}
+    placeholder={FALLBACK_IMAGE}
+    style={[styles.thumb, { backgroundColor: bg }]}
+    contentFit="cover"
+  />
+);
 
 export const OrderItemsSummaryCard: React.FC = () => {
   const palette = useCheckoutPalette();
@@ -35,7 +48,7 @@ export const OrderItemsSummaryCard: React.FC = () => {
             menuId,
             qty,
             menuName: menu?.name || 'Menu MPASI',
-            category: menu?.category || 'Utama',
+            imageUrl: menu?.imageUrl ?? null,
             price: menu?.price || 0,
             subtotal: (menu?.price || 0) * qty,
           };
@@ -57,7 +70,7 @@ export const OrderItemsSummaryCard: React.FC = () => {
       string,
       {
         categoryName: string;
-        menus: Record<string, { menuName: string; qty: number; price: number }>;
+        menus: Record<string, { menuName: string; imageUrl: string | null; qty: number; price: number }>;
         totalQty: number;
         subtotal: number;
       }
@@ -82,6 +95,7 @@ export const OrderItemsSummaryCard: React.FC = () => {
         if (!catMap[cat].menus[menuId]) {
           catMap[cat].menus[menuId] = {
             menuName: menu?.name || 'Menu MPASI',
+            imageUrl: menu?.imageUrl ?? null,
             qty: 0,
             price: menu?.price || 0,
           };
@@ -193,7 +207,7 @@ export const OrderItemsSummaryCard: React.FC = () => {
               <View key={group.dateKey} style={styles.dateGroupCard}>
                 <View style={[styles.groupHeader, { borderBottomColor: palette.dividerColor }]}>
                   <ThemedText style={[styles.dateTitle, { color: palette.cardTitle }]}>
-                    📅 {group.formattedDate}
+                    {group.formattedDate}
                   </ThemedText>
                   <ThemedText style={[styles.groupBadge, { color: palette.cardSubtext }]}>
                     {group.totalItems} Porsi
@@ -202,12 +216,16 @@ export const OrderItemsSummaryCard: React.FC = () => {
 
                 {group.items.map((item) => (
                   <View key={item.menuId} style={styles.itemRow}>
+                    <MenuThumb imageUrl={item.imageUrl} bg={palette.optionBg} />
                     <View style={styles.itemLeft}>
-                      <ThemedText style={[styles.itemName, { color: palette.cardTitle }]}>
+                      <ThemedText style={[styles.itemName, { color: palette.cardTitle }]} numberOfLines={2}>
                         {item.menuName}
                       </ThemedText>
                       <ThemedText style={[styles.itemSub, { color: palette.cardSubtext }]}>
-                        {item.category} • {item.qty}x @ Rp {item.price.toLocaleString('id-ID')}
+                        {item.qty}x
+                      </ThemedText>
+                      <ThemedText style={[styles.itemSub, { color: palette.cardSubtext }]}>
+                        Rp {item.price.toLocaleString('id-ID')}
                       </ThemedText>
                     </View>
                     <ThemedText style={[styles.itemPrice, { color: palette.cardTitle }]}>
@@ -227,7 +245,7 @@ export const OrderItemsSummaryCard: React.FC = () => {
               <View key={group.categoryName} style={styles.dateGroupCard}>
                 <View style={[styles.groupHeader, { borderBottomColor: palette.dividerColor }]}>
                   <ThemedText style={[styles.dateTitle, { color: palette.cardTitle }]}>
-                    🥣 {group.categoryName}
+                    {group.categoryName}
                   </ThemedText>
                   <ThemedText style={[styles.groupBadge, { color: palette.cardSubtext }]}>
                     Total {group.totalQty} Porsi
@@ -236,6 +254,7 @@ export const OrderItemsSummaryCard: React.FC = () => {
 
                 {Object.values(group.menus).map((menu, idx) => (
                   <View key={`cat-menu-${idx}`} style={styles.itemRow}>
+                    <MenuThumb imageUrl={menu.imageUrl} bg={palette.optionBg} />
                     <View style={styles.itemLeft}>
                       <ThemedText style={[styles.itemName, { color: palette.cardTitle }]}>
                         {menu.menuName}
@@ -368,7 +387,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
     paddingVertical: 4,
+  },
+  thumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
   },
   itemLeft: {
     flex: 1,

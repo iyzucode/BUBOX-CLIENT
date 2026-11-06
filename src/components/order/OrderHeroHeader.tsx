@@ -149,11 +149,11 @@ const styles = StyleSheet.create({
   },
   closeIconText: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '500',
     letterSpacing: 1.2,
     ...Platform.select({
       web: {

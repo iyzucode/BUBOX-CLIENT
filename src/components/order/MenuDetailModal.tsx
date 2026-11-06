@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { CUSTOMER_MAX_WIDTH } from '@/hooks/use-customer-layout';
 import { Menu } from '@/types/menu';
 import { useOrderPalette } from './orderPalette';
 
@@ -228,7 +229,7 @@ const styles = StyleSheet.create({
   },
   sheetCard: {
     width: '100%',
-    maxWidth: 500,
+    maxWidth: CUSTOMER_MAX_WIDTH, // selebar kolom customer (modal digambar di atas seluruh jendela)
     maxHeight: '82%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -293,18 +294,18 @@ const styles = StyleSheet.create({
   },
   categoryBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '500',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   menuTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '500',
     letterSpacing: -0.3,
   },
   priceTag: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '500',
     marginTop: 2,
   },
   sectionBlock: {
@@ -313,7 +314,7 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '500',
     letterSpacing: -0.1,
   },
   sectionBody: {

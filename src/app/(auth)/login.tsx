@@ -8,9 +8,9 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
+import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,7 +26,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeContext();
-  const { width } = useWindowDimensions();
+  const { width } = useCustomerLayout();
   const isDesktop = width > 768;
 
   const [email, setEmail] = useState('');

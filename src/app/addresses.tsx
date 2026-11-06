@@ -6,11 +6,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from 'react-native';
+import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -21,18 +21,41 @@ import {
   useDeleteAddress,
   useSetPrimaryAddress,
 } from '@/features/biodata/useAddresses';
+import { useCartStore } from '@/store/useCartStore';
 import { Address } from '@/types/address';
 
 export default function AddressesScreen() {
   const { isDark, theme } = useThemeContext();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width } = useCustomerLayout();
   const isDesktop = width > 768;
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  // Mode pilih: dibuka dari Checkout untuk memilih alamat pengantaran
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isSelectMode = mode === 'select';
+  const selectedAddressId = useCartStore((s) => s.selectedAddressId);
+  const setSelectedAddressId = useCartStore((s) => s.setSelectedAddressId);
+
   const { data: addresses, isLoading, isError, error, refetch } = useAddresses();
+
+  // Alamat yang sedang dipakai: pilihan di keranjang, atau alamat utama (sama seperti di Checkout)
+  const activeAddressId =
+    addresses?.find((a) => a.id === selectedAddressId)?.id ??
+    addresses?.find((a) => a.isPrimary)?.id ??
+    addresses?.[0]?.id ??
+    null;
+
+  const handleSelectAddress = (addr: Address) => {
+    setSelectedAddressId(addr.id);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/checkout');
+    }
+  };
   const setPrimaryMutation = useSetPrimaryAddress();
   const deleteMutation = useDeleteAddress();
 
@@ -142,7 +165,9 @@ export default function AddressesScreen() {
           </Pressable>
 
           {/* Right Header Title */}
-          <ThemedText style={styles.headerTitle}>Alamat</ThemedText>
+          <ThemedText style={styles.headerTitle}>
+            {isSelectMode ? 'Pilih Alamat' : 'Alamat'}
+          </ThemedText>
         </View>
       </View>
 
@@ -243,6 +268,8 @@ export default function AddressesScreen() {
                   deleteMutation.isPending &&
                   deleteMutation.variables === addr.id
                 }
+                onSelect={isSelectMode ? handleSelectAddress : undefined}
+                isSelected={isSelectMode && addr.id === activeAddressId}
               />
             ))}
           </View>

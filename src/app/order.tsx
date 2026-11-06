@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '500',
   },
   emptySubtitle: {
     fontSize: 13,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '500',
   },
   pressed: {
     opacity: 0.8,

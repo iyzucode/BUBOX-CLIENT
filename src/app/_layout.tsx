@@ -1,5 +1,4 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { Stack } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,24 +6,40 @@ import React, { useEffect, useState } from 'react';
 
 import { AppThemeProvider, useThemeContext } from '@/context/ThemeContext';
 import { AppSidebar } from '@/components/ui/AppSidebar';
+// Tampilan desktop penuh (dengan sidebar) hanya untuk area admin; customer dibatasi kolom ini
+import { CUSTOMER_MAX_WIDTH } from '@/hooks/use-customer-layout';
+
 
 function RootLayoutContent() {
   const { theme, isDark } = useThemeContext();
   const { width } = useWindowDimensions();
-  const isDesktop = width > 768;
+  const pathname = usePathname();
+  const isDesktop = width > CUSTOMER_MAX_WIDTH;
+
+  // Admin & role internal: layout desktop dengan sidebar.
+  // Customer: tanpa sidebar, konten dibatasi 768px di tengah layar.
+  const isAdminArea = pathname === '/admin' || pathname.startsWith('/admin/');
+  const showSidebar = isDesktop && isAdminArea;
+  const constrainCustomer = isDesktop && !isAdminArea;
 
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <View
         style={[
           styles.container,
-          { backgroundColor: theme.background },
-          isDesktop && styles.desktopContainer,
+          { backgroundColor: constrainCustomer ? theme.backgroundElement : theme.background },
+          showSidebar && styles.desktopContainer,
         ]}
       >
-        {isDesktop && <AppSidebar />}
+        {showSidebar && <AppSidebar />}
 
-        <View style={[styles.content, { backgroundColor: theme.background }]}>
+        <View
+          style={[
+            styles.content,
+            { backgroundColor: theme.background },
+            constrainCustomer && [styles.customerColumn, { borderColor: theme.border }],
+          ]}
+        >
           <Stack
             screenOptions={{
               headerShown: false,
@@ -117,5 +132,12 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     height: '100%',
+  },
+  customerColumn: {
+    width: '100%',
+    maxWidth: CUSTOMER_MAX_WIDTH,
+    alignSelf: 'center',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
   },
 });

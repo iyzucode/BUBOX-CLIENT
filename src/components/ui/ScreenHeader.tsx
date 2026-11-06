@@ -76,7 +76,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   row: {
-    maxWidth: 720,
     width: '100%',
     alignSelf: 'center',
     flexDirection: 'row',

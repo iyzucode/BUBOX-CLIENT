@@ -4,9 +4,9 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from 'react-native';
+import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,7 +19,7 @@ export const ProfileHeroHeader: React.FC = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const palette = useProfilePalette();
-  const { width } = useWindowDimensions();
+  const { width } = useCustomerLayout();
   const isMobile = width <= 768;
 
   const handleClose = () => {

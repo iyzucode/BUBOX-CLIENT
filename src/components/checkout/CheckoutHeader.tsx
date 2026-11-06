@@ -92,7 +92,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   contentRow: {
-    maxWidth: 600,
     width: '100%',
     alignSelf: 'center',
     flexDirection: 'row',
