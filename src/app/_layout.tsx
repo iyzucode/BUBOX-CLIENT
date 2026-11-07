@@ -57,6 +57,7 @@ function RootLayoutContent() {
             <Stack.Screen name="orders" />
             <Stack.Screen name="order-detail" />
             <Stack.Screen name="(auth)" />
+            <Stack.Screen name="oauth-redirect" />
             <Stack.Screen name="admin/index" />
             <Stack.Screen name="admin/menu" />
             <Stack.Screen name="admin/menu-form" />

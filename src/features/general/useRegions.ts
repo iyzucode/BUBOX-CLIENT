@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
-import { RegionItem, VillageItem } from '@/types/region';
+import { RegionItem, ResolvedLocation, VillageItem } from '@/types/region';
 
 export const useProvinces = () => {
   return useQuery<RegionItem[]>({
@@ -54,3 +54,14 @@ export const useVillages = (districtCode?: string) => {
     staleTime: 1000 * 60 * 60,
   });
 };
+
+/**
+ * Titik peta → alamat + kode wilayah resmi (server memanggil Google Geocoding).
+ * Fungsi biasa (bukan hook) karena dipanggil saat peta berhenti digeser.
+ */
+export async function resolveLocation(latitude: number, longitude: number): Promise<ResolvedLocation> {
+  const response = await api.get<ResolvedLocation>('/general/ResolveLocation', {
+    params: { latitude, longitude },
+  });
+  return response.data;
+}

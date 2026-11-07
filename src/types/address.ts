@@ -12,6 +12,10 @@ export interface Address {
   notes?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** ID tempat Google Maps. */
+  placeId?: string | null;
+  /** Kode kelurahan/desa resmi, mis. 34.01.02.1008. */
+  wilayahCode?: string | null;
   isPrimary: boolean;
   createdAt: string;
   updatedAt: string;
@@ -29,6 +33,10 @@ export interface CreateAddressRequest {
   notes?: string;
   latitude?: number | null;
   longitude?: number | null;
+  /** ID tempat Google Maps. */
+  placeId?: string | null;
+  /** Kode kelurahan/desa resmi, mis. 34.01.02.1008. */
+  wilayahCode?: string | null;
   isPrimary?: boolean;
 }
 
@@ -44,5 +52,9 @@ export interface UpdateAddressRequest {
   notes?: string;
   latitude?: number | null;
   longitude?: number | null;
+  /** ID tempat Google Maps. */
+  placeId?: string | null;
+  /** Kode kelurahan/desa resmi, mis. 34.01.02.1008. */
+  wilayahCode?: string | null;
   isPrimary?: boolean;
 }

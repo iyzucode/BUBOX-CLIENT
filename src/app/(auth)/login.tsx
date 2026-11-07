@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { AlertBanner } from '@/components/auth/AlertBanner';
+import { useGoogleSignIn } from '@/features/auth/useGoogleSignIn';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useLogin } from '@/features/auth/useLogin';
 import { ApiErrorResponse } from '@/types/auth';
@@ -35,6 +36,11 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isUnverified, setIsUnverified] = useState(false);
+
+  const google = useGoogleSignIn({
+    onSuccess: () => router.replace('/'),
+    onError: (message) => setErrorMessage(message),
+  });
 
   const loginMutation = useLogin();
 
@@ -340,6 +346,11 @@ export default function LoginScreen() {
 
                 {/* Google */}
                 <Pressable
+                  onPress={() => {
+                    setErrorMessage(null);
+                    google.signIn();
+                  }}
+                  disabled={google.isPending}
                   style={({ pressed }) => [
                     styles.socialTile,
                     { backgroundColor: socialButtonBg },
@@ -348,7 +359,9 @@ export default function LoginScreen() {
                   accessibilityLabel="Login dengan Google"
                   accessibilityRole="button"
                 >
-                  {Platform.OS === 'web' ? (
+                  {google.isPending ? (
+                    <ActivityIndicator size="small" color={iconColor} />
+                  ) : Platform.OS === 'web' ? (
                     <svg width="22" height="22" viewBox="0 0 24 24" fill={isDark ? '#F4F4F5' : Brand.navy}>
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                       <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />

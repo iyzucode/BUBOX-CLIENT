@@ -18,7 +18,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { SelectModalPicker } from '@/components/ui/SelectModalPicker';
-import { AddressLocationPicker } from '@/components/address/AddressLocationPicker';
+import { AddressMapSection } from '@/components/address/AddressMapSection';
 import { FloatingLabelPillInput } from '@/components/ui/FloatingLabelPillInput';
 import { useThemeContext } from '@/context/ThemeContext';
 import {
@@ -33,6 +33,9 @@ import {
   useVillages,
 } from '@/features/general/useRegions';
 import { CreateAddressRequest } from '@/types/address';
+import { ResolvedLocation } from '@/types/region';
+
+const VILLAGE_CODE_PATTERN = /^\d{2}\.\d{2}\.\d{2}\.\d{4}$/;
 
 interface SelectedRegion {
   code: string;
@@ -65,6 +68,9 @@ export default function AddressFormScreen() {
   // Location Coordinate states
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [placeId, setPlaceId] = useState<string | null>(null);
+  // Alamat terakhir yang diisi otomatis dari peta; bila pengguna belum mengubahnya, boleh ditimpa lagi.
+  const [autoFilledAddress, setAutoFilledAddress] = useState('');
 
   // Regional cascading states
   const [selectedProvince, setSelectedProvince] = useState<SelectedRegion | null>(null);
@@ -114,6 +120,29 @@ export default function AddressFormScreen() {
       }
     }
   }, [addressDetail]);
+
+  // Lokasi dipilih di Google Maps: isi koordinat, alamat, wilayah, dan kode pos otomatis.
+  const handleLocationPicked = (location: ResolvedLocation) => {
+    setLatitude(location.latitude);
+    setLongitude(location.longitude);
+    setPlaceId(location.placeId ?? null);
+
+    if (!fullAddress.trim() || fullAddress === autoFilledAddress) {
+      setFullAddress(location.formattedAddress);
+      setAutoFilledAddress(location.formattedAddress);
+    }
+
+    setSelectedProvince(location.province ?? null);
+    setSelectedCity(location.city ?? null);
+    setSelectedDistrict(location.district ?? null);
+    setSelectedVillage(location.village ?? null);
+    setPostalCode(location.postalCode ?? '');
+    setErrorMessage(
+      location.isFullyMatched
+        ? ''
+        : 'Sebagian wilayah belum terisi otomatis. Lengkapi pilihan wilayah di bawah.'
+    );
+  };
 
   // Handle province selection
   const handleSelectProvince = (item: { value: string; label: string }) => {
@@ -195,6 +224,11 @@ export default function AddressFormScreen() {
       notes: notes.trim() || undefined,
       latitude: latitude != null ? latitude : undefined,
       longitude: longitude != null ? longitude : undefined,
+      placeId: placeId ?? undefined,
+      wilayahCode:
+        selectedVillage?.code && VILLAGE_CODE_PATTERN.test(selectedVillage.code)
+          ? selectedVillage.code
+          : undefined,
       isPrimary,
     };
 
@@ -297,15 +331,17 @@ export default function AddressFormScreen() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* INTERACTIVE OPENSTREETMAP LOCATION PICKER */}
-              <AddressLocationPicker
-                initialLatitude={latitude}
-                initialLongitude={longitude}
-                onLocationChange={(lat, lng) => {
+              {/* PETA: web = Google Maps (cari / geser pin, alamat terisi otomatis);
+                  Android/iOS sementara peta lama */}
+              <AddressMapSection
+                latitude={latitude}
+                longitude={longitude}
+                autoOpenPicker={!isEditMode}
+                onLocationPicked={handleLocationPicked}
+                onCoordinatesChange={(lat, lng) => {
                   setLatitude(lat);
                   setLongitude(lng);
                 }}
-                height={230}
               />
 
               {/* 3. CURVED BOTTOM SHEET FORM CONTAINER */}
