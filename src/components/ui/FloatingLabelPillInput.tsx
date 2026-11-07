@@ -106,8 +106,8 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     position: 'relative',
-    // Pre-allocated clearance for floating legend above the pill (simulating <fieldset> top border space)
-    paddingTop: 16,
+    // Ruang tetap untuk label di ATAS pill (tidak menimpa border); tanpa layout shift saat label muncul
+    paddingTop: 18,
   },
   legendWrapper: {
     position: 'absolute',
@@ -122,6 +122,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
+    lineHeight: 16,
     fontWeight: '600',
     letterSpacing: 0.15,
   },
