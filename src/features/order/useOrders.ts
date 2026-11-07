@@ -12,8 +12,10 @@ import {
   OrderCutoffInfo,
   OrderDetail,
   OrderDayStatusCode,
+  OrderPaymentStatus,
   OrderSearchParams,
   OrderSettings,
+  OrderStatusCode,
   OrderSummary,
   PagedResult,
   UpdateOrderSettingsRequest,
@@ -25,6 +27,7 @@ export const ORDER_QUERY_KEYS = {
   all: ['orders'] as const,
   mine: () => [...ORDER_QUERY_KEYS.all, 'mine'] as const,
   detail: (id: string) => [...ORDER_QUERY_KEYS.all, 'detail', id] as const,
+  paymentStatus: (id: string) => [...ORDER_QUERY_KEYS.all, 'payment-status', id] as const,
   adminList: (params: OrderSearchParams) => [...ORDER_QUERY_KEYS.all, 'admin', params] as const,
   production: (date: string) => [...ORDER_QUERY_KEYS.all, 'production', date] as const,
   cutoff: ['settings', 'cutoff'] as const,
@@ -63,18 +66,42 @@ export const useMyOrders = () => {
   });
 };
 
-/**
- * Detail order. Saat masih menunggu pembayaran, data di-poll tiap 5 detik
- * agar halaman QRIS otomatis berpindah begitu webhook Midtrans masuk.
- */
-export const useOrderDetail = (id?: string, options?: { pollWhileAwaitingPayment?: boolean }) => {
+/** Detail order lengkap (hari, item, histori). Diambil sekali; tidak di-poll. */
+export const useOrderDetail = (id?: string) => {
   const token = useAuthStore((s) => s.token);
   return useQuery<OrderDetail, ApiError>({
     queryKey: ORDER_QUERY_KEYS.detail(id || ''),
     queryFn: async () => (await api.get<OrderDetail>('/Order/GetDetailOrder', { params: { id } })).data,
     enabled: !!token && !!id,
+  });
+};
+
+const PAYMENT_POLL_MS = 5000;
+
+/**
+ * Polling ringan halaman QRIS: hanya GET /Order/GetPaymentStatus tiap 5 detik
+ * selama masih AWAITING_PAYMENT. Begitu status berubah (dibayar/kedaluwarsa/batal),
+ * detail lengkap & daftar pesanan diambil ulang sekali.
+ */
+export const usePaymentStatus = (id?: string, currentStatus?: OrderStatusCode) => {
+  const token = useAuthStore((s) => s.token);
+  const queryClient = useQueryClient();
+  const isAwaiting = currentStatus === 'AWAITING_PAYMENT';
+
+  return useQuery<OrderPaymentStatus, ApiError>({
+    queryKey: ORDER_QUERY_KEYS.paymentStatus(id || ''),
+    queryFn: async () => {
+      const status = (await api.get<OrderPaymentStatus>('/Order/GetPaymentStatus', { params: { id } })).data;
+      if (status.statusCode !== currentStatus) {
+        queryClient.invalidateQueries({ queryKey: ORDER_QUERY_KEYS.detail(id || '') });
+        queryClient.invalidateQueries({ queryKey: ORDER_QUERY_KEYS.mine() });
+      }
+      return status;
+    },
+    // Hanya aktif selama detail menyatakan masih menunggu pembayaran.
+    enabled: !!token && !!id && isAwaiting,
     refetchInterval: (query) =>
-      options?.pollWhileAwaitingPayment && query.state.data?.statusCode === 'AWAITING_PAYMENT' ? 5000 : false,
+      !query.state.data || query.state.data.statusCode === 'AWAITING_PAYMENT' ? PAYMENT_POLL_MS : false,
   });
 };
 

@@ -70,6 +70,15 @@ export interface QrisPayment {
   paidAt: string | null;
 }
 
+/** GET /Order/GetPaymentStatus: status saja, untuk polling halaman QRIS. */
+export interface OrderPaymentStatus {
+  orderId: string;
+  statusCode: OrderStatusCode;
+  paymentDueAt: string;
+  paidAt: string | null;
+  cancelReason: string | null;
+}
+
 export interface CreateOrderResponse {
   orderId: string;
   orderNumber: string;

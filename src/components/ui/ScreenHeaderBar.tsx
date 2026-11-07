@@ -11,10 +11,17 @@ interface ScreenHeaderBarProps {
   onBack: () => void;
   /** Lebar maksimum isi header (ikuti kolom konten). */
   maxWidth?: number | '100%';
+  /** Ikon tombol kiri: panah kembali (default) atau rumah (ke Beranda). */
+  icon?: 'back' | 'home';
 }
 
-/** Header navy: tombol kembali bulat di kiri, judul di kanan (pola screen Alamat). */
-export const ScreenHeaderBar: React.FC<ScreenHeaderBarProps> = ({ title, onBack, maxWidth = '100%' }) => {
+/** Header navy: tombol bulat di kiri, judul di kanan (pola screen Alamat). */
+export const ScreenHeaderBar: React.FC<ScreenHeaderBarProps> = ({
+  title,
+  onBack,
+  maxWidth = '100%',
+  icon = 'back',
+}) => {
   const { isDark } = useThemeContext();
   const insets = useSafeAreaInsets();
 
@@ -32,16 +39,22 @@ export const ScreenHeaderBar: React.FC<ScreenHeaderBarProps> = ({ title, onBack,
         <Pressable
           onPress={onBack}
           style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-          accessibilityLabel="Kembali"
+          accessibilityLabel={icon === 'home' ? 'Ke Beranda' : 'Kembali'}
           accessibilityRole="button"
         >
           {Platform.OS === 'web' ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2.4"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
+            icon === 'home' ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="#111827" aria-hidden>
+                <path d="M12 3.2 2.5 11.1a.9.9 0 0 0 1.15 1.38L5 11.37V19.5A1.5 1.5 0 0 0 6.5 21H10v-5.5h4V21h3.5a1.5 1.5 0 0 0 1.5-1.5v-8.13l1.35 1.11a.9.9 0 0 0 1.15-1.38z" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2.4"
+                strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            )
           ) : (
-            <ThemedText style={styles.backText}>‹</ThemedText>
+            <ThemedText style={styles.backText}>{icon === 'home' ? '⌂' : '‹'}</ThemedText>
           )}
         </Pressable>
         <ThemedText style={styles.title} numberOfLines={1}>
