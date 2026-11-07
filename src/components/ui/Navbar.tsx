@@ -10,6 +10,7 @@ import {
 import { Link, useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -24,12 +25,6 @@ export const Navbar: React.FC = () => {
   const logoutMutation = useLogout();
   const { data: health, isLoading, isError } = useHealthCheck();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-
-  const userInitial = user?.fullName
-    ? user.fullName.trim()[0].toUpperCase()
-    : user?.username
-    ? user.username.trim()[0].toUpperCase()
-    : 'U';
 
   return (
     <View
@@ -110,9 +105,7 @@ export const Navbar: React.FC = () => {
                 accessibilityRole="button"
                 accessibilityLabel="Menu Akun"
               >
-                <ThemedText style={styles.avatarTriggerText}>
-                  {userInitial}
-                </ThemedText>
+                <UserAvatar user={user} size={33} fallbackBackground={theme.primary} />
               </Pressable>
 
               {/* Google-Style Account Popover Modal */}
@@ -143,16 +136,12 @@ export const Navbar: React.FC = () => {
                       {/* Top / Main Profile Area */}
                       <View style={styles.cardHeaderArea}>
                         {/* Large Avatar */}
-                        <View
-                          style={[
-                            styles.avatarLarge,
-                            { backgroundColor: theme.primary },
-                          ]}
-                        >
-                          <ThemedText style={styles.avatarLargeText}>
-                            {userInitial}
-                          </ThemedText>
-                        </View>
+                        <UserAvatar
+                          user={user}
+                          size={72}
+                          fallbackBackground={theme.primary}
+                          style={styles.avatarLarge}
+                        />
 
                         {/* Full Name */}
                         <ThemedText
@@ -490,12 +479,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     cursor: 'pointer' as any,
-  },
-  avatarTriggerText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
   },
   modalRoot: {
     flex: 1,
@@ -532,17 +517,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarLarge: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 14,
-  },
-  avatarLargeText: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '700',
   },
   accountCardName: {
     fontSize: 16,

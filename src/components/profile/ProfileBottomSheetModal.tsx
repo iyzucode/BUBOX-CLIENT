@@ -3,7 +3,6 @@ import {
   Animated,
   Dimensions,
   Easing,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -16,12 +15,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLogout } from '@/features/auth/useLogout';
 import { ProfileThemeSwitch } from './ProfileThemeSwitch';
 import { useProfilePalette } from './profilePalette';
 
-const defaultBabyAvatar = require('@/assets/images/profile-avatar-baby.jpg');
 const SCREEN_HEIGHT = Dimensions.get('window').height || 700;
 
 interface ProfileBottomSheetModalProps {
@@ -142,12 +141,8 @@ export const ProfileBottomSheetModal: React.FC<ProfileBottomSheetModalProps> = (
                ============================================================== */
             <View style={styles.authenticatedContent}>
               {/* Overlapping Baby Avatar */}
-              <View style={[styles.avatarCircle, { borderColor: sheetBg }]}>
-                <Image
-                  source={defaultBabyAvatar}
-                  style={styles.avatarImage}
-                  resizeMode="cover"
-                />
+              <View style={[styles.avatarCircle, { borderColor: sheetBg, backgroundColor: sheetBg }]}>
+                <UserAvatar user={user} size={84} />
               </View>
 
               {/* User Name in bold uppercase */}
@@ -311,6 +306,8 @@ const styles = StyleSheet.create({
     borderRadius: 45,
     borderWidth: 3,
     overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: -45, // Half of avatar sits cleanly above card without being clipped
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -318,10 +315,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
     zIndex: 20,
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
   },
   userName: {
     color: '#FFFFFF',

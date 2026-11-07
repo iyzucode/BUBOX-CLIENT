@@ -8,6 +8,7 @@ import {
 import { usePathname, useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLogout } from '@/features/auth/useLogout';
@@ -456,22 +457,13 @@ export const AppSidebar: React.FC = () => {
               onPress={() => router.push('/profile')}
               style={styles.avatarButton}
             >
-              <View
-                style={[
-                  styles.avatarCircle,
-                  {
-                    backgroundColor: theme.primaryLight || '#FFF0E8',
-                    borderColor: theme.primary,
-                  },
-                ]}
-              >
-                <ThemedText
-                  type="smallBold"
-                  style={{ color: theme.primary, fontSize: 14 }}
-                >
-                  {user.fullName ? user.fullName[0].toUpperCase() : 'U'}
-                </ThemedText>
-              </View>
+              <UserAvatar
+                user={user}
+                size={38}
+                fallbackBackground={theme.primaryLight || '#FFF0E8'}
+                fallbackTextColor={theme.primary}
+                style={[styles.avatarCircle, { borderColor: theme.primary }]}
+              />
             </Pressable>
 
             {!isCollapsed && showText && (
@@ -678,12 +670,7 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   avatarCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
     borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   logoutIconButton: {
     padding: 6,

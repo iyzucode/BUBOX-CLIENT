@@ -5,6 +5,8 @@ export interface User {
   fullName: string;
   isEmailVerified: boolean;
   roles?: string[];
+  /** Path relatif API (/api/Biodata/Avatar/{id}?v=…); null = tampilkan huruf awal nama. */
+  avatarUrl?: string | null;
 }
 
 export interface RegisterRequest {
@@ -65,6 +67,8 @@ export interface ApiErrorResponse {
     | 'OTP_ATTEMPTS_EXCEEDED'
     | 'TOO_MANY_REQUESTS'
     | 'USER_NOT_FOUND'
+    | 'INVALID_AVATAR'
+    | 'AVATAR_TOO_LARGE'
     | string;
   message: string;
   detail?: string;

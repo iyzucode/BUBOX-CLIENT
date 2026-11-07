@@ -50,6 +50,8 @@ function RootLayoutContent() {
             <Stack.Screen name="index" />
             <Stack.Screen name="order" />
             <Stack.Screen name="profile" />
+            <Stack.Screen name="profile-detail" />
+            <Stack.Screen name="profile-edit" />
             <Stack.Screen name="addresses" />
             <Stack.Screen name="address-form" />
             <Stack.Screen name="explore" />

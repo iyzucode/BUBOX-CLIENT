@@ -16,6 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset } from '@/constants/theme';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useCurrentUser } from '@/features/auth/useCurrentUser';
 import { useProfilePalette } from '@/components/profile/profilePalette';
 import { ProfileHeroHeader } from '@/components/profile/ProfileHeroHeader';
 import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
@@ -45,6 +46,8 @@ export default function ProfileScreen() {
 
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  // Segarkan data user (mis. foto profil yang diganti dari perangkat lain).
+  useCurrentUser();
 
   // Simple state for info / about dialogs
   const [activeDialog, setActiveDialog] = useState<{
@@ -60,10 +63,7 @@ export default function ProfileScreen() {
       icon: (color) => <MenuIconDetailProfile size={20} color={color} />,
       onPress: () => {
         if (isAuthenticated && user) {
-          setActiveDialog({
-            title: 'Detail Profil',
-            message: `Nama: ${user.fullName || '-'}\nUsername: @${user.username || '-'}\nEmail: ${user.email || '-'}\nStatus: ${user.isEmailVerified ? 'Email Terverifikasi' : 'Belum Diverifikasi'}`,
-          });
+          router.push('/profile-detail');
         } else {
           router.push('/login');
         }

@@ -1,12 +1,15 @@
 import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfilePalette } from './profilePalette';
 
-const defaultBabyAvatar = require('@/assets/images/profile-avatar-baby.jpg');
+const AVATAR_SIZE = 96;
+const AVATAR_BORDER = 4;
 
+/** Kartu nama di halaman Profil. Foto hanya ditampilkan; ubah foto lewat Detail Profil. */
 export const ProfileIdentityCard: React.FC = () => {
   const palette = useProfilePalette();
 
@@ -24,7 +27,7 @@ export const ProfileIdentityCard: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
-      {/* 1. Overlapping Circular Avatar */}
+      {/* 1. Overlapping Circular Avatar (foto profil atau huruf awal nama) */}
       <View
         style={[
           styles.avatarContainer,
@@ -34,10 +37,9 @@ export const ProfileIdentityCard: React.FC = () => {
           },
         ]}
       >
-        <Image
-          source={defaultBabyAvatar}
-          style={styles.avatarImage}
-          resizeMode="cover"
+        <UserAvatar
+          user={isAuthenticated ? user : null}
+          size={AVATAR_SIZE - AVATAR_BORDER * 2}
         />
       </View>
 
@@ -79,11 +81,13 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   avatarContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 4,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+    borderWidth: AVATAR_BORDER,
     overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 10,
     marginBottom: -44, // Half of avatar above card
     shadowColor: '#000',
@@ -91,10 +95,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 6,
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
   },
   card: {
     width: '100%',
