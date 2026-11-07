@@ -219,23 +219,30 @@ export default function AddressesScreen() {
             </Pressable>
           </View>
         ) : !addresses || addresses.length === 0 ? (
-          <View
-            style={[
-              styles.stateCard,
-              {
-                backgroundColor: isDark ? '#18181B' : '#FFFFFF',
-                borderColor: isDark ? '#27272A' : '#F2DCD5',
-              },
-            ]}
-          >
-            <View style={styles.emptyIconCircle}>
-              <ThemedText style={{ fontSize: 34 }}>📍</ThemedText>
-            </View>
-            <ThemedText style={[styles.stateTitle, { color: theme.text }]}>
-              Belum Ada Alamat Tersimpan
+          <View style={styles.emptyState}>
+            {Platform.OS === 'web' ? (
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={isDark ? '#71717A' : '#B8C0CE'}
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
+                <circle cx="12" cy="9.5" r="2.5" />
+              </svg>
+            ) : (
+              <ThemedText style={{ fontSize: 28, opacity: 0.5 }}>📍</ThemedText>
+            )}
+            <ThemedText style={[styles.emptyTitle, { color: theme.text }]}>
+              Belum ada alamat
             </ThemedText>
-            <ThemedText style={[styles.stateDesc, { color: isDark ? '#A1A1AA' : '#5A6B86' }]}>
-              Tambahkan alamat rumah atau pengantaran katering si kecil dengan menekan tombol Tambah baru di bawah.
+            <ThemedText style={[styles.emptyDesc, { color: isDark ? '#A1A1AA' : '#5A6B86' }]}>
+              Tambahkan alamat pengantaran lewat tombol di bawah.
             </ThemedText>
           </View>
         ) : (
@@ -412,14 +419,22 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 20,
   },
-  emptyIconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    justifyContent: 'center',
+  emptyState: {
     alignItems: 'center',
-    marginBottom: 4,
+    paddingVertical: 72,
+    paddingHorizontal: 24,
+  },
+  emptyTitle: {
+    marginTop: 12,
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  emptyDesc: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
   },
   stateTitle: {
     fontSize: 18,
