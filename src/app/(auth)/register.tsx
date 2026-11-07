@@ -82,6 +82,7 @@ export default function RegisterScreen() {
             params: {
               email: trimmedEmail,
               initialMessage: data.message,
+              otpSent: '1',
             },
           });
         },

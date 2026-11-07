@@ -1,36 +1,27 @@
 import React, { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { AuthInput } from '@/components/auth/AuthInput';
-import { AuthButton } from '@/components/auth/AuthButton';
 import { AlertBanner } from '@/components/auth/AlertBanner';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { AuthHeroShell } from '@/components/auth/AuthHeroShell';
+import { AuthFooterLink, AuthPillButton, AuthPillInput } from '@/components/auth/AuthPill';
+import { useAuthPalette } from '@/components/auth/authPalette';
+import { describeOtpError } from '@/features/auth/otpErrors';
 import { useForgotPassword } from '@/features/auth/useForgotPassword';
-import { ApiErrorResponse } from '@/types/auth';
 
 export default function ForgotPasswordScreen() {
-  const theme = useTheme();
   const router = useRouter();
+  const palette = useAuthPalette();
   const [email, setEmail] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const forgotMutation = useForgotPassword();
 
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace('/login'));
+
   const handleSubmit = () => {
     setErrorMessage(null);
-
     if (!email.trim()) {
       setErrorMessage('Alamat email wajib diisi.');
       return;
@@ -42,219 +33,71 @@ export default function ForgotPasswordScreen() {
         onSuccess: (data) => {
           router.push({
             pathname: '/reset-password',
-            params: {
-              email: email.trim(),
-              initialMessage: data.message,
-            },
+            params: { email: email.trim(), initialMessage: data.message },
           });
         },
-        onError: (err) => {
-          const apiError = (err as any)?.response?.data as ApiErrorResponse | undefined;
-          setErrorMessage(
-            apiError?.message || 'Gagal memproses permintaan reset kata sandi.'
-          );
-        },
+        onError: (err) =>
+          setErrorMessage(describeOtpError(err, 'Gagal memproses permintaan reset kata sandi.').message),
       }
     );
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardView}
-        >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Minimalist Card */}
-            <View
-              style={[
-                styles.authCard,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              {/* Header */}
-              <View style={styles.header}>
-                <View
-                  style={[
-                    styles.logoMark,
-                    { backgroundColor: theme.primary },
-                  ]}
-                >
-                  <ThemedText type="smallBold" style={styles.logoMarkText}>
-                    🔑
-                  </ThemedText>
-                </View>
+    <AuthHeroShell
+      greeting="Lupa kata sandi?"
+      greetingSubtitle="Tenang, kami bantu pulihkan akunmu"
+      cardTitle="LUPA KATA SANDI"
+      navIcon="back"
+      onNavPress={goBack}
+    >
+      <ThemedText style={[styles.lead, { color: palette.textMuted }]}>
+        Masukkan email akunmu. Kami akan mengirim kode 6 digit untuk membuat kata sandi baru.
+      </ThemedText>
 
-                <ThemedText type="subtitle" style={styles.title}>
-                  Lupa Kata Sandi
-                </ThemedText>
+      {errorMessage ? (
+        <View style={styles.alert}>
+          <AlertBanner type="error" message={errorMessage} />
+        </View>
+      ) : null}
 
-                <ThemedText type="small" style={styles.subtitle}>
-                  Masukkan alamat email Anda untuk menerima kode pemulihan kata sandi
-                </ThemedText>
-              </View>
+      <View style={styles.formGroup}>
+        <AuthPillInput
+          icon="mail"
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoComplete="email"
+          onSubmitEditing={handleSubmit}
+        />
+        <View style={styles.buttonSpacer} />
+        <AuthPillButton title="Kirim Kode" onPress={handleSubmit} isLoading={forgotMutation.isPending} />
+      </View>
 
-              {/* Error Alert */}
-              {errorMessage ? (
-                <AlertBanner type="error" message={errorMessage} />
-              ) : null}
+      <View style={[styles.divider, { backgroundColor: palette.border }]} />
 
-              {/* Form Fields */}
-              <View style={styles.form}>
-                <AuthInput
-                  label="Alamat Email"
-                  placeholder="nama@perusahaan.com"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoComplete="email"
-                />
-
-                <AuthButton
-                  title="Kirim Kode OTP"
-                  onPress={handleSubmit}
-                  isLoading={forgotMutation.isPending}
-                  style={styles.submitBtn}
-                />
-              </View>
-
-              {/* Card Footer */}
-              <View style={styles.cardFooter}>
-                <ThemedText type="small" style={styles.footerPrompt}>
-                  Ingat kata sandi Anda?{' '}
-                </ThemedText>
-                <Pressable
-                  onPress={() => router.push('/login')}
-                  style={styles.loginLink}
-                >
-                  <ThemedText
-                    type="smallBold"
-                    style={[styles.linkText, { color: theme.primary }]}
-                  >
-                    Masuk di sini
-                  </ThemedText>
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Back to Home Link */}
-            <Pressable
-              onPress={() => router.replace('/')}
-              style={({ pressed }) => [
-                styles.backButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <ThemedText type="small" style={styles.backText}>
-                ← Kembali ke Beranda
-              </ThemedText>
-            </Pressable>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </ThemedView>
+      <AuthFooterLink prompt="Ingat kata sandimu?" linkText="Login di sini" onPress={() => router.replace('/login')} />
+    </AuthHeroShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  lead: {
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 20,
   },
-  safeArea: {
-    flex: 1,
-    justifyContent: 'center',
+  alert: {
+    marginBottom: 14,
   },
-  keyboardView: {
-    flex: 1,
+  formGroup: {
+    gap: 14,
   },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
+  buttonSpacer: {
+    height: 4,
   },
-  authCard: {
-    maxWidth: 420,
-    width: '100%',
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: Spacing.four,
-    gap: Spacing.three,
-  },
-  header: {
-    alignItems: 'center',
-    gap: 8,
-    paddingBottom: 4,
-  },
-  logoMark: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  logoMarkText: {
-    fontSize: 18,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.4,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 13,
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  form: {
-    gap: Spacing.three,
-    marginTop: 4,
-  },
-  submitBtn: {
-    marginTop: 6,
-  },
-  linkText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#ffffff10',
-    marginTop: 4,
-  },
-  footerPrompt: {
-    fontSize: 13,
-    opacity: 0.7,
-  },
-  loginLink: {
-    cursor: 'pointer' as any,
-  },
-  backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    cursor: 'pointer' as any,
-  },
-  backText: {
-    fontSize: 13,
-    opacity: 0.6,
-  },
-  pressed: {
-    opacity: 0.7,
+  divider: {
+    height: 1,
+    marginVertical: 26,
   },
 });

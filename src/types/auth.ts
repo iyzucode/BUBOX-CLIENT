@@ -48,6 +48,11 @@ export interface MessageResponse {
   message: string;
 }
 
+/** Verifikasi email berhasil: akun langsung masuk. */
+export interface VerifyEmailResponse extends AuthResponse {
+  message: string;
+}
+
 export interface ApiErrorResponse {
   statusCode: number;
   errorCode?:
@@ -57,6 +62,8 @@ export interface ApiErrorResponse {
     | 'USERNAME_ALREADY_EXISTS'
     | 'INVALID_USERNAME'
     | 'INVALID_OTP'
+    | 'OTP_ATTEMPTS_EXCEEDED'
+    | 'TOO_MANY_REQUESTS'
     | 'USER_NOT_FOUND'
     | string;
   message: string;

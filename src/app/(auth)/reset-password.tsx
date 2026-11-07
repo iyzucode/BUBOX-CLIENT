@@ -1,28 +1,21 @@
 import React, { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { AuthInput } from '@/components/auth/AuthInput';
-import { AuthButton } from '@/components/auth/AuthButton';
 import { AlertBanner } from '@/components/auth/AlertBanner';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { AuthHeroShell } from '@/components/auth/AuthHeroShell';
+import { AuthFooterLink, AuthPillButton, AuthPillInput } from '@/components/auth/AuthPill';
+import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
+import { useAuthPalette } from '@/components/auth/authPalette';
+import { describeOtpError } from '@/features/auth/otpErrors';
+import { useResendCooldown } from '@/features/auth/useResendCooldown';
+import { useResendOtp } from '@/features/auth/useResendOtp';
 import { useResetPassword } from '@/features/auth/useResetPassword';
-import { ApiErrorResponse } from '@/types/auth';
 
 export default function ResetPasswordScreen() {
-  const theme = useTheme();
   const router = useRouter();
+  const palette = useAuthPalette();
   const params = useLocalSearchParams<{ email?: string; initialMessage?: string }>();
 
   const [email, setEmail] = useState(params.email || '');
@@ -30,248 +23,167 @@ export default function ResetPasswordScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(
-    params.initialMessage || null
-  );
+  const [successMessage, setSuccessMessage] = useState<string | null>(params.initialMessage || null);
 
   const resetMutation = useResetPassword();
+  const resendMutation = useResendOtp();
+  // Datang dari "Lupa kata sandi": kode baru saja dikirim, kirim ulang aktif setelah 60 detik.
+  const cooldown = useResendCooldown(true);
+
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace('/login'));
+
+  const handleResend = () => {
+    if (!cooldown.canResend || resendMutation.isPending) return;
+    setErrorMessage(null);
+    if (!email.trim()) {
+      setErrorMessage('Alamat email wajib diisi.');
+      return;
+    }
+
+    resendMutation.mutate(
+      { email: email.trim(), type: 'PasswordReset' },
+      {
+        onSuccess: (data) => {
+          setSuccessMessage(data.message);
+          setOtpCode('');
+          cooldown.restart();
+        },
+        onError: (err) => setErrorMessage(describeOtpError(err, 'Gagal mengirim ulang kode OTP.').message),
+      }
+    );
+  };
 
   const handleReset = () => {
     setErrorMessage(null);
-
-    if (!email.trim() || !otpCode.trim() || !newPassword) {
-      setErrorMessage('Semua field wajib diisi.');
+    if (!email.trim() || otpCode.length !== 6 || !newPassword) {
+      setErrorMessage('Isi email, 6 digit kode, dan kata sandi baru.');
       return;
     }
-
     if (newPassword.length < 6) {
-      setErrorMessage('Kata sandi baru minimal terdiri dari 6 karakter.');
+      setErrorMessage('Kata sandi baru minimal 6 karakter.');
       return;
     }
-
     if (newPassword !== confirmPassword) {
       setErrorMessage('Konfirmasi kata sandi tidak cocok.');
       return;
     }
 
     resetMutation.mutate(
-      {
-        email: email.trim(),
-        otpCode: otpCode.trim(),
-        newPassword,
-      },
+      { email: email.trim(), otpCode, newPassword },
       {
         onSuccess: (data) => {
           setSuccessMessage(data.message);
-          setTimeout(() => {
-            router.replace('/login');
-          }, 1500);
+          setTimeout(() => router.replace('/login'), 1500);
         },
         onError: (err) => {
-          const apiError = (err as any)?.response?.data as ApiErrorResponse | undefined;
           setErrorMessage(
-            apiError?.message || 'Gagal mengatur ulang kata sandi. Pastikan kode OTP benar.'
+            describeOtpError(err, 'Gagal mengatur ulang kata sandi. Pastikan kode OTP benar.').message
           );
+          setOtpCode('');
         },
       }
     );
   };
 
+  const resendLabel = resendMutation.isPending
+    ? 'Mengirim…'
+    : cooldown.canResend
+      ? 'Kirim ulang'
+      : `Kirim ulang (${cooldown.secondsLeft} dtk)`;
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardView}
-        >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Minimalist Card */}
-            <View
-              style={[
-                styles.authCard,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              {/* Header */}
-              <View style={styles.header}>
-                <View
-                  style={[
-                    styles.logoMark,
-                    { backgroundColor: theme.primary },
-                  ]}
-                >
-                  <ThemedText type="smallBold" style={styles.logoMarkText}>
-                    🔒
-                  </ThemedText>
-                </View>
+    <AuthHeroShell
+      greeting="Kata sandi baru"
+      greetingSubtitle="Buat kata sandi baru untuk akunmu"
+      cardTitle="RESET KATA SANDI"
+      navIcon="back"
+      onNavPress={goBack}
+    >
+      <ThemedText style={[styles.lead, { color: palette.textMuted }]}>
+        Masukkan kode 6 digit dari email, lalu buat kata sandi baru.
+      </ThemedText>
 
-                <ThemedText type="subtitle" style={styles.title}>
-                  Kata Sandi Baru
-                </ThemedText>
+      {errorMessage ? (
+        <View style={styles.alert}>
+          <AlertBanner type="error" message={errorMessage} />
+        </View>
+      ) : successMessage ? (
+        <View style={styles.alert}>
+          <AlertBanner type="success" message={successMessage} />
+        </View>
+      ) : null}
 
-                <ThemedText type="small" style={styles.subtitle}>
-                  Masukkan kode OTP dan buat kata sandi baru untuk akun Anda
-                </ThemedText>
-              </View>
+      <View style={styles.formGroup}>
+        <AuthPillInput
+          icon="mail"
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoComplete="email"
+        />
 
-              {/* Alerts */}
-              {successMessage ? (
-                <AlertBanner type="success" message={successMessage} />
-              ) : null}
+        <OtpCodeInput
+          value={otpCode}
+          onChange={(code) => {
+            setOtpCode(code);
+            if (errorMessage) setErrorMessage(null);
+          }}
+          hasError={!!errorMessage && otpCode.length === 0}
+          disabled={resetMutation.isPending}
+        />
 
-              {errorMessage ? (
-                <AlertBanner type="error" message={errorMessage} />
-              ) : null}
+        <AuthPillInput
+          icon="lock"
+          placeholder="Kata sandi baru"
+          value={newPassword}
+          onChangeText={setNewPassword}
+          isPassword
+          autoComplete="new-password"
+        />
+        <AuthPillInput
+          icon="lock"
+          placeholder="Ulangi kata sandi baru"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          isPassword
+          autoComplete="new-password"
+          onSubmitEditing={handleReset}
+        />
 
-              {/* Form Fields */}
-              <View style={styles.form}>
-                <AuthInput
-                  label="Alamat Email"
-                  placeholder="nama@perusahaan.com"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoComplete="email"
-                />
+        <View style={styles.buttonSpacer} />
+        <AuthPillButton title="Simpan Kata Sandi" onPress={handleReset} isLoading={resetMutation.isPending} />
+      </View>
 
-                <AuthInput
-                  label="Kode OTP (6 Digit)"
-                  placeholder="• • • • • •"
-                  value={otpCode}
-                  onChangeText={setOtpCode}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  style={styles.otpInput}
-                />
+      <View style={[styles.divider, { backgroundColor: palette.border }]} />
 
-                <AuthInput
-                  label="Kata Sandi Baru"
-                  placeholder="Minimal 6 karakter"
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  isPassword
-                />
-
-                <AuthInput
-                  label="Konfirmasi Kata Sandi Baru"
-                  placeholder="Ulangi kata sandi baru"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  isPassword
-                />
-
-                <AuthButton
-                  title="Simpan Kata Sandi Baru"
-                  onPress={handleReset}
-                  isLoading={resetMutation.isPending}
-                  style={styles.submitBtn}
-                />
-              </View>
-            </View>
-
-            {/* Back to Login Link */}
-            <Pressable
-              onPress={() => router.replace('/login')}
-              style={({ pressed }) => [
-                styles.backButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <ThemedText type="small" style={styles.backText}>
-                ← Kembali ke Halaman Login
-              </ThemedText>
-            </Pressable>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </ThemedView>
+      <AuthFooterLink
+        prompt="Belum menerima kode?"
+        linkText={resendLabel}
+        onPress={handleResend}
+        disabled={!cooldown.canResend || resendMutation.isPending}
+      />
+    </AuthHeroShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  lead: {
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 20,
   },
-  safeArea: {
-    flex: 1,
-    justifyContent: 'center',
+  alert: {
+    marginBottom: 14,
   },
-  keyboardView: {
-    flex: 1,
+  formGroup: {
+    gap: 14,
   },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
+  buttonSpacer: {
+    height: 4,
   },
-  authCard: {
-    maxWidth: 420,
-    width: '100%',
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: Spacing.four,
-    gap: Spacing.three,
-  },
-  header: {
-    alignItems: 'center',
-    gap: 8,
-    paddingBottom: 4,
-  },
-  logoMark: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  logoMarkText: {
-    fontSize: 18,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.4,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 13,
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  form: {
-    gap: Spacing.three,
-    marginTop: 4,
-  },
-  otpInput: {
-    letterSpacing: 8,
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  submitBtn: {
-    marginTop: 6,
-  },
-  backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    cursor: 'pointer' as any,
-  },
-  backText: {
-    fontSize: 13,
-    opacity: 0.6,
-  },
-  pressed: {
-    opacity: 0.7,
+  divider: {
+    height: 1,
+    marginVertical: 26,
   },
 });
