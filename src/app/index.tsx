@@ -58,6 +58,15 @@ export default function HomeScreen() {
 
   const topBarTop = insets.top > 0 ? insets.top + 14 : 20;
 
+  // Belum login → ke halaman login dulu, lalu kembali ke tujuan setelah berhasil masuk.
+  const goTo = (path: '/order' | '/orders', params?: Record<string, string>) => {
+    if (!isAuthenticated) {
+      router.push({ pathname: '/login', params: { redirect: path } });
+      return;
+    }
+    router.push(params ? { pathname: path, params } : path);
+  };
+
   return (
     <ThemedView style={styles.container}>
       {/* 1. COLLAPSIBLE HERO HEADER (CROPPED VERTICALLY ON SCROLL) */}
@@ -89,12 +98,12 @@ export default function HomeScreen() {
         <View style={[styles.topBar, { top: topBarTop }]}>
           {/* Cart Button */}
           <Pressable
-            onPress={() => router.push('/order')}
+            onPress={() => goTo('/orders', { tab: 'all' })}
             style={({ pressed }) => [
               styles.circleButton,
               pressed && styles.buttonPressed,
             ]}
-            accessibilityLabel="Keranjang Pesanan"
+            accessibilityLabel="Pesanan Saya"
             accessibilityRole="button"
           >
             {Platform.OS === 'web' ? (
@@ -160,7 +169,7 @@ export default function HomeScreen() {
           <ThemedText style={styles.brandSubtitle}>our story</ThemedText>
 
           <Pressable
-            onPress={() => router.push('/order')}
+            onPress={() => goTo('/order')}
             style={({ pressed }) => [
               styles.pesanButton,
               pressed && styles.pesanButtonPressed,

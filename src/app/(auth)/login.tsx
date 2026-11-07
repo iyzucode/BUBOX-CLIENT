@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { Brand } from '@/constants/theme';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -20,6 +20,7 @@ import { AlertBanner } from '@/components/auth/AlertBanner';
 import { useGoogleSignIn } from '@/features/auth/useGoogleSignIn';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useLogin } from '@/features/auth/useLogin';
+import { resolveLoginRedirect } from '@/features/auth/loginRedirect';
 import { ApiErrorResponse } from '@/types/auth';
 
 const babyHeroImage = require('@/assets/images/login-hero.jpg');
@@ -37,8 +38,12 @@ export default function LoginScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isUnverified, setIsUnverified] = useState(false);
 
+  // Kembali ke halaman yang tadi ingin dibuka (mis. Pesan / Keranjang di Beranda).
+  const { redirect } = useLocalSearchParams<{ redirect?: string }>();
+  const afterLogin = resolveLoginRedirect(redirect);
+
   const google = useGoogleSignIn({
-    onSuccess: () => router.replace('/'),
+    onSuccess: () => router.replace(afterLogin),
     onError: (message) => setErrorMessage(message),
   });
 
@@ -57,7 +62,7 @@ export default function LoginScreen() {
       { email: email.trim(), password },
       {
         onSuccess: () => {
-          router.replace('/');
+          router.replace(afterLogin);
         },
         onError: (err) => {
           const apiError = (err as any)?.response?.data as ApiErrorResponse | undefined;
