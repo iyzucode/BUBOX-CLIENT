@@ -166,7 +166,11 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, imageUrl, palette, onPress
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.card, { backgroundColor: palette.cardBg }, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: palette.cardBg, borderColor: palette.optionActiveBorder },
+        pressed && styles.pressed,
+      ]}
       accessibilityRole="button"
       accessibilityLabel={`Pesanan ${order.orderNumber}`}
     >
@@ -252,6 +256,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   card: {
+    borderWidth: 1,
     borderRadius: 14,
     overflow: 'hidden',
     ...Platform.select({ web: { cursor: 'pointer' } }),
