@@ -3,10 +3,11 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
+import { StatusBadge } from '@/components/order/StatusBadge';
 import { Brand } from '@/constants/theme';
 import { useThemeContext } from '@/context/ThemeContext';
 import { formatLongDate, formatRupiah } from '@/features/order/orderStatus';
-import { OrderDetail } from '@/types/order';
+import { OrderDayStatusCode, OrderDetail } from '@/types/order';
 import { resolveApiAssetUri } from '@/utils/apiAsset';
 
 const FALLBACK_IMAGE = require('@/assets/images/baby-puree-fallback.jpg');
@@ -25,6 +26,10 @@ interface RowGroup {
   key: string;
   title: string;
   rows: MenuRow[];
+  /** Hanya tampilan Per Hari. */
+  dayStatus?: OrderDayStatusCode;
+  /** Catatan pembatalan hari oleh admin (Per Hari). */
+  note?: string;
 }
 
 /** Per hari: urutan hari, tiap item apa adanya. */
@@ -32,6 +37,11 @@ function groupByDay(order: OrderDetail): RowGroup[] {
   return order.days.map((day) => ({
     key: day.id,
     title: formatLongDate(day.deliveryDate),
+    dayStatus: day.statusCode,
+    note:
+      day.statusCode === 'CANCELLED_BY_ADMIN'
+        ? `${day.cancelReason ?? 'Force majeure'} · refund diproses manual oleh admin`
+        : undefined,
     rows: day.items.map((item) => ({
       key: item.id,
       menuName: item.menuName,
@@ -125,10 +135,29 @@ const MODES: { value: GroupMode; label: string }[] = [
   { value: 'category', label: 'Per Kategori' },
 ];
 
-/** Rincian Pesanan: bisa dibuka/tutup; menu dikelompokkan per hari atau per kategori, plus ringkasan biaya. */
-export const OrderBreakdown: React.FC<{ order: OrderDetail }> = ({ order }) => {
+interface OrderBreakdownProps {
+  order: OrderDetail;
+  /** false: selalu terbuka tanpa tombol buka/tutup. Default true. */
+  collapsible?: boolean;
+  /** Posisi awal saat collapsible (default tertutup). */
+  defaultOpen?: boolean;
+  /** Tampilkan status tiap hari & catatan pembatalan admin di tampilan Per Hari. */
+  showDayStatus?: boolean;
+  /** Baris "Metode" di ringkasan biaya, mis. "QRIS · Dibayar 4 Nov, 21.12". */
+  paymentMethod?: string;
+}
+
+/** Rincian Pesanan: menu dikelompokkan per hari atau per kategori, plus ringkasan biaya. */
+export const OrderBreakdown: React.FC<OrderBreakdownProps> = ({
+  order,
+  collapsible = true,
+  defaultOpen = false,
+  showDayStatus = false,
+  paymentMethod,
+}) => {
   const { theme, isDark } = useThemeContext();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpenState, setIsOpen] = useState(defaultOpen);
+  const isOpen = !collapsible || isOpenState;
   const [mode, setMode] = useState<GroupMode>('day');
   const cardBg = isDark ? '#18181B' : '#FFFFFF';
   const activeBg = isDark ? '#3F3F46' : Brand.navy;
@@ -138,13 +167,14 @@ export const OrderBreakdown: React.FC<{ order: OrderDetail }> = ({ order }) => {
 
   return (
     <View style={[styles.card, { backgroundColor: cardBg, borderColor: theme.border }]}>
-      <Pressable
-        onPress={() => setIsOpen((v) => !v)}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: isOpen }}
-        style={[styles.header, styles.clickable]}
-      >
-        <ThemedText style={[styles.title, { color: theme.text }]}>Rincian Pesanan</ThemedText>
+      {collapsible ? (
+        <Pressable
+          onPress={() => setIsOpen((v) => !v)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isOpen }}
+          style={[styles.header, styles.clickable]}
+        >
+          <ThemedText style={[styles.title, { color: theme.text }]}>Rincian Pesanan</ThemedText>
         <View style={{ transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }}>
           {Platform.OS === 'web' ? (
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="2.4"
@@ -155,7 +185,12 @@ export const OrderBreakdown: React.FC<{ order: OrderDetail }> = ({ order }) => {
             <ThemedText style={{ color: theme.text }}>▾</ThemedText>
           )}
         </View>
-      </Pressable>
+        </Pressable>
+      ) : (
+        <View style={styles.header}>
+          <ThemedText style={[styles.title, { color: theme.text }]}>Rincian Pesanan</ThemedText>
+        </View>
+      )}
 
       {isOpen ? (
         <View style={[styles.body, { borderTopColor: theme.border }]}>
@@ -180,10 +215,16 @@ export const OrderBreakdown: React.FC<{ order: OrderDetail }> = ({ order }) => {
 
           {groups.map((group) => (
             <View key={group.key} style={styles.group}>
-              <ThemedText style={[styles.groupTitle, { color: theme.text }]}>{group.title}</ThemedText>
+              <View style={styles.groupHeader}>
+                <ThemedText style={[styles.groupTitle, { color: theme.text }]}>{group.title}</ThemedText>
+                {showDayStatus && group.dayStatus ? <StatusBadge kind="day" status={group.dayStatus} size="sm" /> : null}
+              </View>
               {group.rows.map((row) => (
                 <MenuLine key={row.key} row={row} />
               ))}
+              {showDayStatus && group.note ? (
+                <ThemedText style={[styles.menuSub, { color: theme.danger }]}>{group.note}</ThemedText>
+              ) : null}
             </View>
           ))}
 
@@ -196,6 +237,7 @@ export const OrderBreakdown: React.FC<{ order: OrderDetail }> = ({ order }) => {
               label={order.fulfillmentType === 'PICKUP' ? 'Ambil sendiri' : 'Ongkos kirim'}
               value={order.deliveryFee > 0 ? formatRupiah(order.deliveryFee) : 'Gratis'}
             />
+            {paymentMethod ? <Line label="Metode" value={paymentMethod} /> : null}
             <Line label="Total" value={formatRupiah(order.grandTotal)} strong />
           </View>
         </View>
@@ -225,7 +267,8 @@ const styles = StyleSheet.create({
   segmentBtn: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 9 },
   segmentText: { fontSize: 13, fontWeight: '600' },
   group: { gap: 10 },
-  groupTitle: { fontSize: 13, fontWeight: '700' },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  groupTitle: { fontSize: 13, fontWeight: '700', flexShrink: 1 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   thumb: { width: 48, height: 48, borderRadius: 10 },
   menuText: { flex: 1, gap: 2 },
