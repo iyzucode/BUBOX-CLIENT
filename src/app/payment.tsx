@@ -41,7 +41,9 @@ async function saveQrImage(url: string, orderNumber: string) {
 
 /** Halaman pembayaran QRIS: tampilkan QR & pantau status (ringan) sampai dibayar. */
 export default function PaymentScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // from=orders: dibuka dari Pesanan Saya / Detail Pesanan → tombol kembali; selain itu (alur pemesanan) → Beranda.
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  const openedFromOrders = from === 'orders';
   const router = useRouter();
   const { theme, isDark } = useThemeContext();
   const { width } = useCustomerLayout();
@@ -57,6 +59,7 @@ export default function PaymentScreen() {
 
   const cardBg = isDark ? '#18181B' : '#FFFFFF';
   const goHome = () => router.replace('/');
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace('/orders'));
   const goToDetail = () => router.replace({ pathname: '/order-detail', params: { id: id ?? '' } });
 
   const handleCancel = async () => {
@@ -235,8 +238,8 @@ export default function PaymentScreen() {
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <ScreenHeaderBar
         title="Selesaikan Pembayaran"
-        icon="home"
-        onBack={goHome}
+        icon={openedFromOrders ? 'back' : 'home'}
+        onBack={openedFromOrders ? goBack : goHome}
         maxWidth={isDesktop ? 600 : '100%'}
       />
       <ScrollView contentContainerStyle={[styles.scroll, { maxWidth: isDesktop ? 600 : '100%' }]}>

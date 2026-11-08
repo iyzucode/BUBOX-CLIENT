@@ -82,7 +82,7 @@ export default function MyOrdersScreen() {
 
   const openOrder = (order: OrderSummary) => {
     if (order.statusCode === 'AWAITING_PAYMENT') {
-      router.push({ pathname: '/payment', params: { id: order.id } });
+      router.push({ pathname: '/payment', params: { id: order.id, from: 'orders' } });
     } else {
       router.push({ pathname: '/order-detail', params: { id: order.id } });
     }

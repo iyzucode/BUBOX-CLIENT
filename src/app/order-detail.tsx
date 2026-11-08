@@ -82,7 +82,7 @@ export default function OrderDetailScreen() {
           ) : null}
           {order.statusCode === 'AWAITING_PAYMENT' ? (
             <Pressable
-              onPress={() => router.push({ pathname: '/payment', params: { id: order.id } })}
+              onPress={() => router.push({ pathname: '/payment', params: { id: order.id, from: 'orders' } })}
               style={[styles.primaryBtn, { backgroundColor: theme.primary }]}
             >
               <ThemedText style={styles.primaryBtnText}>Bayar QRIS →</ThemedText>
