@@ -224,13 +224,19 @@ export default function PaymentScreen() {
         {/* Nominal + QR */}
         <View style={[styles.sectionCard, styles.qrCard, { backgroundColor: theme.backgroundElement, borderColor: 'transparent' }]}>
           <ThemedText style={[styles.amount, { color: theme.text }]}>{formatRupiah(order.grandTotal)}</ThemedText>
-          <View style={[styles.timerPill, { backgroundColor: timer.bg }]}>
+          <View
+            style={[styles.timerPill, { backgroundColor: timer.bg }]}
+            accessibilityLabel={expired ? undefined : `Sisa waktu bayar ${formatCountdown(remaining)}`}
+          >
             <ThemedText style={[styles.timerText, { color: timer.text }]}>
-              {expired ? 'Waktu pembayaran habis' : `Bayar dalam ${formatCountdown(remaining)}`}
+              {expired ? 'Waktu pembayaran habis' : formatCountdown(remaining)}
             </ThemedText>
           </View>
 
           <View style={styles.qrFrame}>
+            <View style={[styles.qrisBand, { backgroundColor: isDark ? '#2A2A2E' : Brand.navy }]}>
+              <ThemedText style={styles.qrisBandText}>QRIS</ThemedText>
+            </View>
             <View style={styles.qrBox}>
               {qrUrl ? (
                 <Image
@@ -242,9 +248,6 @@ export default function PaymentScreen() {
               ) : (
                 <ActivityIndicator color={Brand.navy} />
               )}
-            </View>
-            <View style={[styles.qrisBand, { backgroundColor: isDark ? '#2A2A2E' : Brand.navy }]}>
-              <ThemedText style={styles.qrisBandText}>QRIS</ThemedText>
             </View>
           </View>
 
@@ -289,7 +292,7 @@ export default function PaymentScreen() {
           <View style={styles.waitingRow}>
             <ActivityIndicator size="small" color={theme.primary} />
             <ThemedText style={[styles.muted, { color: theme.textSecondary }]}>
-              Menunggu pembayaran. Scan dengan e-wallet atau m-banking.
+              Menunggu pembayaran…
             </ThemedText>
           </View>
         </View>
