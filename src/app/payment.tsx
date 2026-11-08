@@ -5,16 +5,16 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 
 import { ThemedText } from '@/components/themed-text';
+import { OrderBreakdown } from '@/components/order/OrderBreakdown';
 import { StatusBadge } from '@/components/order/StatusBadge';
 import { ScreenHeaderBar } from '@/components/ui/ScreenHeaderBar';
 import { Brand } from '@/constants/theme';
 import { useThemeContext } from '@/context/ThemeContext';
-import { formatRupiah, formatShortDate, toneColors } from '@/features/order/orderStatus';
+import { formatRupiah, toneColors } from '@/features/order/orderStatus';
 import { formatCountdown, useCountdown } from '@/features/order/useCountdown';
 import { useCancelOrder, useOrderDetail, usePaymentStatus } from '@/features/order/useOrders';
 import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { getApiErrorMessage } from '@/services/apiError';
-import { OrderDetail } from '@/types/order';
 import { confirmAction, showAlert } from '@/utils/alert';
 
 const PAID_STATUSES = ['PAID', 'IN_PROGRESS', 'COMPLETED'];
@@ -38,77 +38,6 @@ async function saveQrImage(url: string, orderNumber: string) {
     window.open(url, '_blank', 'noopener');
   }
 }
-
-/** Satu baris "label ...... nilai" di Rincian Pesanan. */
-const Line: React.FC<{ label: string; value: string; strong?: boolean }> = ({ label, value, strong }) => {
-  const { theme } = useThemeContext();
-  return (
-    <View style={styles.line}>
-      <ThemedText style={[styles.lineLabel, { color: strong ? theme.text : theme.textSecondary }, strong && styles.strong]}>
-        {label}
-      </ThemedText>
-      <ThemedText style={[styles.lineValue, { color: theme.text }, strong && styles.strong]}>{value}</ThemedText>
-    </View>
-  );
-};
-
-/** Rincian Pesanan: bisa dibuka/tutup; berisi menu per hari dan ringkasan biaya. */
-const OrderBreakdown: React.FC<{ order: OrderDetail }> = ({ order }) => {
-  const { theme, isDark } = useThemeContext();
-  const [isOpen, setIsOpen] = useState(false);
-  const cardBg = isDark ? '#18181B' : '#FFFFFF';
-
-  return (
-    <View style={[styles.sectionCard, { backgroundColor: cardBg, borderColor: theme.border }]}>
-      <Pressable
-        onPress={() => setIsOpen((v) => !v)}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: isOpen }}
-        style={[styles.accordionHeader, styles.clickable]}
-      >
-        <ThemedText style={[styles.accordionTitle, { color: theme.text }]}>Rincian Pesanan</ThemedText>
-        <View style={{ transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }}>
-          {Platform.OS === 'web' ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="2.4"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          ) : (
-            <ThemedText style={{ color: theme.text }}>▾</ThemedText>
-          )}
-        </View>
-      </Pressable>
-
-      {isOpen ? (
-        <View style={[styles.accordionBody, { borderTopColor: theme.border }]}>
-          {order.days.map((day) => (
-            <View key={day.id} style={styles.dayBlock}>
-              <ThemedText style={[styles.dayTitle, { color: theme.text }]}>
-                {/* formatShortDate → "Min, 8 Nov"; ambil tanggalnya saja, nama hari lengkap dari server */}
-                {day.dayName}, {formatShortDate(day.deliveryDate).split(', ')[1]}
-              </ThemedText>
-              {day.items.map((item) => (
-                <Line key={item.id} label={`${item.menuName} × ${item.qty}`} value={formatRupiah(item.lineTotal)} />
-              ))}
-            </View>
-          ))}
-
-          <View style={[styles.summary, { borderTopColor: theme.border }]}>
-            <Line label="Subtotal" value={formatRupiah(order.subtotal)} />
-            {order.discountAmount > 0 ? (
-              <Line label="Diskon" value={`- ${formatRupiah(order.discountAmount)}`} />
-            ) : null}
-            <Line
-              label={order.fulfillmentType === 'PICKUP' ? 'Ambil sendiri' : 'Ongkos kirim'}
-              value={order.deliveryFee > 0 ? formatRupiah(order.deliveryFee) : 'Gratis'}
-            />
-            <Line label="Total" value={formatRupiah(order.grandTotal)} strong />
-          </View>
-        </View>
-      ) : null}
-    </View>
-  );
-};
 
 /** Halaman pembayaran QRIS: tampilkan QR & pantau status (ringan) sampai dibayar. */
 export default function PaymentScreen() {
@@ -368,22 +297,6 @@ const styles = StyleSheet.create({
   },
   actionBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   waitingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8 },
-  accordionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-  },
-  accordionTitle: { fontSize: 14, fontWeight: '700' },
-  accordionBody: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 18, paddingVertical: 12, gap: 12 },
-  dayBlock: { gap: 4 },
-  dayTitle: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
-  line: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  lineLabel: { fontSize: 13, flex: 1 },
-  lineValue: { fontSize: 13, fontVariant: ['tabular-nums'] },
-  strong: { fontSize: 14, fontWeight: '700' },
-  summary: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, gap: 4 },
   primaryBtn: {
     marginTop: 8,
     paddingHorizontal: 22,

@@ -94,6 +94,19 @@ export function formatShortDate(dateKey: string): string {
   return `${SHORT_DAYS[date.getDay()]}, ${d} ${SHORT_MONTHS[m - 1]}`;
 }
 
+const LONG_MONTHS = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+];
+const LONG_DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+/** "2026-11-06" → "Jumat, 6 November 2026" */
+export function formatLongDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return `${LONG_DAYS[date.getDay()]}, ${d} ${LONG_MONTHS[m - 1]} ${y}`;
+}
+
 /** Rentang tanggal kirim ringkas: "6 – 8 Nov" atau "6 Nov" */
 export function formatDateRange(first: string | null, last: string | null): string {
   if (!first) return '-';

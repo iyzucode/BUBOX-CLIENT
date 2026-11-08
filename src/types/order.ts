@@ -138,6 +138,8 @@ export interface OrderItem {
   unitPrice: number;
   qty: number;
   lineTotal: number;
+  /** Path gambar menu (berversi), null bila menu tanpa gambar. */
+  imageUrl: string | null;
 }
 
 export interface OrderDay {

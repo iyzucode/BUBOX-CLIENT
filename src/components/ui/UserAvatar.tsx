@@ -4,10 +4,7 @@ import { Image, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Brand } from '@/constants/theme';
 import { User } from '@/types/auth';
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5073/api';
-// avatarUrl dari server berupa path "/api/…"; gabungkan dengan origin API.
-const API_ORIGIN = API_URL.replace(/\/api\/?$/, '');
+import { resolveApiAssetUri } from '@/utils/apiAsset';
 
 /** Warna latar huruf awal, dipilih tetap per pengguna supaya tidak berganti-ganti. */
 const INITIAL_COLORS = [Brand.orange, Brand.red, Brand.navy, '#E0712B', '#2F5D9B'] as const;
@@ -17,9 +14,9 @@ type AvatarUser = Pick<User, 'fullName' | 'username' | 'email'> & {
   avatarUrl?: string | null;
 };
 
+/** avatarUrl dari server berupa path "/api/…"; gabungkan dengan origin API. */
 export function resolveAvatarUri(avatarUrl?: string | null): string | null {
-  if (!avatarUrl) return null;
-  return /^https?:\/\//.test(avatarUrl) ? avatarUrl : `${API_ORIGIN}${avatarUrl}`;
+  return resolveApiAssetUri(avatarUrl);
 }
 
 /** Huruf pertama nama lengkap → username → email; "?" bila tidak ada. */
