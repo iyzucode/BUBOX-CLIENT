@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -10,6 +10,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { useGetMainCategories } from '@/features/menu/useMenu';
 import { CategoryId } from '@/features/order/useOrderCart';
+import { CardCollapseToggle } from './CardCollapseToggle';
 import { useOrderPalette } from './orderPalette';
 
 interface OrderCategoryCardProps {
@@ -25,13 +26,30 @@ export const OrderCategoryCard: React.FC<OrderCategoryCardProps> = ({
 }) => {
   const palette = useOrderPalette();
   const { data: mainCategories, isLoading } = useGetMainCategories();
+  const [isOpen, setIsOpen] = useState(true);
+
+  // Jumlah kategori yang dipilih (porsi > 0); menggantikan ikon burger bila lebih dari 0
+  const selectedCount = (mainCategories ?? []).filter(
+    (c) => (categoryQuantities[c.id] ?? categoryQuantities[c.code] ?? 0) > 0
+  ).length;
 
   return (
     <View style={[styles.card, { backgroundColor: palette.cardBg }]}>
-      {/* Header Row: Category / Menu Icon Box + Title */}
-      <View style={styles.headerRow}>
-        <View style={[styles.iconBox, { backgroundColor: palette.iconBoxBg }]}>
-          {Platform.OS === 'web' ? (
+      {/* Header Row: Category / Menu Icon Box + Title + toggle buka/tutup */}
+      <Pressable
+        onPress={() => setIsOpen((v) => !v)}
+        style={styles.headerRow}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: isOpen }}
+        accessibilityLabel={isOpen ? 'Tutup kategori menu' : 'Buka kategori menu'}
+      >
+        <View
+          style={[styles.iconBox, { backgroundColor: palette.iconBoxBg }]}
+          accessibilityLabel={selectedCount > 0 ? `${selectedCount} kategori dipilih` : undefined}
+        >
+          {selectedCount > 0 ? (
+            <ThemedText style={[styles.countText, { color: palette.iconColor }]}>{selectedCount}</ThemedText>
+          ) : Platform.OS === 'web' ? (
             <svg
               width="22"
               height="22"
@@ -51,13 +69,14 @@ export const OrderCategoryCard: React.FC<OrderCategoryCardProps> = ({
           )}
         </View>
 
-        <ThemedText style={[styles.title, { color: palette.cardTitle }]}>
+        <ThemedText style={[styles.title, styles.titleFill, { color: palette.cardTitle }]}>
           Kategori menu
         </ThemedText>
-      </View>
+        <CardCollapseToggle isOpen={isOpen} />
+      </Pressable>
 
       {/* Dynamic Stack of Category Options with Custom Portion Controls */}
-      {isLoading ? (
+      {!isOpen ? null : isLoading ? (
         <View style={styles.loadingWrapper}>
           <ActivityIndicator size="small" color={palette.buttonActiveBg} />
         </View>
@@ -209,6 +228,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
   },
   iconBox: {
     width: 42,
@@ -221,6 +241,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     letterSpacing: -0.2,
+  },
+  countText: {
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '700',
+  },
+  titleFill: {
+    flex: 1,
   },
   categoryList: {
     gap: 10,

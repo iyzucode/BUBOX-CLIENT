@@ -60,34 +60,37 @@ export const OrderDateCard: React.FC<OrderDateCardProps> = ({
         </ThemedText>
       </View>
 
-      {/* Date Chips Row: Sticky Summary (N hari) + horizontal scrollable list of dates */}
-      <View style={styles.chipsRowContainer}>
-        {/* Sticky Summary Chip on the left: "N hari" */}
-        <View style={styles.summaryChipSticky}>
-          <ThemedText style={[styles.summaryChipText, { color: palette.summaryChipText }]}>
-            {orderDates.length > 0 ? `${orderDates.length} hari` : '0 hari'}
-          </ThemedText>
-        </View>
+      {/* Date Chips Row: Sticky Summary (N hari) + horizontal scrollable list of dates.
+          Disembunyikan selama belum ada tanggal yang dipilih. */}
+      {orderDates.length > 0 ? (
+        <View style={styles.chipsRowContainer}>
+          {/* Sticky Summary Chip on the left: "N hari" */}
+          <View style={styles.summaryChipSticky}>
+            <ThemedText style={[styles.summaryChipText, { color: palette.summaryChipText }]}>
+              {orderDates.length} hari
+            </ThemedText>
+          </View>
 
-        {/* Date Chips: "Sen, 18 Okt", etc. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsScrollContent}
-          style={styles.chipsScrollView}
-        >
-          {orderDates.map((entry) => (
-            <View
-              key={entry.key}
-              style={[styles.dateChip, { backgroundColor: palette.dateChipBg }]}
-            >
-              <ThemedText style={[styles.dateChipText, { color: palette.dateChipText }]}>
-                {entry.formattedChip}
-              </ThemedText>
-            </View>
-          ))}
-        </ScrollView>
-      </View>
+          {/* Date Chips: "Sen, 18 Okt", etc. */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsScrollContent}
+            style={styles.chipsScrollView}
+          >
+            {orderDates.map((entry) => (
+              <View
+                key={entry.key}
+                style={[styles.dateChip, { backgroundColor: palette.dateChipBg }]}
+              >
+                <ThemedText style={[styles.dateChipText, { color: palette.dateChipText }]}>
+                  {entry.formattedChip}
+                </ThemedText>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {/* Action Button: "Pilih tanggal" */}
       <Pressable
