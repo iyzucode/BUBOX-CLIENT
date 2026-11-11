@@ -1,0 +1,12 @@
+# Konteks build image web: tanpa dependensi lokal, hasil build lama, atau rahasia.
+node_modules/
+dist/
+.expo/
+.git/
+android/
+ios/
+.vscode/
+# .env lokal berisi URL API localhost & key; nilai produksi datang dari build args.
+.env
+.env.*
+!.env.example
