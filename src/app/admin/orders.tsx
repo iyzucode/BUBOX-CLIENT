@@ -84,14 +84,14 @@ export default function AdminOrdersScreen() {
     if (!next) return;
     updateStatus.mutate(
       { orderDayId: day.orderDayId, statusCode: next },
-      { onError: (error) => showAlert('Gagal Memperbarui', getApiErrorMessage(error, 'Status tidak dapat diubah.')) }
+      { onError: (error) => showAlert('Gagal Memperbarui', getApiErrorMessage(error, 'Status tidak dapat diubah.'), { tone: 'error' }) }
     );
   };
 
   const handleSubmitCancel = (reason: string) => {
     if (!cancelTarget) return;
     const onSuccess = () => setCancelTarget(null);
-    const onError = (error: unknown) => showAlert('Gagal Membatalkan', getApiErrorMessage(error, 'Pembatalan gagal.'));
+    const onError = (error: unknown) => showAlert('Gagal Membatalkan', getApiErrorMessage(error, 'Pembatalan gagal.'), { tone: 'error' });
 
     if (cancelTarget.kind === 'day') {
       cancelDay.mutate({ orderDayId: cancelTarget.orderDayId, reason }, { onSuccess, onError });

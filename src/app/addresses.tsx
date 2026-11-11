@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
+import { showAlert } from '@/utils/alert';
 import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { Brand } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,11 +79,7 @@ export default function AddressesScreen() {
         err?.response?.data?.message ||
         err?.response?.data?.detail ||
         'Gagal menjadikan alamat utama.';
-      if (Platform.OS === 'web') {
-        window.alert(msg);
-      } else {
-        Alert.alert('Gagal', msg);
-      }
+      showAlert('Gagal', msg, { tone: 'error' });
     }
   };
 
@@ -95,11 +91,7 @@ export default function AddressesScreen() {
         err?.response?.data?.message ||
         err?.response?.data?.detail ||
         'Gagal menghapus alamat.';
-      if (Platform.OS === 'web') {
-        window.alert(msg);
-      } else {
-        Alert.alert('Gagal', msg);
-      }
+      showAlert('Gagal', msg, { tone: 'error' });
     }
   };
 

@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 
 import { AppThemeProvider, useThemeContext } from '@/context/ThemeContext';
 import { AppSidebar } from '@/components/ui/AppSidebar';
+import { AppDialogHost } from '@/components/ui/AppDialog';
 // Tampilan desktop penuh (dengan sidebar) hanya untuk area admin; customer dibatasi kolom ini
 import { CUSTOMER_MAX_WIDTH } from '@/hooks/use-customer-layout';
 
@@ -120,6 +121,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AppThemeProvider>
         <RootLayoutContent />
+        <AppDialogHost />
       </AppThemeProvider>
     </QueryClientProvider>
   );

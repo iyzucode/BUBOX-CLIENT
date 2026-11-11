@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { showAlert } from '@/utils/alert';
 import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { Brand } from '@/constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -244,11 +244,7 @@ export default function AddressFormScreen() {
         err?.response?.data?.message ||
         err?.response?.data?.detail ||
         'Gagal menyimpan alamat. Silakan periksa kembali formulir Anda.';
-      if (Platform.OS === 'web') {
-        window.alert(msg);
-      } else {
-        Alert.alert('Gagal', msg);
-      }
+      showAlert('Gagal Menyimpan', msg, { tone: 'error' });
     }
   };
 
@@ -461,11 +457,7 @@ export default function AddressFormScreen() {
                     <Pressable
                       onPress={() => {
                         if (!selectedProvince?.code) {
-                          if (Platform.OS === 'web') {
-                            window.alert('Silakan pilih Provinsi terlebih dahulu.');
-                          } else {
-                            Alert.alert('Perhatian', 'Silakan pilih Provinsi terlebih dahulu.');
-                          }
+                          showAlert('Perhatian', 'Silakan pilih Provinsi terlebih dahulu.', { tone: 'warning' });
                           return;
                         }
                         setShowCityPicker(true);
@@ -520,11 +512,7 @@ export default function AddressFormScreen() {
                     <Pressable
                       onPress={() => {
                         if (!selectedCity?.code) {
-                          if (Platform.OS === 'web') {
-                            window.alert('Silakan pilih Kota/Kabupaten terlebih dahulu.');
-                          } else {
-                            Alert.alert('Perhatian', 'Silakan pilih Kota/Kabupaten terlebih dahulu.');
-                          }
+                          showAlert('Perhatian', 'Silakan pilih Kota/Kabupaten terlebih dahulu.', { tone: 'warning' });
                           return;
                         }
                         setShowDistrictPicker(true);
@@ -579,11 +567,7 @@ export default function AddressFormScreen() {
                     <Pressable
                       onPress={() => {
                         if (!selectedDistrict?.code) {
-                          if (Platform.OS === 'web') {
-                            window.alert('Silakan pilih Kecamatan terlebih dahulu.');
-                          } else {
-                            Alert.alert('Perhatian', 'Silakan pilih Kecamatan terlebih dahulu.');
-                          }
+                          showAlert('Perhatian', 'Silakan pilih Kecamatan terlebih dahulu.', { tone: 'warning' });
                           return;
                         }
                         setShowVillagePicker(true);

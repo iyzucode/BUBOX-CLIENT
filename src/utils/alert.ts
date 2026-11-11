@@ -1,23 +1,57 @@
-import { Alert, Platform } from 'react-native';
+import { useDialogStore, type DialogTone } from '@/store/useDialogStore';
 
-/** Alert lintas platform (Alert.alert tidak tampil di react-native-web). */
-export function showAlert(title: string, message: string): void {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    window.alert(`${title}\n\n${message}`);
-    return;
-  }
-  Alert.alert(title, message);
+export type { DialogTone } from '@/store/useDialogStore';
+
+export interface AlertOptions {
+  /** Default 'info'. */
+  tone?: Exclude<DialogTone, 'danger'>;
+  /** Teks tombol. Default 'Oke'. */
+  buttonText?: string;
 }
 
-/** Konfirmasi lintas platform. Resolve true bila pengguna menyetujui. */
-export function confirmAction(title: string, message: string, confirmLabel = 'Ya'): Promise<boolean> {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    return Promise.resolve(window.confirm(`${title}\n\n${message}`));
-  }
+export interface ConfirmOptions {
+  /** Teks tombol setuju. Default 'Ya'. */
+  confirmText?: string;
+  /** Teks tombol batal. Default 'Batal'. */
+  cancelText?: string;
+  /** Default 'danger' (tombol merah). Pakai 'info' untuk konfirmasi yang tidak merusak. */
+  tone?: DialogTone;
+}
+
+/**
+ * Pop-up pemberitahuan bertema LUANNA, sama di web, Android, dan iOS.
+ * Resolve setelah pengguna menutupnya. Dialog ditampilkan oleh <AppDialogHost /> di root layout.
+ */
+export function showAlert(title: string, message?: string, options: AlertOptions = {}): Promise<void> {
   return new Promise((resolve) => {
-    Alert.alert(title, message, [
-      { text: 'Batal', style: 'cancel', onPress: () => resolve(false) },
-      { text: confirmLabel, style: 'destructive', onPress: () => resolve(true) },
-    ]);
+    useDialogStore.getState().push({
+      kind: 'alert',
+      title,
+      message,
+      tone: options.tone ?? 'info',
+      confirmText: options.buttonText ?? 'Oke',
+      cancelText: '',
+      resolve: () => resolve(),
+    });
+  });
+}
+
+/** Pop-up konfirmasi. Resolve true bila pengguna menyetujui; false bila batal atau ditutup. */
+export function confirmAction(
+  title: string,
+  message?: string,
+  options: ConfirmOptions | string = {}
+): Promise<boolean> {
+  const opts: ConfirmOptions = typeof options === 'string' ? { confirmText: options } : options;
+  return new Promise((resolve) => {
+    useDialogStore.getState().push({
+      kind: 'confirm',
+      title,
+      message,
+      tone: opts.tone ?? 'danger',
+      confirmText: opts.confirmText ?? 'Ya',
+      cancelText: opts.cancelText ?? 'Batal',
+      resolve,
+    });
   });
 }

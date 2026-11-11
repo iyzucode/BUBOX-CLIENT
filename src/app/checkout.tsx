@@ -45,19 +45,19 @@ export default function CheckoutScreen() {
 
   const handlePay = () => {
     if (!token) {
-      showAlert('Masuk Dulu', 'Silakan masuk ke akun Anda untuk melanjutkan pembayaran.');
+      showAlert('Masuk Dulu', 'Silakan masuk ke akun Anda untuk melanjutkan pembayaran.', { tone: 'warning' });
       router.push('/login');
       return;
     }
 
     if (fulfillmentType === 'DELIVERY' && !selectedAddressId) {
-      showAlert('Alamat Belum Dipilih', 'Tambahkan atau pilih alamat pengantaran terlebih dahulu.');
+      showAlert('Alamat Belum Dipilih', 'Tambahkan atau pilih alamat pengantaran terlebih dahulu.', { tone: 'warning' });
       return;
     }
 
     const days = buildOrderDays();
     if (days.length === 0) {
-      showAlert('Keranjang Kosong', 'Belum ada menu yang dipilih.');
+      showAlert('Keranjang Kosong', 'Belum ada menu yang dipilih.', { tone: 'warning' });
       return;
     }
 
@@ -74,7 +74,7 @@ export default function CheckoutScreen() {
           router.replace({ pathname: '/payment', params: { id: order.orderId } });
         },
         onError: (error) => {
-          showAlert('Pesanan Gagal Dibuat', getApiErrorMessage(error, 'Terjadi kesalahan saat membuat pesanan.'));
+          showAlert('Pesanan Gagal Dibuat', getApiErrorMessage(error, 'Terjadi kesalahan saat membuat pesanan.'), { tone: 'error' });
         },
       }
     );

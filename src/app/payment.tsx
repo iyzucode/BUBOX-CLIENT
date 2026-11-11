@@ -68,7 +68,7 @@ export default function PaymentScreen() {
     if (!ok) return;
     cancelOrder.mutate(
       { id },
-      { onError: (error) => showAlert('Gagal Membatalkan', getApiErrorMessage(error, 'Pesanan tidak dapat dibatalkan.')) }
+      { onError: (error) => showAlert('Gagal Membatalkan', getApiErrorMessage(error, 'Pesanan tidak dapat dibatalkan.'), { tone: 'error' }) }
     );
   };
 

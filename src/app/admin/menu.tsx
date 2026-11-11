@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   Platform,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { confirmAction, showAlert } from '@/utils/alert';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -119,71 +119,48 @@ export default function AdminMenuScreen() {
       refetchWeekly();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Gagal menugaskan menu.';
-      Alert.alert('Gagal Menugaskan', msg);
+      showAlert('Gagal Menugaskan', msg, { tone: 'error' });
     }
   };
 
   // Unassign Menu from current day
-  const handleUnassignMenu = (menu: Menu) => {
+  const handleUnassignMenu = async (menu: Menu) => {
     if (!menu.assignmentId) return;
     const assignmentId = menu.assignmentId;
-    const confirmAction = async () => {
-      try {
-        await removeAssignmentMutation.mutateAsync(assignmentId);
-        setDetailModalVisible(false);
-        setSelectedDetailMenu(null);
-        refetchWeekly();
-      } catch (err: any) {
-        const msg = err.response?.data?.message || err.message || 'Gagal melepaskan menu dari jadwal.';
-        Alert.alert('Gagal', msg);
-      }
-    };
+    const dayName = DAYS.find((d) => d.id === selectedDay)?.name;
+    const ok = await confirmAction(
+      'Lepaskan Menu?',
+      `"${menu.name}" akan dilepas dari jadwal hari ${dayName}.`,
+      'Lepaskan'
+    );
+    if (!ok) return;
 
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Lepaskan hidangan "${menu.name}" dari jadwal hari ${DAYS.find((d) => d.id === selectedDay)?.name}?`)) {
-        confirmAction();
-      }
-    } else {
-      Alert.alert(
-        'Konfirmasi Lepaskan',
-        `Apakah Anda yakin ingin melepaskan "${menu.name}" dari hari ${DAYS.find((d) => d.id === selectedDay)?.name}?`,
-        [
-          { text: 'Batal', style: 'cancel' },
-          { text: 'Lepaskan', style: 'destructive', onPress: confirmAction },
-        ]
-      );
+    try {
+      await removeAssignmentMutation.mutateAsync(assignmentId);
+      setDetailModalVisible(false);
+      setSelectedDetailMenu(null);
+      refetchWeekly();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Gagal melepaskan menu dari jadwal.';
+      showAlert('Gagal', msg, { tone: 'error' });
     }
   };
 
   // Delete Master Menu
-  const handleDeleteMasterMenu = (m: MasterMenu) => {
-    const confirmDelete = async () => {
-      try {
-        await deleteMasterMenuMutation.mutateAsync(m.id);
-        refetchMaster();
-      } catch (err: any) {
-        const msg = err.response?.data?.message || err.message || 'Menu tidak dapat dihapus.';
-        if (Platform.OS === 'web') {
-          window.alert(msg);
-        } else {
-          Alert.alert('Tidak Dapat Dihapus', msg);
-        }
-      }
-    };
+  const handleDeleteMasterMenu = async (m: MasterMenu) => {
+    const ok = await confirmAction(
+      'Hapus Menu?',
+      `"${m.name}" akan dihapus dari katalog. Menu yang masih ada di jadwal tidak dapat dihapus.`,
+      'Hapus'
+    );
+    if (!ok) return;
 
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Hapus master menu "${m.name}"? Jika menu masih ditugaskan ke hari apapun, penghapusan akan ditolak.`)) {
-        confirmDelete();
-      }
-    } else {
-      Alert.alert(
-        'Konfirmasi Hapus',
-        `Apakah Anda yakin ingin menghapus "${m.name}" dari katalog?`,
-        [
-          { text: 'Batal', style: 'cancel' },
-          { text: 'Hapus', style: 'destructive', onPress: confirmDelete },
-        ]
-      );
+    try {
+      await deleteMasterMenuMutation.mutateAsync(m.id);
+      refetchMaster();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Menu tidak dapat dihapus.';
+      showAlert('Tidak Dapat Dihapus', msg, { tone: 'error' });
     }
   };
 
@@ -197,7 +174,7 @@ export default function AdminMenuScreen() {
       refetchMaster();
       refetchWeekly();
     } catch (err: any) {
-      Alert.alert('Gagal', err.response?.data?.message || 'Gagal mengubah status menu.');
+      showAlert('Gagal', err.response?.data?.message || 'Gagal mengubah status menu.', { tone: 'error' });
     }
   };
 

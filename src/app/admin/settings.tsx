@@ -57,7 +57,7 @@ const SettingsForm: React.FC<{ settings: OrderSettings }> = ({ settings }) => {
 
   const handleSave = () => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoffTime.trim())) {
-      showAlert('Jam Tidak Valid', 'Gunakan format HH:mm, contoh 17:00.');
+      showAlert('Jam Tidak Valid', 'Gunakan format HH:mm, contoh 17:00.', { tone: 'warning' });
       return;
     }
 
@@ -70,8 +70,8 @@ const SettingsForm: React.FC<{ settings: OrderSettings }> = ({ settings }) => {
         deliveryFee: Number(deliveryFee) || 0,
       },
       {
-        onSuccess: () => showAlert('Tersimpan', 'Pengaturan pesanan berhasil diperbarui.'),
-        onError: (err) => showAlert('Gagal Menyimpan', getApiErrorMessage(err, 'Pengaturan tidak dapat disimpan.')),
+        onSuccess: () => showAlert('Tersimpan', 'Pengaturan pesanan berhasil diperbarui.', { tone: 'success' }),
+        onError: (err) => showAlert('Gagal Menyimpan', getApiErrorMessage(err, 'Pengaturan tidak dapat disimpan.'), { tone: 'error' }),
       }
     );
   };

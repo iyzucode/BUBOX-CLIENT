@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { confirmAction } from '@/utils/alert';
 import { ThemedText } from '@/components/themed-text';
 import { Brand } from '@/constants/theme';
 import { useThemeContext } from '@/context/ThemeContext';
@@ -59,22 +60,14 @@ export const AddressCard: React.FC<AddressCardProps> = ({
 
   const popoverTextColor = isDark ? '#F4F4F5' : Brand.navy;
 
-  const handleDeletePress = () => {
+  const handleDeletePress = async () => {
     handleCloseMenu();
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Apakah Anda yakin ingin menghapus alamat "${address.label}"?`)) {
-        onDelete(address.id);
-      }
-    } else {
-      Alert.alert(
-        'Hapus Alamat',
-        `Apakah Anda yakin ingin menghapus alamat "${address.label}"?`,
-        [
-          { text: 'Batal', style: 'cancel' },
-          { text: 'Hapus', style: 'destructive', onPress: () => onDelete(address.id) },
-        ]
-      );
-    }
+    const ok = await confirmAction(
+      'Hapus Alamat?',
+      `Alamat "${address.label}" akan dihapus dari daftar alamat Anda.`,
+      'Hapus'
+    );
+    if (ok) onDelete(address.id);
   };
 
   const formattedAddress = [

@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -78,17 +77,19 @@ export default function OrderScreen() {
   // Checkout submission handler
   const handleProceed = () => {
     if (orderDates.length === 0) {
-      Alert.alert(
+      showAlert(
         'Tanggal Belum Dipilih',
-        'Silakan tentukan minimal 1 hari jadwal katering sebelum melanjutkan pemesanan.'
+        'Silakan tentukan minimal 1 hari jadwal katering sebelum melanjutkan pemesanan.',
+        { tone: 'warning' }
       );
       return;
     }
 
     if (totalItemsCount === 0) {
-      Alert.alert(
+      showAlert(
         'Porsi Belum Dipilih',
-        'Silakan pilih minimal 1 porsi menu MPASI sebelum melanjutkan pemesanan.'
+        'Silakan pilih minimal 1 porsi menu MPASI sebelum melanjutkan pemesanan.',
+        { tone: 'warning' }
       );
       return;
     }
@@ -99,7 +100,8 @@ export default function OrderScreen() {
     if (passed.length > 0) {
       showAlert(
         'Batas Pemesanan Lewat',
-        `Tanggal ${passed.join(', ')} sudah melewati batas pemesanan (H-${cutoffInfo?.cutoffDaysBefore} pukul ${cutoffInfo?.cutoffTime}). Hapus atau ganti tanggalnya.`
+        `Tanggal ${passed.join(', ')} sudah melewati batas pemesanan (H-${cutoffInfo?.cutoffDaysBefore} pukul ${cutoffInfo?.cutoffTime}). Hapus atau ganti tanggalnya.`,
+        { tone: 'warning' }
       );
       return;
     }
