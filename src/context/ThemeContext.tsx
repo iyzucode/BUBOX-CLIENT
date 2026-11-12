@@ -23,8 +23,22 @@ export const AppThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const themeMode = useThemeStore((state) => state.themeMode);
   const setThemeMode = useThemeStore((state) => state.setThemeMode);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const hasHydrated = useThemeStore((state) => state.hasHydrated);
   const isDark = themeMode === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
+
+  // Baca tema tersimpan setelah mount (bukan saat render pertama), supaya render pertama di browser
+  // sama dengan HTML statis (light) dan seluruh komponen ikut dirender ulang dengan tema yang benar.
+  useEffect(() => {
+    void useThemeStore.persist.rehydrate();
+  }, []);
+
+  useEffect(() => {
+    // Tema sudah terpasang: tampilkan lagi konten yang disembunyikan script di +html.tsx
+    if (hasHydrated && Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.documentElement.removeAttribute('data-theme-pending');
+    }
+  }, [hasHydrated, themeMode]);
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {

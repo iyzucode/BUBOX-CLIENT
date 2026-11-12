@@ -6,6 +6,8 @@ export type ThemeMode = 'light' | 'dark';
 
 export interface ThemeStoreState {
   themeMode: ThemeMode;
+  /** true setelah tema tersimpan dibaca dari storage (lihat AppThemeProvider). */
+  hasHydrated: boolean;
   setThemeMode: (mode: ThemeMode) => void;
   toggleTheme: () => void;
 }
@@ -41,27 +43,13 @@ const customStorage = {
   },
 };
 
-const getInitialTheme = (): ThemeMode => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('bubox-theme-storage');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed?.state?.themeMode === 'dark' || parsed?.state?.themeMode === 'light') {
-          return parsed.state.themeMode;
-        }
-      }
-    } catch {
-      // fallback
-    }
-  }
-  return 'light';
-};
-
 export const useThemeStore = create<ThemeStoreState>()(
   persist(
     (set) => ({
-      themeMode: getInitialTheme(),
+      // Selalu mulai dari light: sama dengan HTML statis hasil export web, agar hydrate tidak
+      // bercampur tema. Tema tersimpan diterapkan lewat rehydrate() setelah mount.
+      themeMode: 'light',
+      hasHydrated: false,
       setThemeMode: (themeMode: ThemeMode) => set({ themeMode }),
       toggleTheme: () =>
         set((state) => ({
@@ -71,6 +59,11 @@ export const useThemeStore = create<ThemeStoreState>()(
     {
       name: 'bubox-theme-storage',
       storage: createJSONStorage(() => customStorage),
+      partialize: (state) => ({ themeMode: state.themeMode }),
+      skipHydration: true,
+      onRehydrateStorage: () => () => {
+        useThemeStore.setState({ hasHydrated: true });
+      },
     }
   )
 );

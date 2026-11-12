@@ -9,13 +9,17 @@ import { AppSidebar } from '@/components/ui/AppSidebar';
 import { AppDialogHost } from '@/components/ui/AppDialog';
 // Tampilan desktop penuh (dengan sidebar) hanya untuk area admin; customer dibatasi kolom ini
 import { CUSTOMER_MAX_WIDTH } from '@/hooks/use-customer-layout';
+import { useHydrated } from '@/hooks/use-hydrated';
 
 
 function RootLayoutContent() {
   const { theme, isDark } = useThemeContext();
   const { width } = useWindowDimensions();
   const pathname = usePathname();
-  const isDesktop = width > CUSTOMER_MAX_WIDTH;
+  // HTML statis dibuat dengan lebar 0 (tanpa kolom 768px / sidebar). Render pertama di browser
+  // harus sama agar hydrate tidak "membekukan" layout mobile; setelah itu pakai lebar asli.
+  const hydrated = useHydrated();
+  const isDesktop = hydrated && width > CUSTOMER_MAX_WIDTH;
 
   // Admin & role internal: layout desktop dengan sidebar.
   // Customer: tanpa sidebar, konten dibatasi 768px di tengah layar.

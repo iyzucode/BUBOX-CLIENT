@@ -1,5 +1,7 @@
 import { useWindowDimensions } from 'react-native';
 
+import { useHydrated } from './use-hydrated';
+
 /**
  * Lebar maksimum layar customer. Di layar lebar (desktop), layar customer tampil sebagai
  * satu kolom 768px di tengah tanpa sidebar (lihat src/app/_layout.tsx).
@@ -12,7 +14,11 @@ export const CUSTOMER_MAX_WIDTH = 768;
  * sehingga layar customer selalu memakai layout mobile walau jendela browser lebih lebar.
  */
 export function useCustomerLayout() {
-  const { width, height } = useWindowDimensions();
+  const dims = useWindowDimensions();
+  // Saat export statis lebar jendela = 0; samakan sampai hydrate selesai (lihat useHydrated)
+  const hydrated = useHydrated();
+  const width = hydrated ? dims.width : 0;
+  const height = hydrated ? dims.height : 0;
   return {
     width: Math.min(width, CUSTOMER_MAX_WIDTH),
     height,
