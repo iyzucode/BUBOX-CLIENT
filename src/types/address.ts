@@ -17,6 +17,8 @@ export interface Address {
   /** Kode kelurahan/desa resmi, mis. 34.01.02.1008. */
   wilayahCode?: string | null;
   isPrimary: boolean;
+  /** Alamat berada di wilayah yang dijangkau pengantaran (diatur admin). */
+  isDeliveryCovered?: boolean;
   createdAt: string;
   updatedAt: string;
 }

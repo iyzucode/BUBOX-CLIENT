@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { ThemedText } from '@/components/themed-text';
 import { CheckoutHeader } from '@/components/checkout/CheckoutHeader';
@@ -17,6 +18,7 @@ import { PaymentDetailCard } from '@/components/checkout/PaymentDetailCard';
 import { PaymentMethodCard } from '@/components/checkout/PaymentMethodCard';
 import { PromoCodeCard } from '@/components/checkout/PromoCodeCard';
 import { useCheckoutPalette } from '@/components/checkout/checkoutPalette';
+import { ADDRESSES_QUERY_KEY, useAddresses } from '@/features/biodata/useAddresses';
 import { useCreateOrder } from '@/features/order/useOrders';
 import { useScrollActivity } from '@/hooks/use-scroll-activity';
 import { getApiErrorCode, getApiErrorMessage } from '@/services/apiError';
@@ -42,6 +44,8 @@ export default function CheckoutScreen() {
   const subtotal = useCartStore((s) => s.getSubtotal());
 
   const createOrder = useCreateOrder();
+  const queryClient = useQueryClient();
+  const { data: addresses } = useAddresses();
   const { isScrolling, onScroll } = useScrollActivity();
 
   const isCartEmpty = selectedDateKeys.length === 0 || totalItemsCount === 0;
@@ -55,6 +59,18 @@ export default function CheckoutScreen() {
 
     if (fulfillmentType === 'DELIVERY' && !selectedAddressId) {
       showAlert('Alamat Belum Dipilih', 'Tambahkan atau pilih alamat pengantaran terlebih dahulu.', { tone: 'warning' });
+      return;
+    }
+
+    if (
+      fulfillmentType === 'DELIVERY' &&
+      addresses?.find((a) => a.id === selectedAddressId)?.isDeliveryCovered === false
+    ) {
+      showAlert(
+        'Di Luar Jangkauan',
+        'Alamat ini belum terjangkau pengantaran kami. Pilih alamat lain atau ambil sendiri di outlet.',
+        { tone: 'warning' }
+      );
       return;
     }
 
@@ -100,6 +116,12 @@ export default function CheckoutScreen() {
               `${getApiErrorMessage(error, 'Voucher tidak bisa dipakai.')} Voucher dilepas dari pesanan, silakan cek totalnya lalu bayar lagi.`,
               { tone: 'warning' }
             );
+            return;
+          }
+          if (code === 'DELIVERY_NOT_COVERED') {
+            // Jangkauan berubah sejak daftar alamat dimuat: segarkan agar penandanya ikut tampil
+            queryClient.invalidateQueries({ queryKey: ADDRESSES_QUERY_KEY });
+            showAlert('Di Luar Jangkauan', getApiErrorMessage(error, 'Alamat ini di luar jangkauan pengantaran.'), { tone: 'warning' });
             return;
           }
           showAlert('Pesanan Gagal Dibuat', getApiErrorMessage(error, 'Terjadi kesalahan saat membuat pesanan.'), { tone: 'error' });

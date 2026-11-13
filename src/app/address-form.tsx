@@ -116,7 +116,14 @@ export default function AddressFormScreen() {
         setSelectedCity({ code: '', name: addressDetail.city });
       }
       if (addressDetail.subdistrict) {
-        setSelectedDistrict({ code: '', name: addressDetail.subdistrict });
+        // Disimpan sebagai "Kecamatan, Kelurahan"; pisahkan lagi agar kelurahan tetap terpilih.
+        const [districtName, ...rest] = addressDetail.subdistrict.split(', ');
+        const villageName = rest.join(', ').trim();
+        setSelectedDistrict({ code: '', name: districtName });
+        if (villageName) {
+          const code = addressDetail.wilayahCode ?? '';
+          setSelectedVillage({ code: VILLAGE_CODE_PATTERN.test(code) ? code : '', name: villageName });
+        }
       }
     }
   }, [addressDetail]);
@@ -202,6 +209,11 @@ export default function AddressFormScreen() {
       !postalCode.trim()
     ) {
       setErrorMessage('Mohon lengkapi semua bidang wajib, termasuk pilihan wilayah.');
+      return;
+    }
+    // Kelurahan wajib: jangkauan & driver pengantaran ditentukan sampai tingkat kelurahan.
+    if (!villageName.trim()) {
+      setErrorMessage('Pilih Kelurahan / Desa agar kami bisa memastikan alamat ini terjangkau pengantaran.');
       return;
     }
 

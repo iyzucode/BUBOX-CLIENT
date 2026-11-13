@@ -10,8 +10,10 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { ThemedText } from '@/components/themed-text';
+import { DeliveryBoard } from '@/components/order/DeliveryBoard';
 import { ReasonModal } from '@/components/order/ReasonModal';
 import { StatusBadge } from '@/components/order/StatusBadge';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
@@ -26,6 +28,7 @@ import {
   nextDayStatus,
 } from '@/features/order/orderStatus';
 import {
+  ORDER_QUERY_KEYS,
   useAdminOrders,
   useCancelDayByAdmin,
   useCancelOrderByAdmin,
@@ -37,7 +40,13 @@ import { getApiErrorMessage } from '@/services/apiError';
 import { DailyOrderDay, OrderStatusCode, OrderSummary } from '@/types/order';
 import { showAlert } from '@/utils/alert';
 
-type Tab = 'daily' | 'all';
+type Tab = 'daily' | 'delivery' | 'all';
+
+const TAB_LABEL: Record<Tab, string> = {
+  daily: '🍳 Harian',
+  delivery: '🛵 Antar',
+  all: '🧾 Semua',
+};
 
 type CancelTarget =
   | { kind: 'day'; orderDayId: string; label: string }
@@ -75,6 +84,7 @@ export default function AdminOrdersScreen() {
     pageSize: 50,
   });
 
+  const queryClient = useQueryClient();
   const updateStatus = useUpdateDayStatus();
   const cancelDay = useCancelDayByAdmin();
   const cancelOrder = useCancelOrderByAdmin();
@@ -114,7 +124,7 @@ export default function AdminOrdersScreen() {
   const muted = { color: theme.textSecondary };
   const strong = { color: theme.text };
 
-  const renderDaily = () => (
+  const renderDatePicker = () => (
     <>
       {/* Pilih tanggal */}
       <View style={[card, styles.dateRow]}>
@@ -129,6 +139,12 @@ export default function AdminOrdersScreen() {
           <ThemedText style={strong}>›</ThemedText>
         </Pressable>
       </View>
+    </>
+  );
+
+  const renderDaily = () => (
+    <>
+      {renderDatePicker()}
 
       {production.isLoading ? (
         <ActivityIndicator style={styles.loader} color={theme.primary} />
@@ -198,6 +214,13 @@ export default function AdminOrdersScreen() {
                   </ThemedText>
                 ))}
                 {day.notes ? <ThemedText style={[styles.tiny, muted]}>📝 {day.notes}</ThemedText> : null}
+                {day.fulfillmentType === 'DELIVERY' ? (
+                  <ThemedText
+                    style={[styles.tiny, day.driverUserId ? muted : { color: theme.warning, fontWeight: '700' }]}
+                  >
+                    🗺️ {day.zoneName ?? 'Tanpa zona'} · 🛵 {day.driverName ?? 'Belum ada driver'}
+                  </ThemedText>
+                ) : null}
 
                 {next || canCancel ? (
                   <View style={styles.actionsRow}>
@@ -304,21 +327,21 @@ export default function AdminOrdersScreen() {
   );
 
   const isCancelling = cancelDay.isPending || cancelOrder.isPending;
-  const refreshing = tab === 'daily' ? production.isRefetching : adminOrders.isRefetching;
+  const refreshing = tab === 'all' ? adminOrders.isRefetching : production.isRefetching;
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <ScreenHeader title="Pesanan" subtitle="Dapur · Antar · Force majeure" fallbackHref="/admin" />
 
       <View style={[styles.tabs, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-        {(['daily', 'all'] as Tab[]).map((t) => (
+        {(['daily', 'delivery', 'all'] as Tab[]).map((t) => (
           <Pressable
             key={t}
             onPress={() => setTab(t)}
             style={[styles.tab, { borderBottomColor: tab === t ? theme.primary : 'transparent' }]}
           >
             <ThemedText style={[styles.small, styles.bold, { color: tab === t ? theme.primary : theme.textSecondary }]}>
-              {t === 'daily' ? '🍳 Harian' : '🧾 Semua'}
+              {TAB_LABEL[t]}
             </ThemedText>
           </Pressable>
         ))}
@@ -329,11 +352,21 @@ export default function AdminOrdersScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => (tab === 'daily' ? production.refetch() : adminOrders.refetch())}
+            onRefresh={() => (tab === 'all' ? adminOrders.refetch() : queryClient.invalidateQueries({ queryKey: ORDER_QUERY_KEYS.all }))}
           />
         }
       >
-        {tab === 'daily' ? renderDaily() : renderAll()}
+        {tab === 'daily' ? (
+          renderDaily()
+        ) : tab === 'delivery' ? (
+          <>
+            {renderDatePicker()}
+            {/* key: pilihan kiriman direset saat tanggal berganti */}
+            <DeliveryBoard key={date} date={date} />
+          </>
+        ) : (
+          renderAll()
+        )}
       </ScrollView>
 
       <ReasonModal

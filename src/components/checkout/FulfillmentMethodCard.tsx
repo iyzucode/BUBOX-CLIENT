@@ -8,6 +8,7 @@ import {
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
+import { DeliveryCoverageNote } from '@/components/address/DeliveryCoverageNote';
 import { useAddresses } from '@/features/biodata/useAddresses';
 import { FulfillmentType, useCartStore } from '@/store/useCartStore';
 import { useCheckoutPalette } from './checkoutPalette';
@@ -219,6 +220,8 @@ export const FulfillmentMethodCard: React.FC = () => {
           </>
         )}
       </View>
+
+      {isDelivery && activeAddress?.isDeliveryCovered === false ? <DeliveryCoverageNote /> : null}
     </View>
   );
 };

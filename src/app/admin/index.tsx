@@ -164,6 +164,42 @@ export default function AdminDashboardScreen() {
               </Pressable>
 
               <Pressable
+                onPress={() => router.push('/admin/delivery-areas')}
+                style={({ pressed }) => [
+                  styles.actionCard,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: '#E7ECF5' }]}>
+                  <ThemedText style={{ fontSize: 24 }}>🗺️</ThemedText>
+                </View>
+                <View style={styles.actionInfo}>
+                  <ThemedText style={[styles.actionTitle, { color: theme.secondary }]}>Wilayah Antar</ThemedText>
+                  <ThemedText style={styles.actionDesc}>Atur wilayah yang terjangkau pengantaran dan petakan ke zona driver.</ThemedText>
+                </View>
+                <ThemedText style={[styles.actionArrow, { color: theme.primary }]}>➔</ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/admin/delivery-zones')}
+                style={({ pressed }) => [
+                  styles.actionCard,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: '#E8F5EC' }]}>
+                  <ThemedText style={{ fontSize: 24 }}>🛵</ThemedText>
+                </View>
+                <View style={styles.actionInfo}>
+                  <ThemedText style={[styles.actionTitle, { color: theme.secondary }]}>Zona & Driver</ThemedText>
+                  <ThemedText style={styles.actionDesc}>Buat zona, pasang driver per zona, dan kelola user ber-peran Driver.</ThemedText>
+                </View>
+                <ThemedText style={[styles.actionArrow, { color: theme.primary }]}>➔</ThemedText>
+              </Pressable>
+
+              <Pressable
                 onPress={() => router.push('/admin/vouchers')}
                 style={({ pressed }) => [
                   styles.actionCard,

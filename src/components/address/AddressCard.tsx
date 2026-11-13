@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { confirmAction } from '@/utils/alert';
 import { ThemedText } from '@/components/themed-text';
+import { DeliveryCoverageNote } from '@/components/address/DeliveryCoverageNote';
 import { Brand } from '@/constants/theme';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Address } from '@/types/address';
@@ -224,6 +225,12 @@ export const AddressCard: React.FC<AddressCardProps> = ({
             >
               {address.notes}
             </ThemedText>
+          ) : null}
+
+          {address.isDeliveryCovered === false ? (
+            <View style={styles.coverageNote}>
+              <DeliveryCoverageNote message="Di luar jangkauan pengantaran kami saat ini." />
+            </View>
           ) : null}
         </View>
 
@@ -475,6 +482,9 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 19,
     marginTop: 2,
+  },
+  coverageNote: {
+    marginTop: 8,
   },
   notesText: {
     fontSize: 14,

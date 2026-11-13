@@ -1,3 +1,5 @@
+import type { AssignmentSource } from '@/types/delivery';
+
 // Kontrak API modul Order (lihat Server/docs/ORDER_FLOW_PLANNING.md)
 
 export type FulfillmentType = 'DELIVERY' | 'PICKUP';
@@ -201,6 +203,16 @@ export interface DailyOrderDay {
   address: AddressSnapshot | null;
   notes: string | null;
   items: OrderItem[];
+  /** Pengantaran (DELIVERY saja): zona & driver efektif. */
+  zoneName?: string | null;
+  driverUserId?: string | null;
+  driverName?: string | null;
+  assignmentSource?: AssignmentSource | null;
+}
+
+export interface DailyDeliveries {
+  date: string;
+  deliveries: DailyOrderDay[];
 }
 
 export interface ProductionMenuSummary {

@@ -31,7 +31,9 @@ const CUSTOMER_NAV_ITEMS: NavItem[] = [
 
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'admin-dashboard', label: 'Ringkasan', path: '/admin' },
-  { id: 'admin-orders', label: 'Pesanan Harian', path: '/admin/orders' },
+  { id: 'admin-orders', label: 'Pesanan', path: '/admin/orders' },
+  { id: 'admin-delivery-areas', label: 'Wilayah Antar', path: '/admin/delivery-areas' },
+  { id: 'admin-delivery-zones', label: 'Zona & Driver', path: '/admin/delivery-zones' },
   { id: 'admin-menu', label: 'Kelola Menu', path: '/admin/menu' },
   { id: 'admin-vouchers', label: 'Voucher', path: '/admin/vouchers' },
   { id: 'admin-settings', label: 'Cutoff & Bayar', path: '/admin/settings' },
@@ -52,6 +54,25 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
           <line x1="9" y1="7" x2="15" y2="7" />
           <line x1="9" y1="11" x2="15" y2="11" />
           <line x1="9" y1="15" x2="13" y2="15" />
+        </svg>
+      );
+    }
+    if (name === 'admin-delivery-areas') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+          <line x1="8" y1="2" x2="8" y2="18" />
+          <line x1="16" y1="6" x2="16" y2="22" />
+        </svg>
+      );
+    }
+    if (name === 'admin-delivery-zones') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="1" y="3" width="15" height="13" />
+          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+          <circle cx="5.5" cy="18.5" r="2.5" />
+          <circle cx="18.5" cy="18.5" r="2.5" />
         </svg>
       );
     }
@@ -211,6 +232,8 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
     'admin-dashboard': '📊',
     'admin-menu': '🍲',
     'admin-orders': '🧾',
+    'admin-delivery-areas': '🗺️',
+    'admin-delivery-zones': '🛵',
     'admin-settings': '⏰',
     'admin-vouchers': '🎟️',
     'go-admin': '⚙️',

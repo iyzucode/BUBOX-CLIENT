@@ -8,6 +8,7 @@ import {
   AdminCancelRequest,
   CreateOrderRequest,
   CreateOrderResponse,
+  DailyDeliveries,
   DailyProduction,
   OrderCutoffInfo,
   OrderDetail,
@@ -30,6 +31,7 @@ export const ORDER_QUERY_KEYS = {
   paymentStatus: (id: string) => [...ORDER_QUERY_KEYS.all, 'payment-status', id] as const,
   adminList: (params: OrderSearchParams) => [...ORDER_QUERY_KEYS.all, 'admin', params] as const,
   production: (date: string) => [...ORDER_QUERY_KEYS.all, 'production', date] as const,
+  deliveries: (date: string) => [...ORDER_QUERY_KEYS.all, 'deliveries', date] as const,
   cutoff: ['settings', 'cutoff'] as const,
   settings: ['settings', 'order'] as const,
 };
@@ -133,6 +135,16 @@ export const useDailyProduction = (date: string) =>
     queryFn: async () =>
       (await api.get<DailyProduction>('/OrderAdmin/GetDailyProduction', { params: { date } })).data,
     enabled: !!date,
+    refetchInterval: 60_000,
+  });
+
+/** Kiriman DELIVERY terbayar pada tanggal tsb, lengkap dengan zona & driver efektif. */
+export const useDailyDeliveries = (date: string, enabled = true) =>
+  useQuery<DailyDeliveries, ApiError>({
+    queryKey: ORDER_QUERY_KEYS.deliveries(date),
+    queryFn: async () =>
+      (await api.get<DailyDeliveries>('/OrderAdmin/GetDailyDeliveries', { params: { date } })).data,
+    enabled: !!date && enabled,
     refetchInterval: 60_000,
   });
 
