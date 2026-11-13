@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -225,11 +226,29 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
 /** Urutan peran dari yang tertinggi; yang tampil di sidebar adalah peran tertinggi pengguna. */
 const ROLE_PRIORITY = ['Super Admin', 'Owner', 'Admin', 'Kitchen', 'Driver', 'Customer'];
 
-function primaryRoleLabel(roles?: string[]): string | null {
+/** Singkatan peran saat sidebar ditutup. */
+const ROLE_SHORT: Record<string, string> = {
+  'super admin': 'SA',
+  owner: 'OW',
+  admin: 'AD',
+  kitchen: 'KT',
+  driver: 'DR',
+  customer: 'CS',
+};
+
+/** Peran tertinggi pengguna: { full: "SUPER ADMIN", short: "SA" }, atau null bila tanpa peran. */
+function primaryRole(roles?: string[]): { full: string; short: string } | null {
   if (!roles || roles.length === 0) return null;
   const lower = roles.map((r) => r.toLowerCase());
   const top = ROLE_PRIORITY.find((r) => lower.includes(r.toLowerCase())) ?? roles[0];
-  return top.toUpperCase();
+  const short =
+    ROLE_SHORT[top.toLowerCase()] ??
+    top
+      .split(/\s+/)
+      .map((w) => w[0])
+      .join('')
+      .slice(0, 2);
+  return { full: top.toUpperCase(), short: short.toUpperCase() };
 }
 
 export const AppSidebar: React.FC = () => {
@@ -245,6 +264,9 @@ export const AppSidebar: React.FC = () => {
   const expandTimerRef = useRef<any>(null);
 
   const isAdminArea = pathname.startsWith('/admin');
+  const role = primaryRole(user?.roles);
+  // Singkatan dipakai selama sidebar tertutup / sedang membuka (teks lengkap belum muat)
+  const compactRole = isCollapsed || !showText;
   // Selalu aktifkan akses Panel Admin di masa development
   const hasAdminRole = true;
 
@@ -373,8 +395,13 @@ export const AppSidebar: React.FC = () => {
         </Pressable>
       </View>
 
-      {/* Navigation Items */}
-      <View style={styles.navSection}>
+      {/* Navigation Items: bisa di-scroll bila layar terlalu pendek; header & profil tetap di tempat.
+          Scrollbar disembunyikan: di Windows scrollbar memakan lebar dan menggeser posisi ikon. */}
+      <ScrollView
+        style={styles.navSection}
+        contentContainerStyle={styles.navSectionContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.navItemsList}>
           {currentNavItems.map((item) => {
             const active = isTabActive(item.path);
@@ -428,7 +455,7 @@ export const AppSidebar: React.FC = () => {
             );
           })}
         </View>
-      </View>
+      </ScrollView>
 
       {/* Bottom Profile / Auth Section */}
       <View
@@ -439,11 +466,16 @@ export const AppSidebar: React.FC = () => {
           },
         ]}
       >
-        {/* Pita peran pengguna, tepat di atas kartu profil (area admin) */}
-        {isAdminArea && isAuthenticated && user && !isCollapsed && showText && primaryRoleLabel(user.roles) ? (
+        {/* Pita peran pengguna, tepat di atas kartu profil (area admin). Saat sidebar ditutup tampil
+            singkatannya (SUPER ADMIN → SA); tinggi pita sama di kedua keadaan agar profil tidak bergeser. */}
+        {isAdminArea && isAuthenticated && user && role ? (
           <View style={[styles.roleBand, { backgroundColor: theme.primaryLight || '#FFF0E8' }]}>
-            <ThemedText style={[styles.roleBandText, { color: theme.primary }]} numberOfLines={1}>
-              {primaryRoleLabel(user.roles)}
+            <ThemedText
+              style={[styles.roleBandText, { color: theme.primary }, compactRole && styles.roleBandTextCompact]}
+              numberOfLines={1}
+              accessibilityLabel={role.full}
+            >
+              {compactRole ? role.short : role.full}
             </ThemedText>
           </View>
         ) : null}
@@ -462,7 +494,7 @@ export const AppSidebar: React.FC = () => {
             >
               <UserAvatar
                 user={user}
-                size={38}
+                size={AVATAR_SIZE}
                 fallbackBackground={theme.primaryLight || '#FFF0E8'}
                 fallbackTextColor={theme.primary}
                 style={[styles.avatarCircle, { borderColor: theme.primary }]}
@@ -531,6 +563,14 @@ export const AppSidebar: React.FC = () => {
 
 /** Tinggi tiap menu sidebar (terbuka & tertutup). */
 const NAV_ITEM_HEIGHT = 52;
+/** Lebar sidebar tertutup (lihat sidebarCollapsed) & garis tepi kanannya. */
+const COLLAPSED_WIDTH = 76;
+const SIDEBAR_BORDER = 1;
+const AVATAR_SIZE = 38;
+/** Jarak avatar dari tepi kiri sidebar, sehingga avatar di tengah saat sidebar tertutup. */
+const AVATAR_INSET = (COLLAPSED_WIDTH - SIDEBAR_BORDER - AVATAR_SIZE) / 2;
+/** Tinggi baris profil (nama + username dua baris, padding 12 atas-bawah), sama di kedua keadaan. */
+const USER_CARD_HEIGHT = 65;
 /** Jarak ikon dari tepi kiri menu: (52 - ikon 24) / 2, sehingga ikon di tengah saat sidebar tertutup. */
 const NAV_ICON_INSET = (NAV_ITEM_HEIGHT - 24) / 2;
 
@@ -550,7 +590,7 @@ const styles = StyleSheet.create({
     width: 220,
   },
   sidebarCollapsed: {
-    width: 76,
+    width: COLLAPSED_WIDTH,
     alignItems: 'center',
   },
   headerRow: {
@@ -619,6 +659,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
   },
+  roleBandTextCompact: {
+    textAlign: 'center',
+  },
   hamburgerBtn: {
     flexShrink: 0,
     width: 40,
@@ -636,9 +679,13 @@ const styles = StyleSheet.create({
   },
   navSection: {
     flex: 1,
+    minHeight: 0, // boleh menyusut di dalam kolom sidebar sehingga isinya bisa di-scroll
+    width: '100%',
+  },
+  navSectionContent: {
     paddingHorizontal: 12,
     paddingTop: 12,
-    width: '100%',
+    paddingBottom: 12,
   },
   navItemsList: {
     gap: 8,
@@ -685,15 +732,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     width: '100%',
   },
+  // Avatar rata kiri dengan jarak tetap di kedua keadaan (seperti ikon menu), jadi diam di tempat
+  // saat sidebar dibuka/ditutup dan pas di tengah saat tertutup.
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    // Tinggi tetap: tanpa ini baris memendek saat nama disembunyikan dan avatar ikut turun
+    height: USER_CARD_HEIGHT,
+    paddingLeft: AVATAR_INSET,
+    paddingRight: 14,
   },
   userCardCollapsed: {
-    justifyContent: 'center',
+    paddingRight: 0,
   },
   avatarButton: {
     cursor: 'pointer' as any,
