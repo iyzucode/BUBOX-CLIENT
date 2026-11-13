@@ -34,7 +34,6 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'admin-menu', label: 'Kelola Menu', path: '/admin/menu' },
   { id: 'admin-vouchers', label: 'Voucher', path: '/admin/vouchers' },
   { id: 'admin-settings', label: 'Cutoff & Bayar', path: '/admin/settings' },
-  { id: 'back-customer', label: 'Web Customer', path: '/' },
 ];
 
 interface SidebarIconProps {
@@ -183,24 +182,6 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
         </svg>
       );
     }
-    if (name === 'back-customer') {
-      return (
-        <svg
-          width={size}
-          height={size}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={color}
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="12" cy="12" r="10" />
-          <line x1="2" y1="12" x2="22" y2="12" />
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-        </svg>
-      );
-    }
     if (name === 'go-admin') {
       return (
         <svg
@@ -231,7 +212,6 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
     'admin-orders': '🧾',
     'admin-settings': '⏰',
     'admin-vouchers': '🎟️',
-    'back-customer': '🌐',
     'go-admin': '⚙️',
   };
 
@@ -241,6 +221,16 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
     </ThemedText>
   );
 };
+
+/** Urutan peran dari yang tertinggi; yang tampil di sidebar adalah peran tertinggi pengguna. */
+const ROLE_PRIORITY = ['Super Admin', 'Owner', 'Admin', 'Kitchen', 'Driver', 'Customer'];
+
+function primaryRoleLabel(roles?: string[]): string | null {
+  if (!roles || roles.length === 0) return null;
+  const lower = roles.map((r) => r.toLowerCase());
+  const top = ROLE_PRIORITY.find((r) => lower.includes(r.toLowerCase())) ?? roles[0];
+  return top.toUpperCase();
+}
 
 export const AppSidebar: React.FC = () => {
   const theme = useTheme();
@@ -341,18 +331,9 @@ export const AppSidebar: React.FC = () => {
             </View>
             {showText && (
               <View style={styles.brandTextWrapper}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <ThemedText style={[styles.brandTitleText, { color: theme.secondary }]}>
-                    BUBOX
-                  </ThemedText>
-                  {isAdminArea && (
-                    <View style={[styles.adminTag, { backgroundColor: theme.primaryLight || '#FFF0E8' }]}>
-                      <ThemedText style={[styles.adminTagText, { color: theme.primary }]}>
-                        ADMIN
-                      </ThemedText>
-                    </View>
-                  )}
-                </View>
+                <ThemedText style={[styles.brandTitleText, { color: theme.secondary }]} numberOfLines={1}>
+                  BUBOX
+                </ThemedText>
               </View>
             )}
           </Pressable>
@@ -397,7 +378,7 @@ export const AppSidebar: React.FC = () => {
         <View style={styles.navItemsList}>
           {currentNavItems.map((item) => {
             const active = isTabActive(item.path);
-            const isSwitchBtn = item.id === 'go-admin' || item.id === 'back-customer';
+            const isSwitchBtn = item.id === 'go-admin';
             const activeColor = theme.primary;
             const inactiveColor = isSwitchBtn ? theme.secondary : theme.textSecondary;
             const itemColor = active ? activeColor : inactiveColor;
@@ -458,10 +439,20 @@ export const AppSidebar: React.FC = () => {
           },
         ]}
       >
+        {/* Pita peran pengguna, tepat di atas kartu profil (area admin) */}
+        {isAdminArea && isAuthenticated && user && !isCollapsed && showText && primaryRoleLabel(user.roles) ? (
+          <View style={[styles.roleBand, { backgroundColor: theme.primaryLight || '#FFF0E8' }]}>
+            <ThemedText style={[styles.roleBandText, { color: theme.primary }]} numberOfLines={1}>
+              {primaryRoleLabel(user.roles)}
+            </ThemedText>
+          </View>
+        ) : null}
+
         {isAuthenticated && user ? (
           <View
             style={[
               styles.userCard,
+              { backgroundColor: theme.backgroundElement },
               isCollapsed && styles.userCardCollapsed,
             ]}
           >
@@ -499,7 +490,17 @@ export const AppSidebar: React.FC = () => {
                   style={styles.logoutIconButton}
                   accessibilityLabel="Keluar"
                 >
-                  <ThemedText style={{ fontSize: 14 }}>🚪</ThemedText>
+                  {Platform.OS === 'web' ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="2"
+                      strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      {/* Lingkaran terbuka + panah keluar (seperti desain) */}
+                      <path d="M15.5 5.2A8 8 0 1 0 15.5 18.8" />
+                      <line x1="10" y1="12" x2="21" y2="12" />
+                      <polyline points="17.5 8.5 21 12 17.5 15.5" />
+                    </svg>
+                  ) : (
+                    <ThemedText style={{ fontSize: 16, color: theme.text }}>⇥</ThemedText>
+                  )}
                 </Pressable>
               </>
             )}
@@ -527,6 +528,11 @@ export const AppSidebar: React.FC = () => {
     </View>
   );
 };
+
+/** Tinggi tiap menu sidebar (terbuka & tertutup). */
+const NAV_ITEM_HEIGHT = 52;
+/** Jarak ikon dari tepi kiri menu: (52 - ikon 24) / 2, sehingga ikon di tengah saat sidebar tertutup. */
+const NAV_ICON_INSET = (NAV_ITEM_HEIGHT - 24) / 2;
 
 const styles = StyleSheet.create({
   sidebarWrapper: {
@@ -562,9 +568,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   brandContainer: {
+    flex: 1,
+    minWidth: 0, // boleh menyusut; tombol burger tidak
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginRight: 8,
     cursor: 'pointer' as any,
   },
   logoMarkContainer: {
@@ -588,25 +597,30 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
   brandTextWrapper: {
+    flexShrink: 1,
+    minWidth: 0,
     justifyContent: 'center',
+    alignItems: 'flex-start',
     overflow: 'hidden',
   },
   brandTitleText: {
-    fontSize: 22,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: '900',
     letterSpacing: 1.5,
   },
-  adminTag: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+  roleBand: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
-  adminTagText: {
-    fontSize: 9,
+  roleBandText: {
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   hamburgerBtn: {
+    flexShrink: 0,
     width: 40,
     height: 40,
     borderRadius: 12,
@@ -637,19 +651,20 @@ const styles = StyleSheet.create({
     transitionProperty: 'background-color, transform',
     transitionDuration: '150ms',
   } as any,
+  // Menu sama persis di kedua keadaan: tinggi tetap & ikon rata kiri dengan jarak tetap, jadi saat
+  // sidebar dibuka/ditutup ikon diam di tempat dan latar menu ikut menyempit/melebar bersama sidebar.
+  // Lebar sidebar tertutup (76) = padding navSection 12×2 + menu 52, jadi ikon pas di tengah.
   navItemExpanded: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    height: NAV_ITEM_HEIGHT,
+    paddingLeft: NAV_ICON_INSET,
+    paddingRight: 16,
     borderRadius: 16,
     gap: 12,
   },
   navItemCollapsed: {
-    width: 52,
-    height: 52,
+    height: NAV_ITEM_HEIGHT,
+    paddingLeft: NAV_ICON_INSET,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
   },
   iconBox: {
     width: 24,
@@ -665,15 +680,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     letterSpacing: -0.2,
   },
+  // Pita peran & blok profil menempel penuh selebar sidebar (tanpa jarak), seperti desain
   bottomSection: {
     borderTopWidth: 1,
-    padding: 12,
     width: '100%',
   },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   userCardCollapsed: {
     justifyContent: 'center',
@@ -692,6 +709,7 @@ const styles = StyleSheet.create({
   guestContainer: {
     width: '100%',
     alignItems: 'center',
+    padding: 12,
   },
   guestBtn: {
     width: '100%',

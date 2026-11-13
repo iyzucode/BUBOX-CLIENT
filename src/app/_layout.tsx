@@ -9,6 +9,7 @@ import { AppSidebar } from '@/components/ui/AppSidebar';
 import { AppDialogHost } from '@/components/ui/AppDialog';
 // Tampilan desktop penuh (dengan sidebar) hanya untuk area admin; customer dibatasi kolom ini
 import { CUSTOMER_MAX_WIDTH } from '@/hooks/use-customer-layout';
+import { useDesktopViewport } from '@/hooks/use-desktop-viewport';
 import { useHydrated } from '@/hooks/use-hydrated';
 
 
@@ -21,10 +22,14 @@ function RootLayoutContent() {
   const hydrated = useHydrated();
   const isDesktop = hydrated && width > CUSTOMER_MAX_WIDTH;
 
-  // Admin & role internal: layout desktop dengan sidebar.
-  // Customer: tanpa sidebar, konten dibatasi 768px di tengah layar.
+  // Admin & role internal: layout desktop dengan sidebar, dikunci ke tampilan desktop (web) walau
+  // dibuka di HP. Customer: tanpa sidebar, konten dibatasi 768px di tengah layar.
   const isAdminArea = pathname === '/admin' || pathname.startsWith('/admin/');
-  const showSidebar = isDesktop && isAdminArea;
+  useDesktopViewport(isAdminArea);
+  // Di web, area admin selalu desktop (viewport dikunci 1280px). Lebar dari useWindowDimensions tetap
+  // lebar fisik HP (react-native-web menghitungnya dari visualViewport × zoom), jadi tidak dipakai di sini.
+  const adminDesktop = isAdminArea && (isDesktop || (hydrated && Platform.OS === 'web'));
+  const showSidebar = adminDesktop;
   const constrainCustomer = isDesktop && !isAdminArea;
 
   return (

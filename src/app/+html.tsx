@@ -11,6 +11,13 @@ import type { PropsWithChildren } from 'react';
  */
 const THEME_BOOT_SCRIPT = `try{var s=JSON.parse(localStorage.getItem('bubox-theme-storage')||'null');if(s&&s.state&&s.state.themeMode==='dark'){document.documentElement.setAttribute('data-theme-pending','dark');setTimeout(function(){document.documentElement.removeAttribute('data-theme-pending')},4000)}}catch(e){}`;
 
+/**
+ * Area admin selalu tampilan desktop (lihat useDesktopViewport): bila halaman admin dibuka langsung,
+ * meta viewport diganti sebelum halaman tampil supaya browser HP langsung merender versi desktop.
+ * Lebar 1280 = ADMIN_DESKTOP_WIDTH.
+ */
+const ADMIN_VIEWPORT_BOOT_SCRIPT = `try{var p=location.pathname;if(p==='/admin'||p.indexOf('/admin/')===0){var w=1280,sw=(screen&&screen.width)||w,m=document.querySelector('meta[name="viewport"]');if(m)m.setAttribute('content','width='+w+', initial-scale='+Math.min(1,sw/w).toFixed(3))}}catch(e){}`;
+
 const THEME_BOOT_STYLE = `html[data-theme-pending=dark],html[data-theme-pending=dark] body{background-color:#0A0A0A}html[data-theme-pending=dark] #root{visibility:hidden}`;
 
 export default function Root({ children }: PropsWithChildren) {
@@ -22,6 +29,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: THEME_BOOT_STYLE }} />
+        <script dangerouslySetInnerHTML={{ __html: ADMIN_VIEWPORT_BOOT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body>{children}</body>
