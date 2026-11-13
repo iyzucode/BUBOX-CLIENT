@@ -1,127 +1,115 @@
-import React, { useState } from 'react';
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import React from 'react';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
+import { VoucherTicket } from '@/components/voucher/VoucherTicket';
+import { formatRupiah } from '@/features/order/orderStatus';
+import { useCheckoutTotals } from '@/features/order/useCheckoutTotals';
 import { useCheckoutPalette } from './checkoutPalette';
 
 /**
- * Input kode promo (tampilan saja).
- * Belum terhubung ke backend: kupon di-hold untuk v1, sehingga tombol Pakai hanya memberi info.
+ * Voucher di checkout: baris "Voucher ›" membuka layar Pilih Voucher; voucher yang dipakai tampil
+ * sebagai tiket di bawahnya. Melepas voucher: ketuk tiketnya lagi di layar Pilih Voucher.
  */
 export const PromoCodeCard: React.FC = () => {
   const palette = useCheckoutPalette();
-  const [code, setCode] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
+  const router = useRouter();
+  const { voucher, discount, subtotal, voucherBelowMinimum } = useCheckoutTotals();
 
-  const canApply = code.trim().length > 0;
-
-  const handleApply = () => {
-    if (!canApply) return;
-    setMessage('Kode promo belum bisa digunakan saat ini.');
-  };
+  const openPicker = () => router.push('/voucher');
 
   return (
-    <View style={[styles.card, { backgroundColor: palette.cardBg }]}>
-      <ThemedText style={[styles.cardTitle, { color: palette.cardTitle }]}>
-        Kode Promo
-      </ThemedText>
+    <View style={styles.section}>
+      <Pressable
+        onPress={openPicker}
+        style={({ pressed }) => [styles.row, { backgroundColor: palette.cardBg, opacity: pressed ? 0.85 : 1 }]}
+        accessibilityRole="button"
+        accessibilityLabel={voucher ? `Voucher ${voucher.code} dipakai. Ganti voucher` : 'Pilih voucher'}
+      >
+        <TicketIcon color={palette.cardTitle} cutout={palette.cardBg} />
+        <ThemedText style={[styles.label, { color: palette.cardTitle }]}>Voucher</ThemedText>
+        {voucher && !voucherBelowMinimum ? (
+          <ThemedText style={[styles.saving, { color: palette.optionIconColor }]} numberOfLines={1}>
+            Hemat {formatRupiah(discount)}
+          </ThemedText>
+        ) : null}
+        <ThemedText style={[styles.chevron, { color: palette.cardTitle }]}>›</ThemedText>
+      </Pressable>
 
-      <View style={styles.inputRow}>
-        <View style={[styles.inputWrapper, { backgroundColor: palette.inputBg }]}>
-          <TextInput
-            value={code}
-            onChangeText={(text) => {
-              setCode(text.toUpperCase());
-              if (message) setMessage(null);
-            }}
-            onSubmitEditing={handleApply}
-            placeholder="Masukkan kode promo"
-            placeholderTextColor={palette.inputPlaceholder}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={30}
-            returnKeyType="done"
-            style={[styles.textInput, { color: palette.inputText }]}
-            accessibilityLabel="Kode promo"
+      {/* Panel menyambung dari bawah tombol Voucher, berisi tiket voucher yang dipakai */}
+      {voucher ? (
+        <View style={[styles.panel, { backgroundColor: palette.voucherPanelBg }]}>
+          {/* Pesan "Tambah … lagi" muncul otomatis bila keranjang berubah di bawah minimal pembelian */}
+          <VoucherTicket
+            voucher={voucher}
+            subtotal={subtotal}
+            selected
+            onPress={openPicker}
+            cutoutColor={palette.voucherPanelBg}
           />
         </View>
-
-        <Pressable
-          onPress={handleApply}
-          disabled={!canApply}
-          style={({ pressed }) => [
-            styles.applyBtn,
-            {
-              backgroundColor: palette.actionPillBtnBg,
-              opacity: !canApply ? 0.5 : pressed ? 0.8 : 1,
-            },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Pakai kode promo"
-        >
-          <ThemedText style={[styles.applyBtnText, { color: palette.actionPillBtnText }]}>
-            Pakai
-          </ThemedText>
-        </Pressable>
-      </View>
-
-      {message ? (
-        <ThemedText style={[styles.message, { color: palette.cardSubtext }]}>{message}</ThemedText>
       ) : null}
     </View>
   );
 };
 
+/** Ikon tiket kecil dengan tanda % dan lekukan di kedua sisi. */
+const TicketIcon: React.FC<{ color: string; cutout: string }> = ({ color, cutout }) => (
+  <View style={[styles.ticketIcon, { backgroundColor: color }]}>
+    <View style={[styles.notch, styles.notchLeft, { backgroundColor: cutout }]} />
+    <View style={[styles.notch, styles.notchRight, { backgroundColor: cutout }]} />
+    <ThemedText style={[styles.ticketIconText, { color: cutout }]}>%</ThemedText>
+  </View>
+);
+
+/** Seberapa jauh panel voucher menyelip di bawah tombol Voucher (px). */
+const PANEL_TUCK = 20;
+
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 24,
-    padding: 16,
-    gap: 12,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    letterSpacing: -0.2,
-  },
-  inputRow: {
+  section: {},
+  row: {
+    zIndex: 1,
+    minHeight: 60,
+    borderRadius: 20,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+    ...Platform.select({
+      web: { cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: { elevation: 2 },
+    }),
   },
-  inputWrapper: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    justifyContent: 'center',
+  // Lebih sempit dari tombol & menyelip di bawahnya, jadi tampak keluar dari tombol Voucher
+  panel: {
+    marginHorizontal: 20,
+    marginTop: -PANEL_TUCK,
+    paddingTop: PANEL_TUCK + 12,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   },
-  textInput: {
-    // 16px mencegah iOS Safari melakukan auto-zoom saat input difokuskan
-    fontSize: 16,
-    fontWeight: '400',
-    paddingVertical: 0,
-    ...Platform.select({ web: { outlineWidth: 0 } }),
-  },
-  applyBtn: {
-    height: 44,
-    paddingHorizontal: 22,
-    borderRadius: 12,
-    justifyContent: 'center',
+  label: { flex: 1, fontSize: 16, fontWeight: '500', letterSpacing: -0.2 },
+  saving: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  chevron: { fontSize: 26, lineHeight: 28, fontWeight: '400' },
+  ticketIcon: {
+    width: 28,
+    height: 20,
+    borderRadius: 4,
     alignItems: 'center',
-    ...Platform.select({ web: { cursor: 'pointer' } }),
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  applyBtnText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  message: {
-    fontSize: 12,
-    fontWeight: '400',
-  },
+  notch: { position: 'absolute', width: 6, height: 6, borderRadius: 3, top: 7 },
+  notchLeft: { left: -3 },
+  notchRight: { right: -3 },
+  ticketIconText: { fontSize: 12, lineHeight: 14, fontWeight: '800' },
 });

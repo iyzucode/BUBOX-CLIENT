@@ -61,6 +61,7 @@ function RootLayoutContent() {
             <Stack.Screen name="address-form" />
             <Stack.Screen name="explore" />
             <Stack.Screen name="payment" />
+            <Stack.Screen name="voucher" />
             <Stack.Screen name="orders" />
             <Stack.Screen name="order-detail" />
             <Stack.Screen name="(auth)" />
@@ -70,6 +71,8 @@ function RootLayoutContent() {
             <Stack.Screen name="admin/menu-form" />
             <Stack.Screen name="admin/orders" />
             <Stack.Screen name="admin/settings" />
+            <Stack.Screen name="admin/vouchers" />
+            <Stack.Screen name="admin/voucher-form" />
           </Stack>
         </View>
       </View>

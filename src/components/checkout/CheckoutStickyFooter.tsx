@@ -56,7 +56,7 @@ export const CheckoutStickyFooter: React.FC<CheckoutStickyFooterProps> = ({
             { color: palette.footerTotalAmount, fontSize: lerp(19, 13), lineHeight: lerp(24, 18) },
           ]}
         >
-          Rp{grandTotal.toLocaleString('id-ID')}
+          Rp {grandTotal.toLocaleString('id-ID')}
         </Animated.Text>
       </View>
 

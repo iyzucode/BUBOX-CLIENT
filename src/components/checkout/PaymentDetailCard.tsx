@@ -11,7 +11,7 @@ import { useCheckoutPalette } from './checkoutPalette';
 
 export const PaymentDetailCard: React.FC = () => {
   const palette = useCheckoutPalette();
-  const { subtotal, deliveryFee, grandTotal } = useCheckoutTotals();
+  const { subtotal, deliveryFee, discount, voucher, grandTotal } = useCheckoutTotals();
 
   return (
     <View style={[styles.card, { backgroundColor: palette.cardBg }]}>
@@ -29,6 +29,18 @@ export const PaymentDetailCard: React.FC = () => {
           Rp {subtotal.toLocaleString('id-ID')}
         </ThemedText>
       </View>
+
+      {/* 2b. Potongan voucher */}
+      {voucher && discount > 0 ? (
+        <View style={styles.detailRow}>
+          <ThemedText style={[styles.label, { color: palette.financeLabel }]} numberOfLines={1}>
+            Diskon Voucher ({voucher.code})
+          </ThemedText>
+          <ThemedText style={[styles.value, { color: palette.optionIconColor }]}>
+            - Rp {discount.toLocaleString('id-ID')}
+          </ThemedText>
+        </View>
+      ) : null}
 
       {/* 3. Biaya Pengantaran */}
       <View style={styles.detailRow}>

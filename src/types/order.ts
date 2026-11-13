@@ -40,6 +40,8 @@ export interface CreateOrderRequest {
   addressId?: string | null;
   notes?: string | null;
   days: CreateOrderDayRequest[];
+  /** Opsional; syarat & potongan dicek ulang server. */
+  voucherCode?: string | null;
 }
 
 export interface UpdateDayStatusRequest {
@@ -175,6 +177,7 @@ export interface OrderDetail {
   notes: string | null;
   subtotal: number;
   discountAmount: number;
+  voucherCode: string | null;
   deliveryFee: number;
   grandTotal: number;
   paymentDueAt: string;

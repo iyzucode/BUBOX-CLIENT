@@ -231,7 +231,10 @@ export const OrderBreakdown: React.FC<OrderBreakdownProps> = ({
           <View style={[styles.summary, { borderTopColor: theme.border }]}>
             <Line label="Subtotal" value={formatRupiah(order.subtotal)} />
             {order.discountAmount > 0 ? (
-              <Line label="Diskon" value={`- ${formatRupiah(order.discountAmount)}`} />
+              <Line
+                label={order.voucherCode ? `Diskon (${order.voucherCode})` : 'Diskon'}
+                value={`- ${formatRupiah(order.discountAmount)}`}
+              />
             ) : null}
             <Line
               label={order.fulfillmentType === 'PICKUP' ? 'Ambil sendiri' : 'Ongkos kirim'}

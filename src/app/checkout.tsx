@@ -19,10 +19,10 @@ import { PromoCodeCard } from '@/components/checkout/PromoCodeCard';
 import { useCheckoutPalette } from '@/components/checkout/checkoutPalette';
 import { useCreateOrder } from '@/features/order/useOrders';
 import { useScrollActivity } from '@/hooks/use-scroll-activity';
-import { getApiErrorMessage } from '@/services/apiError';
+import { getApiErrorCode, getApiErrorMessage } from '@/services/apiError';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCartStore } from '@/store/useCartStore';
-import { showAlert } from '@/utils/alert';
+import { confirmAction, showAlert } from '@/utils/alert';
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -37,13 +37,16 @@ export default function CheckoutScreen() {
   const notes = useCartStore((s) => s.notes);
   const buildOrderDays = useCartStore((s) => s.buildOrderDays);
   const clearCart = useCartStore((s) => s.clearCart);
+  const selectedVoucher = useCartStore((s) => s.selectedVoucher);
+  const setSelectedVoucher = useCartStore((s) => s.setSelectedVoucher);
+  const subtotal = useCartStore((s) => s.getSubtotal());
 
   const createOrder = useCreateOrder();
   const { isScrolling, onScroll } = useScrollActivity();
 
   const isCartEmpty = selectedDateKeys.length === 0 || totalItemsCount === 0;
 
-  const handlePay = () => {
+  const handlePay = async () => {
     if (!token) {
       showAlert('Masuk Dulu', 'Silakan masuk ke akun Anda untuk melanjutkan pembayaran.', { tone: 'warning' });
       router.push('/login');
@@ -61,12 +64,26 @@ export default function CheckoutScreen() {
       return;
     }
 
+    // Isi keranjang berubah setelah voucher dipilih: minimal pembelian tidak lagi terpenuhi
+    let voucherCode = selectedVoucher?.code ?? null;
+    if (selectedVoucher && subtotal < selectedVoucher.minSubtotal) {
+      const proceed = await confirmAction(
+        'Voucher Belum Memenuhi Syarat',
+        `Voucher ${selectedVoucher.code} butuh minimal pembelian Rp ${selectedVoucher.minSubtotal.toLocaleString('id-ID')}. Lanjutkan tanpa voucher?`,
+        { confirmText: 'Lanjut tanpa voucher', tone: 'info' }
+      );
+      if (!proceed) return;
+      setSelectedVoucher(null);
+      voucherCode = null;
+    }
+
     createOrder.mutate(
       {
         fulfillmentType,
         addressId: fulfillmentType === 'DELIVERY' ? selectedAddressId : null,
         notes: notes.trim() || null,
         days,
+        voucherCode,
       },
       {
         onSuccess: (order) => {
@@ -74,6 +91,17 @@ export default function CheckoutScreen() {
           router.replace({ pathname: '/payment', params: { id: order.orderId } });
         },
         onError: (error) => {
+          const code = getApiErrorCode(error);
+          if (code === 'VOUCHER_NOT_APPLICABLE' || code === 'VOUCHER_NOT_FOUND') {
+            // Voucher berakhir / sudah dipakai sejak dipilih: lepas supaya pengguna bisa lanjut
+            setSelectedVoucher(null);
+            showAlert(
+              'Voucher Tidak Bisa Dipakai',
+              `${getApiErrorMessage(error, 'Voucher tidak bisa dipakai.')} Voucher dilepas dari pesanan, silakan cek totalnya lalu bayar lagi.`,
+              { tone: 'warning' }
+            );
+            return;
+          }
           showAlert('Pesanan Gagal Dibuat', getApiErrorMessage(error, 'Terjadi kesalahan saat membuat pesanan.'), { tone: 'error' });
         },
       }
@@ -129,7 +157,7 @@ export default function CheckoutScreen() {
               {/* Card 3: Metode Pembayaran (QRIS; Tunai belum tersedia) */}
               <PaymentMethodCard />
 
-              {/* Card 4: Kode Promo (tampilan saja, belum terhubung ke backend) */}
+              {/* Card 4: Voucher (buka layar Pilih Voucher) */}
               <PromoCodeCard />
 
               {/* Card 5: Detail Pembayaran Breakdown */}

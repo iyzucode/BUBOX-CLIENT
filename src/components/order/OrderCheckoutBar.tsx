@@ -66,7 +66,7 @@ export const OrderCheckoutBar: React.FC<OrderCheckoutBarProps> = ({
             { color: palette.checkoutTotalText, fontSize: lerp(19, 13), lineHeight: lerp(24, 18) },
           ]}
         >
-          Rp{grandTotal.toLocaleString('id-ID')}
+          Rp {grandTotal.toLocaleString('id-ID')}
         </Animated.Text>
         <Animated.View style={{ height: lerp(16, 0), opacity: lerp(1, 0), overflow: 'hidden' }}>
           <Text numberOfLines={1} style={[styles.summaryText, { color: palette.checkoutSubtext }]}>

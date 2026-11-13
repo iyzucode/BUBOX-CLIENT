@@ -164,6 +164,24 @@ export default function AdminDashboardScreen() {
               </Pressable>
 
               <Pressable
+                onPress={() => router.push('/admin/vouchers')}
+                style={({ pressed }) => [
+                  styles.actionCard,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: '#FDE8E3' }]}>
+                  <ThemedText style={{ fontSize: 24 }}>🎟️</ThemedText>
+                </View>
+                <View style={styles.actionInfo}>
+                  <ThemedText style={[styles.actionTitle, { color: theme.secondary }]}>Voucher</ThemedText>
+                  <ThemedText style={styles.actionDesc}>Buat kode promo, atur minimal belanja, masa berlaku, dan kode rahasia.</ThemedText>
+                </View>
+                <ThemedText style={[styles.actionArrow, { color: theme.primary }]}>➔</ThemedText>
+              </Pressable>
+
+              <Pressable
                 onPress={() => router.push('/admin/settings')}
                 style={({ pressed }) => [
                   styles.actionCard,

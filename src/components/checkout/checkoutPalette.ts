@@ -24,6 +24,8 @@ export interface CheckoutPalette {
 
   // Nested address & outlet box
   nestedBoxBg: string;
+  /** Panel di bawah tombol Voucher yang memuat tiket voucher terpilih (sama dengan panel di layar Order). */
+  voucherPanelBg: string;
   nestedBoxBorder: string;
   actionPillBtnBg: string;
   actionPillBtnText: string;
@@ -85,6 +87,7 @@ export const CheckoutPalettes: { light: CheckoutPalette; dark: CheckoutPalette }
 
     // Nested address/outlet box
     nestedBoxBg: '#E7ECF5',
+    voucherPanelBg: '#113366',
     nestedBoxBorder: 'transparent',
     actionPillBtnBg: '#113366',
     actionPillBtnText: '#FFFFFF',
@@ -144,6 +147,7 @@ export const CheckoutPalettes: { light: CheckoutPalette; dark: CheckoutPalette }
 
     // Nested address/outlet box
     nestedBoxBg: '#232326',
+    voucherPanelBg: '#18181B',
     nestedBoxBorder: '#2E2E33',
     actionPillBtnBg: '#3F3F46',
     actionPillBtnText: '#F4F4F5',

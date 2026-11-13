@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Menu } from '@/types/menu';
 import { CreateOrderDayRequest } from '@/types/order';
+import { VoucherOption } from '@/types/voucher';
 
 export type FulfillmentType = 'DELIVERY' | 'PICKUP';
 
@@ -12,6 +13,8 @@ export interface CartStoreState {
   fulfillmentType: FulfillmentType;
   selectedAddressId: string | null;
   notes: string;
+  /** Voucher yang dipilih di layar Voucher. Syarat & potongan final dicek ulang server saat CreateOrder. */
+  selectedVoucher: VoucherOption | null;
 
   // Actions
   setOrderData: (data: {
@@ -23,6 +26,7 @@ export interface CartStoreState {
   setFulfillmentType: (type: FulfillmentType) => void;
   setSelectedAddressId: (id: string | null) => void;
   setNotes: (notes: string) => void;
+  setSelectedVoucher: (voucher: VoucherOption | null) => void;
   clearCart: () => void;
 
   // Computed helpers
@@ -33,7 +37,7 @@ export interface CartStoreState {
   buildOrderDays: () => CreateOrderDayRequest[];
 }
 
-// Catatan: kupon promo di-hold (belum ada di v1). Ongkir & total final ditentukan server.
+// Ongkir, potongan voucher & total final ditentukan server.
 export const useCartStore = create<CartStoreState>((set, get) => ({
   selectedDateKeys: [],
   categoryQuantities: {},
@@ -42,6 +46,7 @@ export const useCartStore = create<CartStoreState>((set, get) => ({
   fulfillmentType: 'DELIVERY',
   selectedAddressId: null,
   notes: '',
+  selectedVoucher: null,
 
   setOrderData: (data) =>
     set({
@@ -57,6 +62,8 @@ export const useCartStore = create<CartStoreState>((set, get) => ({
 
   setNotes: (notes) => set({ notes }),
 
+  setSelectedVoucher: (voucher) => set({ selectedVoucher: voucher }),
+
   clearCart: () =>
     set({
       selectedDateKeys: [],
@@ -66,6 +73,7 @@ export const useCartStore = create<CartStoreState>((set, get) => ({
       fulfillmentType: 'DELIVERY',
       selectedAddressId: null,
       notes: '',
+      selectedVoucher: null,
     }),
 
   getSubtotal: () => {
