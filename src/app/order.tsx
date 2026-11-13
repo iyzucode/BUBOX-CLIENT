@@ -179,7 +179,7 @@ export default function OrderScreen() {
         scrollEventThrottle={16}
       >
         {/* 1. HERO HEADER IMAGE (~200px) WITH CLOSE 'X' & 'PESAN MENU LUANNA' */}
-        <OrderHeroHeader />
+        <OrderHeroHeader selectedPortions={totalItemsCount} />
 
         {/* 2. OVERLAPPING CONTAINER (marginTop: -55px) */}
         <View style={styles.overlapContainer}>

@@ -12,16 +12,31 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Brand } from '@/constants/theme';
 import { MaxContentWidth } from '@/constants/theme';
+import { confirmAction } from '@/utils/alert';
 import { useOrderPalette } from './orderPalette';
 
 const orderHeroImage = require('@/assets/images/order-hero.jpg');
 
-export const OrderHeroHeader: React.FC = () => {
+interface OrderHeroHeaderProps {
+  /** Jumlah porsi yang sudah dipilih. Bila > 0, tombol X minta konfirmasi dulu (pilihan akan hilang). */
+  selectedPortions?: number;
+}
+
+export const OrderHeroHeader: React.FC<OrderHeroHeaderProps> = ({ selectedPortions = 0 }) => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const palette = useOrderPalette();
 
-  const handleClose = () => {
+  const handleClose = async () => {
+    if (selectedPortions > 0) {
+      const leave = await confirmAction('Keluar dari Pemesanan?', undefined, {
+        confirmText: 'Keluar',
+        cancelText: 'Lanjut pesan',
+        tone: 'danger',
+      });
+      if (!leave) return;
+    }
+
     if (router.canGoBack()) {
       router.back();
     } else {
