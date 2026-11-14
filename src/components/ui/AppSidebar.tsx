@@ -34,6 +34,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'admin-orders', label: 'Pesanan', path: '/admin/orders' },
   { id: 'admin-delivery-areas', label: 'Wilayah Antar', path: '/admin/delivery-areas' },
   { id: 'admin-delivery-zones', label: 'Zona & Driver', path: '/admin/delivery-zones' },
+  { id: 'admin-outlets', label: 'Outlet', path: '/admin/outlets' },
   { id: 'admin-menu', label: 'Kelola Menu', path: '/admin/menu' },
   { id: 'admin-vouchers', label: 'Voucher', path: '/admin/vouchers' },
   { id: 'admin-settings', label: 'Cutoff & Bayar', path: '/admin/settings' },
@@ -73,6 +74,16 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
           <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
           <circle cx="5.5" cy="18.5" r="2.5" />
           <circle cx="18.5" cy="18.5" r="2.5" />
+        </svg>
+      );
+    }
+    if (name === 'admin-outlets') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9l1.5-5h15L21 9" />
+          <path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
+          <path d="M5 12v8h14v-8" />
+          <path d="M10 20v-5h4v5" />
         </svg>
       );
     }
@@ -234,6 +245,7 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
     'admin-orders': '🧾',
     'admin-delivery-areas': '🗺️',
     'admin-delivery-zones': '🛵',
+    'admin-outlets': '🏪',
     'admin-settings': '⏰',
     'admin-vouchers': '🎟️',
     'go-admin': '⚙️',

@@ -1,3 +1,4 @@
+import type { OutletSnapshot } from '@/types/outlet';
 import type { AssignmentSource } from '@/types/delivery';
 
 // Kontrak API modul Order (lihat Server/docs/ORDER_FLOW_PLANNING.md)
@@ -44,6 +45,8 @@ export interface CreateOrderRequest {
   days: CreateOrderDayRequest[];
   /** Opsional; syarat & potongan dicek ulang server. */
   voucherCode?: string | null;
+  /** Wajib untuk PICKUP: outlet tempat ambil. */
+  outletId?: string | null;
 }
 
 export interface UpdateDayStatusRequest {
@@ -191,6 +194,8 @@ export interface OrderDetail {
   payment: QrisPayment | null;
   days: OrderDay[];
   histories: OrderStatusHistory[];
+  /** PICKUP: outlet tempat ambil (null pada pesanan lama sebelum ada outlet). */
+  outlet?: OutletSnapshot | null;
 }
 
 export interface DailyOrderDay {
@@ -208,6 +213,8 @@ export interface DailyOrderDay {
   driverUserId?: string | null;
   driverName?: string | null;
   assignmentSource?: AssignmentSource | null;
+  /** Pengambilan (PICKUP saja): outlet tempat ambil. */
+  outlet?: OutletSnapshot | null;
 }
 
 export interface DailyDeliveries {

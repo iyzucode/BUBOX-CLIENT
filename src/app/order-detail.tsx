@@ -16,6 +16,7 @@ import {
   formatRupiah,
 } from '@/features/order/orderStatus';
 import { useOrderDetail } from '@/features/order/useOrders';
+import { openExternal, outletMapsUrl, whatsappUrl } from '@/features/outlet/outletUtils';
 import { useCustomerLayout } from '@/hooks/use-customer-layout';
 import { useAuthStore } from '@/store/useAuthStore';
 import { OrderDayStatusCode, OrderDetail, OrderStatusCode } from '@/types/order';
@@ -246,6 +247,31 @@ export default function OrderDetailScreen() {
               </ThemedText>
             </>
           ) : null}
+          {order.outlet ? (
+            <>
+              <ThemedText style={[styles.body, { color: theme.text }]}>{order.outlet.name}</ThemedText>
+              <ThemedText style={[styles.small, { color: theme.textSecondary }]}>
+                {order.outlet.fullAddress}, {order.outlet.wilayahPath}
+              </ThemedText>
+              {order.outlet.pickupHours ? (
+                <ThemedText style={[styles.small, { color: theme.textSecondary }]}>
+                  Jam ambil: {order.outlet.pickupHours}
+                </ThemedText>
+              ) : null}
+              <View style={styles.outletLinks}>
+                {outletMapsUrl(order.outlet) ? (
+                  <Pressable onPress={() => openExternal(outletMapsUrl(order.outlet!))} accessibilityRole="link" style={styles.clickable}>
+                    <ThemedText style={[styles.small, styles.outletLink]}>Lihat di peta</ThemedText>
+                  </Pressable>
+                ) : null}
+                {order.outlet.whatsappNumber ? (
+                  <Pressable onPress={() => openExternal(whatsappUrl(order.outlet!.whatsappNumber))} accessibilityRole="link" style={styles.clickable}>
+                    <ThemedText style={[styles.small, styles.outletLink]}>WhatsApp outlet</ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
+            </>
+          ) : null}
           {order.notes ? (
             <ThemedText style={[styles.small, { color: theme.textSecondary }]}>Catatan: {order.notes}</ThemedText>
           ) : null}
@@ -288,6 +314,8 @@ export default function OrderDetailScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { width: '100%', alignSelf: 'center', padding: 16, paddingBottom: 40, gap: 14 },
+  outletLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 2 },
+  outletLink: { color: Brand.orange, fontWeight: '700' },
   center: { paddingVertical: 60, alignItems: 'center' },
   card: {
     width: '100%',

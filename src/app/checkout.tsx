@@ -18,6 +18,7 @@ import { PromoCodeCard } from '@/components/checkout/PromoCodeCard';
 import { useCheckoutPalette } from '@/components/checkout/checkoutPalette';
 import { ADDRESSES_QUERY_KEY, useAddresses } from '@/features/biodata/useAddresses';
 import { useCreateOrder } from '@/features/order/useOrders';
+import { OUTLET_QUERY_KEYS } from '@/features/outlet/useOutlets';
 import { useLeavePageWarning } from '@/hooks/use-leave-page-warning';
 import { useScrollActivity } from '@/hooks/use-scroll-activity';
 import { getApiErrorCode, getApiErrorMessage } from '@/services/apiError';
@@ -35,6 +36,8 @@ export default function CheckoutScreen() {
   const totalItemsCount = getTotalItemsCount();
   const fulfillmentType = useCartStore((s) => s.fulfillmentType);
   const selectedAddressId = useCartStore((s) => s.selectedAddressId);
+  const selectedOutletId = useCartStore((s) => s.selectedOutletId);
+  const setSelectedOutletId = useCartStore((s) => s.setSelectedOutletId);
   const notes = useCartStore((s) => s.notes);
   const buildOrderDays = useCartStore((s) => s.buildOrderDays);
   const clearCart = useCartStore((s) => s.clearCart);
@@ -85,6 +88,11 @@ export default function CheckoutScreen() {
       return;
     }
 
+    if (fulfillmentType === 'PICKUP' && !selectedOutletId) {
+      showAlert('Outlet Belum Dipilih', 'Pilih outlet tempat mengambil pesanan, atau gunakan Pesan Antar.', { tone: 'warning' });
+      return;
+    }
+
     const days = buildOrderDays();
     if (days.length === 0) {
       showAlert('Keranjang Kosong', 'Belum ada menu yang dipilih.', { tone: 'warning' });
@@ -108,6 +116,7 @@ export default function CheckoutScreen() {
       {
         fulfillmentType,
         addressId: fulfillmentType === 'DELIVERY' ? selectedAddressId : null,
+        outletId: fulfillmentType === 'PICKUP' ? selectedOutletId : null,
         notes: notes.trim() || null,
         days,
         voucherCode,
@@ -128,6 +137,13 @@ export default function CheckoutScreen() {
               `${getApiErrorMessage(error, 'Voucher tidak bisa dipakai.')} Voucher dilepas dari pesanan, silakan cek totalnya lalu bayar lagi.`,
               { tone: 'warning' }
             );
+            return;
+          }
+          if (code === 'OUTLET_UNAVAILABLE') {
+            // Outlet dinonaktifkan sejak daftar dimuat: muat ulang & pilih ulang outlet
+            setSelectedOutletId(null);
+            queryClient.invalidateQueries({ queryKey: OUTLET_QUERY_KEYS.all });
+            showAlert('Outlet Tidak Tersedia', getApiErrorMessage(error, 'Outlet yang dipilih sudah tidak tersedia.'), { tone: 'warning' });
             return;
           }
           if (code === 'DELIVERY_NOT_COVERED') {

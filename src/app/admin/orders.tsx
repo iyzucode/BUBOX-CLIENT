@@ -208,6 +208,11 @@ export default function AdminOrdersScreen() {
                     {day.address.notes ? ` (${day.address.notes})` : ''}
                   </ThemedText>
                 ) : null}
+                {day.outlet ? (
+                  <ThemedText style={[styles.tiny, muted]}>🏪 Ambil di {day.outlet.name}</ThemedText>
+                ) : day.fulfillmentType === 'PICKUP' ? (
+                  <ThemedText style={[styles.tiny, muted]}>🏪 Outlet tidak tercatat (pesanan lama)</ThemedText>
+                ) : null}
                 {day.items.map((item) => (
                   <ThemedText key={item.id} style={[styles.small, strong]}>
                     {item.qty}× {item.menuName}

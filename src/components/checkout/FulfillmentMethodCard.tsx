@@ -9,7 +9,9 @@ import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { DeliveryCoverageNote } from '@/components/address/DeliveryCoverageNote';
+import { SelectModalPicker } from '@/components/ui/SelectModalPicker';
 import { useAddresses } from '@/features/biodata/useAddresses';
+import { useAvailableOutlets } from '@/features/outlet/useOutlets';
 import { FulfillmentType, useCartStore } from '@/store/useCartStore';
 import { useCheckoutPalette } from './checkoutPalette';
 
@@ -42,6 +44,29 @@ export const FulfillmentMethodCard: React.FC = () => {
       setSelectedAddressId(activeAddress.id);
     }
   }, [activeAddress, selectedAddressId, setSelectedAddressId]);
+
+  // Outlet Ambil Sendiri: pilihan customer → outlet terakhir dipakai → outlet aktif teratas
+  const selectedOutletId = useCartStore((s) => s.selectedOutletId);
+  const setSelectedOutletId = useCartStore((s) => s.setSelectedOutletId);
+  const { data: outletData, isPending: isLoadingOutlets } = useAvailableOutlets();
+  const [isOutletPickerOpen, setIsOutletPickerOpen] = React.useState(false);
+
+  const activeOutlet = React.useMemo(() => {
+    const outlets = outletData?.outlets ?? [];
+    return (
+      outlets.find((o) => o.id === selectedOutletId) ??
+      outlets.find((o) => o.id === outletData?.lastUsedOutletId) ??
+      outlets[0] ??
+      null
+    );
+  }, [outletData, selectedOutletId]);
+
+  // Samakan pilihan di keranjang (juga saat outlet terpilih sudah dinonaktifkan admin)
+  React.useEffect(() => {
+    if (!outletData) return;
+    const nextId = activeOutlet?.id ?? null;
+    if (nextId !== selectedOutletId) setSelectedOutletId(nextId);
+  }, [outletData, activeOutlet, selectedOutletId, setSelectedOutletId]);
 
   const handleSelectMethod = (type: FulfillmentType) => {
     setFulfillmentType(type);
@@ -131,7 +156,7 @@ export const FulfillmentMethodCard: React.FC = () => {
               Ambil Sendiri
             </ThemedText>
             <ThemedText style={[styles.optionSubtext, { color: palette.optionSubtext }]}>
-              Dari outlet terdekat
+              Ambil di outlet pilihan
             </ThemedText>
           </View>
 
@@ -192,36 +217,59 @@ export const FulfillmentMethodCard: React.FC = () => {
             </Pressable>
           </>
         ) : (
-          /* Case Pickup: Default Outlet (Outlet Luanna Brosot) */
+          /* Case Pickup: outlet terpilih */
           <>
             <View style={styles.detailTextCol}>
               <ThemedText style={[styles.detailTitle, { color: palette.cardTitle }]} numberOfLines={1}>
-                Outlet Luanna Brosot
+                {activeOutlet?.name ?? (isLoadingOutlets ? 'Memuat outlet…' : 'Belum ada outlet')}
               </ThemedText>
               <ThemedText style={[styles.detailSubtext, { color: palette.cardSubtext }]} numberOfLines={2}>
-                Jl. Brosot - Galur, Kulon Progo, D.I. Yogyakarta (Pengambilan pkl 06.30 - 09.00 WIB)
+                {activeOutlet
+                  ? `${activeOutlet.fullAddress}${activeOutlet.pickupHours ? ` (Pengambilan pkl ${activeOutlet.pickupHours})` : ''}`
+                  : isLoadingOutlets
+                    ? ''
+                    : 'Ambil Sendiri belum tersedia. Silakan pilih Pesan Antar.'}
               </ThemedText>
             </View>
 
-            <Pressable
-              onPress={() => {}}
-              style={({ pressed }) => [
-                styles.actionPillBtn,
-                { backgroundColor: palette.actionPillBtnBg },
-                pressed && styles.pressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Pilih outlet"
-            >
-              <ThemedText style={[styles.actionPillBtnText, { color: palette.actionPillBtnText }]}>
-                Ubah
-              </ThemedText>
-            </Pressable>
+            {/* Hanya bila ada lebih dari satu outlet untuk dipilih */}
+            {(outletData?.outlets.length ?? 0) > 1 ? (
+              <Pressable
+                onPress={() => setIsOutletPickerOpen(true)}
+                style={({ pressed }) => [
+                  styles.actionPillBtn,
+                  { backgroundColor: palette.actionPillBtnBg },
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Pilih outlet"
+              >
+                <ThemedText style={[styles.actionPillBtnText, { color: palette.actionPillBtnText }]}>
+                  Ubah
+                </ThemedText>
+              </Pressable>
+            ) : null}
           </>
         )}
       </View>
 
       {isDelivery && activeAddress?.isDeliveryCovered === false ? <DeliveryCoverageNote /> : null}
+
+      <SelectModalPicker
+        visible={isOutletPickerOpen}
+        title="Pilih Outlet"
+        items={(outletData?.outlets ?? []).map((o) => ({
+          value: o.id,
+          label: o.name,
+          subtitle: `${o.fullAddress}${o.pickupHours ? ` · ${o.pickupHours}` : ''}`,
+        }))}
+        selectedValue={activeOutlet?.id}
+        onSelect={(item) => {
+          setSelectedOutletId(item.value);
+          setIsOutletPickerOpen(false);
+        }}
+        onClose={() => setIsOutletPickerOpen(false)}
+      />
     </View>
   );
 };

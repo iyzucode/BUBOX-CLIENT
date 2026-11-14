@@ -12,6 +12,8 @@ export interface CartStoreState {
   allMenus: Record<string, Menu>; // menuId -> Menu
   fulfillmentType: FulfillmentType;
   selectedAddressId: string | null;
+  /** Outlet tempat ambil (PICKUP). */
+  selectedOutletId: string | null;
   notes: string;
   /** Voucher yang dipilih di layar Voucher. Syarat & potongan final dicek ulang server saat CreateOrder. */
   selectedVoucher: VoucherOption | null;
@@ -25,6 +27,7 @@ export interface CartStoreState {
   }) => void;
   setFulfillmentType: (type: FulfillmentType) => void;
   setSelectedAddressId: (id: string | null) => void;
+  setSelectedOutletId: (id: string | null) => void;
   setNotes: (notes: string) => void;
   setSelectedVoucher: (voucher: VoucherOption | null) => void;
   clearCart: () => void;
@@ -45,6 +48,7 @@ export const useCartStore = create<CartStoreState>((set, get) => ({
   allMenus: {},
   fulfillmentType: 'DELIVERY',
   selectedAddressId: null,
+  selectedOutletId: null,
   notes: '',
   selectedVoucher: null,
 
@@ -60,6 +64,8 @@ export const useCartStore = create<CartStoreState>((set, get) => ({
 
   setSelectedAddressId: (id) => set({ selectedAddressId: id }),
 
+  setSelectedOutletId: (id) => set({ selectedOutletId: id }),
+
   setNotes: (notes) => set({ notes }),
 
   setSelectedVoucher: (voucher) => set({ selectedVoucher: voucher }),
@@ -72,6 +78,7 @@ export const useCartStore = create<CartStoreState>((set, get) => ({
       allMenus: {},
       fulfillmentType: 'DELIVERY',
       selectedAddressId: null,
+      selectedOutletId: null,
       notes: '',
       selectedVoucher: null,
     }),

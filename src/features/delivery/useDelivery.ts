@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { AxiosError } from 'axios';
 
 import { ORDER_QUERY_KEYS } from '@/features/order/useOrders';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { api } from '@/services/api';
 import { ApiErrorBody } from '@/services/apiError';
 import {
@@ -46,14 +47,29 @@ export const useAreaChildren = (parentCode: string | null) =>
     placeholderData: keepPreviousData,
   });
 
+/** Jeda setelah berhenti mengetik sebelum pencarian dikirim ke server. */
+const SEARCH_DEBOUNCE_MS = 400;
+const MIN_SEARCH_LENGTH = 3;
+
+/**
+ * isLoading juga true selama menunggu jeda ketik, agar layar menampilkan loading
+ * (bukan "tidak ditemukan") sebelum hasil untuk kata kunci terbaru datang.
+ */
+const withDebounceLoading = <T extends { isLoading: boolean }>(result: T, waiting: boolean) => ({
+  ...result,
+  isLoading: result.isLoading || waiting,
+});
+
 export const useSearchWilayah = (query: string) => {
-  const q = query.trim();
-  return useQuery<WilayahSearchItem[], ApiError>({
+  const typed = query.trim();
+  const q = useDebouncedValue(typed, SEARCH_DEBOUNCE_MS);
+  const result = useQuery<WilayahSearchItem[], ApiError>({
     queryKey: DELIVERY_QUERY_KEYS.search(q),
     queryFn: async () => (await api.get<WilayahSearchItem[]>('/DeliveryAdmin/SearchWilayah', { params: { q } })).data,
-    enabled: q.length >= 3,
+    enabled: q.length >= MIN_SEARCH_LENGTH,
     staleTime: 60_000,
   });
+  return withDebounceLoading(result, typed.length >= MIN_SEARCH_LENGTH && typed !== q);
 };
 
 export const useSetCoverage = () => {
@@ -134,12 +150,14 @@ export const useDrivers = (enabled = true) =>
   });
 
 export const useSearchUsers = (query: string) => {
-  const q = query.trim();
-  return useQuery<UserSearchResult[], ApiError>({
+  const typed = query.trim();
+  const q = useDebouncedValue(typed, SEARCH_DEBOUNCE_MS);
+  const result = useQuery<UserSearchResult[], ApiError>({
     queryKey: DELIVERY_QUERY_KEYS.users(q),
     queryFn: async () => (await api.get<UserSearchResult[]>('/DeliveryAdmin/SearchUsers', { params: { q } })).data,
-    enabled: q.length >= 3,
+    enabled: q.length >= MIN_SEARCH_LENGTH,
   });
+  return withDebounceLoading(result, typed.length >= MIN_SEARCH_LENGTH && typed !== q);
 };
 
 export const useSetDriverRole = () => {
