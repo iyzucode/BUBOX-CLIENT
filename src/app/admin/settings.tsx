@@ -11,16 +11,34 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { computeOrderCharges, formatPercent, serviceFeeLabel } from '@/features/order/orderCharges';
 import { formatDateTime, formatShortDate } from '@/features/order/orderStatus';
 import { useOrderCutoffInfo, useOrderSettings, useUpdateOrderSettings } from '@/features/order/useOrders';
 import { useTheme } from '@/hooks/use-theme';
 import { getApiErrorMessage } from '@/services/apiError';
-import { OrderSettings } from '@/types/order';
+import { OrderSettings, ServiceFeeType } from '@/types/order';
 import { showAlert } from '@/utils/alert';
 
 const DAY_OPTIONS = [0, 1, 2, 3];
+const SERVICE_FEE_TYPES: { id: ServiceFeeType; label: string }[] = [
+  { id: 'PERCENT', label: 'Persen (%)' },
+  { id: 'FIXED', label: 'Nominal (Rp)' },
+];
+/** Contoh subtotal untuk pratinjau perhitungan di form. */
+const EXAMPLE_SUBTOTAL = 100_000;
 
-/** Pengaturan cutoff pemesanan, batas waktu bayar QRIS, dan ongkir (Admin / Super Admin). */
+/** "2,5" / "2.5" → 2.5; null bila bukan angka. */
+const parseDecimal = (v: string): number | null => {
+  const n = Number(v.trim().replace(',', '.'));
+  return v.trim() !== '' && Number.isFinite(n) ? n : null;
+};
+/** Persen 0–100 dengan maksimal 2 angka desimal. */
+const isValidPercent = (n: number | null): n is number =>
+  n != null && n >= 0 && n <= 100 && Math.round(n * 100) === n * 100;
+/** Hanya angka & satu pemisah desimal. */
+const decimalInput = (v: string) => v.replace(/[^0-9.,]/g, '');
+
+/** Pengaturan cutoff pemesanan, batas waktu bayar QRIS, ongkir, biaya layanan & pajak (Admin / Super Admin). */
 export default function AdminSettingsScreen() {
   const theme = useTheme();
   const { data: settings, isLoading, isError, error } = useOrderSettings();
@@ -54,10 +72,41 @@ const SettingsForm: React.FC<{ settings: OrderSettings }> = ({ settings }) => {
   const [cutoffTime, setCutoffTime] = useState(settings.cutoffTime);
   const [timeout, setTimeoutMinutes] = useState(String(settings.paymentTimeoutMinutes));
   const [deliveryFee, setDeliveryFee] = useState(String(settings.deliveryFee));
+  const [serviceFeeType, setServiceFeeType] = useState<ServiceFeeType>(settings.serviceFeeType);
+  const [serviceFeeValue, setServiceFeeValue] = useState(String(settings.serviceFeeValue).replace('.', ','));
+  const [taxPercent, setTaxPercent] = useState(String(settings.taxPercent).replace('.', ','));
+
+  const serviceValue = parseDecimal(serviceFeeValue) ?? 0;
+  const taxValue = parseDecimal(taxPercent) ?? 0;
+  const example = computeOrderCharges(EXAMPLE_SUBTOTAL, {
+    serviceFeeType,
+    serviceFeeValue: serviceValue,
+    taxPercent: taxValue,
+  });
 
   const handleSave = () => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoffTime.trim())) {
       showAlert('Jam Tidak Valid', 'Gunakan format HH:mm, contoh 17:00.', { tone: 'warning' });
+      return;
+    }
+    const parsedService = serviceFeeValue.trim() === '' ? 0 : parseDecimal(serviceFeeValue);
+    const serviceValid =
+      serviceFeeType === 'PERCENT'
+        ? isValidPercent(parsedService)
+        : parsedService != null && Number.isInteger(parsedService) && parsedService >= 0 && parsedService <= 1_000_000;
+    if (parsedService == null || !serviceValid) {
+      showAlert(
+        'Biaya Layanan Tidak Valid',
+        serviceFeeType === 'PERCENT'
+          ? 'Isi persen antara 0 sampai 100, maksimal 2 angka desimal (contoh 2,5).'
+          : 'Isi nominal Rupiah bulat, contoh 2000.',
+        { tone: 'warning' }
+      );
+      return;
+    }
+    const parsedTax = taxPercent.trim() === '' ? 0 : parseDecimal(taxPercent);
+    if (!isValidPercent(parsedTax)) {
+      showAlert('Pajak Tidak Valid', 'Isi persen antara 0 sampai 100, maksimal 2 angka desimal (contoh 11).', { tone: 'warning' });
       return;
     }
 
@@ -68,6 +117,9 @@ const SettingsForm: React.FC<{ settings: OrderSettings }> = ({ settings }) => {
         timeZone: settings.timeZone,
         paymentTimeoutMinutes: Number(timeout) || 0,
         deliveryFee: Number(deliveryFee) || 0,
+        serviceFeeType,
+        serviceFeeValue: parsedService,
+        taxPercent: parsedTax,
       },
       {
         onSuccess: () => showAlert('Tersimpan', 'Pengaturan pesanan berhasil diperbarui.', { tone: 'success' }),
@@ -154,6 +206,81 @@ const SettingsForm: React.FC<{ settings: OrderSettings }> = ({ settings }) => {
         />
       </View>
 
+      {/* Biaya layanan & pajak */}
+      <View style={card}>
+        <ThemedText style={[styles.label, strong]}>🧾 Biaya layanan</ThemedText>
+        <View style={styles.segment}>
+          {SERVICE_FEE_TYPES.map((t) => {
+            const active = t.id === serviceFeeType;
+            return (
+              <Pressable
+                key={t.id}
+                onPress={() => {
+                  setServiceFeeType(t.id);
+                  setServiceFeeValue('0');
+                }}
+                style={[styles.segmentBtn, { backgroundColor: active ? theme.primary : theme.backgroundElement }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <ThemedText style={[styles.small, styles.bold, { color: active ? '#FFFFFF' : theme.text }]}>
+                  {t.label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+        <TextInput
+          value={serviceFeeValue}
+          onChangeText={(v) => setServiceFeeValue(serviceFeeType === 'PERCENT' ? decimalInput(v) : v.replace(/[^0-9]/g, ''))}
+          keyboardType={serviceFeeType === 'PERCENT' ? 'decimal-pad' : 'number-pad'}
+          placeholder={serviceFeeType === 'PERCENT' ? 'Contoh 2,5' : 'Contoh 2000'}
+          placeholderTextColor={theme.textSecondary}
+          style={input}
+        />
+        <ThemedText style={[styles.tiny, muted]}>
+          {serviceFeeType === 'PERCENT'
+            ? 'Persen dari subtotal menu setelah diskon voucher, dibulatkan ke atas.'
+            : 'Rupiah tetap per pesanan.'}{' '}
+          Isi 0 untuk tanpa biaya layanan.
+        </ThemedText>
+
+        <ThemedText style={[styles.label, strong]}>🏛 Pajak (%)</ThemedText>
+        <TextInput
+          value={taxPercent}
+          onChangeText={(v) => setTaxPercent(decimalInput(v))}
+          keyboardType="decimal-pad"
+          placeholder="Contoh 11"
+          placeholderTextColor={theme.textSecondary}
+          style={input}
+        />
+        <ThemedText style={[styles.tiny, muted]}>
+          Dari subtotal setelah diskon + biaya layanan, dibulatkan ke atas. Isi 0 untuk tanpa pajak. Berlaku untuk Pesan
+          Antar dan Ambil Sendiri.
+        </ThemedText>
+
+        {/* Pratinjau perhitungan */}
+        <View style={[styles.preview, { backgroundColor: theme.backgroundElement }]}>
+          <ThemedText style={[styles.tiny, styles.bold, muted]}>
+            CONTOH PESANAN Rp {EXAMPLE_SUBTOTAL.toLocaleString('id-ID')} (tanpa voucher & ongkir)
+          </ThemedText>
+          <View style={styles.previewRow}>
+            <ThemedText style={[styles.small, muted]}>{serviceFeeLabel(example.serviceFeePercent)}</ThemedText>
+            <ThemedText style={[styles.small, strong]}>Rp {example.serviceFee.toLocaleString('id-ID')}</ThemedText>
+          </View>
+          <View style={styles.previewRow}>
+            <ThemedText style={[styles.small, muted]}>Pajak ({formatPercent(example.taxPercent)})</ThemedText>
+            <ThemedText style={[styles.small, strong]}>Rp {example.taxAmount.toLocaleString('id-ID')}</ThemedText>
+          </View>
+          <View style={styles.previewRow}>
+            <ThemedText style={[styles.small, styles.bold, strong]}>Total</ThemedText>
+            <ThemedText style={[styles.small, styles.bold, strong]}>
+              Rp {(EXAMPLE_SUBTOTAL + example.serviceFee + example.taxAmount).toLocaleString('id-ID')}
+            </ThemedText>
+          </View>
+        </View>
+      </View>
+
       <Pressable
         onPress={handleSave}
         disabled={update.isPending}
@@ -184,6 +311,8 @@ const styles = StyleSheet.create({
     ...Platform.select({ web: { cursor: 'pointer' } }),
   },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },
+  preview: { borderRadius: 12, padding: 12, gap: 6, marginTop: 4 },
+  previewRow: { flexDirection: 'row', justifyContent: 'space-between' },
   saveBtn: {
     paddingVertical: 14,
     borderRadius: 14,

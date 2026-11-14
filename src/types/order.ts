@@ -196,6 +196,11 @@ export interface OrderDetail {
   histories: OrderStatusHistory[];
   /** PICKUP: outlet tempat ambil (null pada pesanan lama sebelum ada outlet). */
   outlet?: OutletSnapshot | null;
+  /** Biaya layanan & pajak (0 pada pesanan lama). serviceFeePercent null = nominal tetap. */
+  serviceFee: number;
+  serviceFeePercent: number | null;
+  taxAmount: number;
+  taxPercent: number;
 }
 
 export interface DailyOrderDay {
@@ -239,12 +244,20 @@ export interface DailyProduction {
 
 // ---------- Settings ----------
 
+/** PERCENT = persen dari subtotal − diskon; FIXED = Rupiah per pesanan. */
+export type ServiceFeeType = 'PERCENT' | 'FIXED';
+
 export interface OrderSettings {
   cutoffDaysBefore: number;
   cutoffTime: string; // HH:mm
   timeZone: string;
   paymentTimeoutMinutes: number;
   deliveryFee: number;
+  serviceFeeType: ServiceFeeType;
+  /** Persen atau Rupiah, sesuai serviceFeeType. */
+  serviceFeeValue: number;
+  /** Pajak (persen) dari subtotal − diskon + biaya layanan. */
+  taxPercent: number;
   updatedAt: string | null;
 }
 
@@ -258,4 +271,7 @@ export interface OrderCutoffInfo {
   earliestDeliveryDate: string;
   latestDeliveryDate: string;
   deliveryFee: number;
+  serviceFeeType: ServiceFeeType;
+  serviceFeeValue: number;
+  taxPercent: number;
 }

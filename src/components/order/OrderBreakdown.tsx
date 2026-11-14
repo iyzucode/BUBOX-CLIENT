@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/order/StatusBadge';
 import { Brand } from '@/constants/theme';
 import { useThemeContext } from '@/context/ThemeContext';
 import { formatLongDate, formatRupiah } from '@/features/order/orderStatus';
+import { formatPercent, serviceFeeLabel } from '@/features/order/orderCharges';
 import { OrderDayStatusCode, OrderDetail } from '@/types/order';
 import { resolveApiAssetUri } from '@/utils/apiAsset';
 
@@ -240,6 +241,12 @@ export const OrderBreakdown: React.FC<OrderBreakdownProps> = ({
               label={order.fulfillmentType === 'PICKUP' ? 'Ambil sendiri' : 'Ongkos kirim'}
               value={order.deliveryFee > 0 ? formatRupiah(order.deliveryFee) : 'Gratis'}
             />
+            {order.serviceFee > 0 ? (
+              <Line label={serviceFeeLabel(order.serviceFeePercent, 'Biaya layanan')} value={formatRupiah(order.serviceFee)} />
+            ) : null}
+            {order.taxAmount > 0 ? (
+              <Line label={`Pajak (${formatPercent(order.taxPercent)})`} value={formatRupiah(order.taxAmount)} />
+            ) : null}
             {paymentMethod ? <Line label="Metode" value={paymentMethod} /> : null}
             <Line label="Total" value={formatRupiah(order.grandTotal)} strong />
           </View>
