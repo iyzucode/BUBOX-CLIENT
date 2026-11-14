@@ -13,6 +13,7 @@ import { BoardFilterPanel, BoardFilters, EMPTY_FILTERS, countActiveFilters } fro
 import { BoardSummary } from '@/components/admin-orders/BoardSummary';
 import { DayTable, OrderTable } from '@/components/admin-orders/BoardTables';
 import { BoardTopBar } from '@/components/admin-orders/BoardTopBar';
+import { BulkActionBar } from '@/components/admin-orders/BulkActionBar';
 import { OrderDetailPanel } from '@/components/admin-orders/OrderDetailPanel';
 import { ThemedText } from '@/components/themed-text';
 import { DeliveryBoard } from '@/components/order/DeliveryBoard';
@@ -27,23 +28,43 @@ import {
   ORDER_TABS,
   PAGE_SIZES,
   addDaysKey,
+  bulkResultMessage,
+  bulkTargets,
+  formatTime,
+  shortOrderNumber,
 } from '@/features/order/adminBoardUtils';
 import { toDateKey } from '@/features/order/dateUtils';
 import { formatLongDate, formatShortDate, nextDayStatus } from '@/features/order/orderStatus';
-import { useAdminBoardDays, useAdminBoardOrders } from '@/features/order/useAdminBoard';
+import { buildKitchenSheetHtml, printHtml } from '@/features/order/kitchenSheetPrint';
+import {
+  downloadBoardExport,
+  fetchKitchenSheet,
+  useAdminBoardDays,
+  useAdminBoardOrders,
+  useBoardActivity,
+  useBulkCancelDays,
+  useBulkDayStatus,
+  useMarkDaysRefunded,
+} from '@/features/order/useAdminBoard';
 import { useCancelDayByAdmin, useCancelOrderByAdmin, useUpdateDayStatus } from '@/features/order/useOrders';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTheme } from '@/hooks/use-theme';
 import { getApiErrorCode, getApiErrorMessage } from '@/services/apiError';
 import { useAuthStore } from '@/store/useAuthStore';
-import type { AdminBoardParams, BoardView, DateBasis, DayTab, OrderTab } from '@/types/adminOrders';
+import type { AdminBoardParams, AdminDayRow, BoardView, DateBasis, DayTab, OrderTab } from '@/types/adminOrders';
 import type { OrderDayStatusCode } from '@/types/order';
-import { showAlert } from '@/utils/alert';
+import { confirmAction, showAlert } from '@/utils/alert';
 
 type Mode = 'board' | 'delivery';
 type CancelTarget =
   | { kind: 'day'; orderDayId: string; label: string }
+  | { kind: 'days'; orderDayIds: string[]; label: string }
   | { kind: 'order'; orderId: string; label: string };
+/** Hari kirim yang akan diatur drivernya; bulk = dari bar aksi massal (pilihan dikosongkan setelah berhasil). */
+type DriverTarget = { ids: string[]; bulk: boolean };
+type RefundTarget = { ids: string[]; label: string; bulk: boolean };
+
+const EMPTY_SELECTION = new Map<string, AdminDayRow>();
 
 const ZONE_DRIVER = '__ZONE__';
 const clickable = Platform.select({ web: { cursor: 'pointer' as const } }) ?? {};
@@ -76,8 +97,15 @@ export default function AdminOrdersScreen() {
   const [pageSize, setPageSize] = useState(20);
   const [sortOpen, setSortOpen] = useState(false);
   const [detail, setDetail] = useState<{ orderId: string; dayId: string | null } | null>(null);
-  const [driverDays, setDriverDays] = useState<string[] | null>(null);
+  const [driverTarget, setDriverTarget] = useState<DriverTarget | null>(null);
   const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
+  const [refundTarget, setRefundTarget] = useState<RefundTarget | null>(null);
+  const [selectionState, setSelectionState] = useState({ key: '', rows: EMPTY_SELECTION });
+  const [exporting, setExporting] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  // Indikator pesanan baru: dihitung sejak `seenAt`; baris yang dibuat setelah `newSince` diberi label "Baru"
+  const [seenAt, setSeenAt] = useState(() => new Date().toISOString());
+  const [newSince, setNewSince] = useState<string | null>(null);
 
   const isDays = view === 'days' || !canSeeOrders;
   const tab = isDays ? dayTab : orderTab;
@@ -93,6 +121,9 @@ export default function AdminOrdersScreen() {
     driverIds: isDays ? filters.drivers.join(',') || undefined : undefined,
     outletIds: filters.outlets.join(',') || undefined,
     categoryCodes: filters.categories.join(',') || undefined,
+    payments: filters.payments.join(',') || undefined,
+    vouchers: filters.vouchers.join(',') || undefined,
+    refunds: filters.refunds.join(',') || undefined,
     menuId: isDays ? filters.menu?.id : undefined,
     tab,
     sort,
@@ -114,8 +145,125 @@ export default function AdminOrdersScreen() {
   const cancelDay = useCancelDayByAdmin();
   const cancelOrder = useCancelOrderByAdmin();
   const setDayDriver = useSetDayDriver();
-  const drivers = useDrivers(isManager && driverDays != null);
+  const bulkStatus = useBulkDayStatus();
+  const bulkCancel = useBulkCancelDays();
+  const markRefunded = useMarkDaysRefunded();
+  const drivers = useDrivers(isManager && driverTarget != null);
+  const activity = useBoardActivity(seenAt, mode === 'board');
   const busyDayId = updateStatus.isPending ? updateStatus.variables?.orderDayId ?? null : null;
+  const bulkBusy = bulkStatus.isPending || bulkCancel.isPending || markRefunded.isPending || setDayDriver.isPending;
+
+  // ---------- Pilihan aksi massal (per hari kirim) ----------
+  // Pilihan disimpan bersama kriterianya: filter / tab / periode berubah → pilihan otomatis kosong
+  const canSelect = isDays && (canAdvance || isManager);
+  const selection = selectionState.key === criteriaKey ? selectionState.rows : EMPTY_SELECTION;
+  const setSelection = (next: Map<string, AdminDayRow>) => setSelectionState({ key: criteriaKey, rows: next });
+  const clearSelection = () => setSelectionState({ key: '', rows: EMPTY_SELECTION });
+  // Data baris terbaru (hasil refresh) menggantikan salinan saat dicentang
+  const selectedRows = useMemo(() => {
+    const fresh = new Map((daysQuery.data?.items ?? []).map((r) => [r.orderDayId, r]));
+    return [...selection.values()].map((r) => fresh.get(r.orderDayId) ?? r);
+  }, [selection, daysQuery.data?.items]);
+  const targets = useMemo(() => bulkTargets(selectedRows), [selectedRows]);
+
+  const toggleRow = (row: AdminDayRow) => {
+    const next = new Map(selection);
+    if (next.has(row.orderDayId)) next.delete(row.orderDayId);
+    else next.set(row.orderDayId, row);
+    setSelection(next);
+  };
+  const togglePage = (rows: AdminDayRow[], select: boolean) => {
+    const next = new Map(selection);
+    rows.forEach((r) => (select ? next.set(r.orderDayId, r) : next.delete(r.orderDayId)));
+    setSelection(next);
+  };
+
+  const reportBulk = (title: string, res: { succeeded: number; failed: { orderNumber: string | null; message: string }[] }, doneText: string) =>
+    showAlert(res.failed.length > 0 ? `${title}: Sebagian Gagal` : title, bulkResultMessage(res.succeeded, res.failed, doneText), {
+      tone: res.failed.length > 0 ? 'warning' : 'success',
+    });
+
+  const bulkAdvance = async (status: OrderDayStatusCode, ids: string[], label: string) => {
+    const ok = await confirmAction(`${label} ${ids.length} Hari Kirim?`, 'Status yang sudah dimajukan tidak bisa dikembalikan.', {
+      confirmText: label,
+      tone: 'info',
+    });
+    if (!ok) return;
+    bulkStatus.mutate(
+      { orderDayIds: ids, statusCode: status },
+      {
+        onSuccess: (res) => {
+          clearSelection();
+          reportBulk(label, res, 'diperbarui');
+        },
+        onError: (error) => showAlert('Gagal Memperbarui', getApiErrorMessage(error, 'Status tidak dapat diubah.'), { tone: 'error' }),
+      }
+    );
+  };
+
+  const submitRefund = (note: string) => {
+    if (!refundTarget) return;
+    const target = refundTarget;
+    markRefunded.mutate(
+      { orderDayIds: target.ids, note: note || null },
+      {
+        onSuccess: (res) => {
+          setRefundTarget(null);
+          if (target.bulk) clearSelection();
+          if (res.failed.length > 0 || target.ids.length > 1) reportBulk('Refund Ditandai', res, 'ditandai sudah direfund');
+        },
+        onError: (error) => showAlert('Gagal Menandai Refund', getApiErrorMessage(error, 'Refund tidak dapat ditandai.'), { tone: 'error' }),
+      }
+    );
+  };
+
+  const runExport = async () => {
+    setExporting(true);
+    try {
+      // Cadangan bila header nama file tidak terbaca; formatnya sama dengan nama dari server
+      const period = range.from === range.to ? range.from : `${range.from}_${range.to}`;
+      const fileName = `${isDays ? 'pesanan-per-hari' : 'transaksi'}_${basis === 'CREATED' ? 'pesan' : 'kirim'}_${period}.xlsx`;
+      await downloadBoardExport(isDays ? 'days' : 'orders', params, fileName);
+    } catch (error) {
+      showAlert('Gagal Mengekspor', getApiErrorMessage(error, 'File Excel tidak dapat dibuat.'), { tone: 'error' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const runPrint = async () => {
+    setPrinting(true);
+    try {
+      const sheet = await fetchKitchenSheet(params);
+      const filterLabels = [
+        ...(tab !== 'ALL' ? [`Tab: ${DAY_TABS.find((t) => t.id === tab)?.label ?? tab}`] : []),
+        ...(search ? [`Cari: "${search}"`] : []),
+        ...chips.map((c) => c.text),
+      ];
+      printHtml(buildKitchenSheetHtml(sheet, { basisLabel: basis === 'CREATED' ? 'Tanggal pesan' : 'Tanggal kirim', filters: filterLabels }));
+    } catch (error) {
+      showAlert('Gagal Mencetak', getApiErrorMessage(error, 'Lembar dapur tidak dapat dibuat.'), { tone: 'error' });
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  // ---------- Pesanan baru ----------
+  const newOrders = activity.data?.newOrders ?? 0;
+  const newlyPaid = activity.data?.newlyPaid ?? 0;
+  const showNewOrders = () => {
+    // Tampilkan pesanan sejak terakhir dilihat: acuan tanggal pesan, terbaru di atas, tanpa filter
+    setNewSince(seenAt);
+    setSeenAt(activity.data?.serverTime ?? new Date().toISOString());
+    setBasis('CREATED');
+    setRange({ from: toDateKey(new Date(seenAt)), to: today });
+    setFilters({ ...EMPTY_FILTERS });
+    setDayTab('ALL');
+    setOrderTab('ALL');
+    setDaySort('NEWEST');
+    setOrderSort('NEWEST');
+    setSearchInput('');
+  };
 
   const advance = (orderDayId: string, next: OrderDayStatusCode) =>
     updateStatus.mutate(
@@ -136,17 +284,30 @@ export default function AdminOrdersScreen() {
     const onSuccess = () => setCancelTarget(null);
     const onError = (error: unknown) => showAlert('Gagal Membatalkan', getApiErrorMessage(error, 'Pembatalan gagal.'), { tone: 'error' });
     if (cancelTarget.kind === 'day') cancelDay.mutate({ orderDayId: cancelTarget.orderDayId, reason }, { onSuccess, onError });
-    else cancelOrder.mutate({ orderId: cancelTarget.orderId, reason }, { onSuccess, onError });
+    else if (cancelTarget.kind === 'days') {
+      bulkCancel.mutate(
+        { orderDayIds: cancelTarget.orderDayIds, reason },
+        {
+          onSuccess: (res) => {
+            setCancelTarget(null);
+            clearSelection();
+            reportBulk('Hari Kirim Dibatalkan', res, 'dibatalkan');
+          },
+          onError,
+        }
+      );
+    } else cancelOrder.mutate({ orderId: cancelTarget.orderId, reason }, { onSuccess, onError });
   };
 
   const assignDriver = (driverUserId: string | null) => {
-    if (!driverDays) return;
-    const ids = driverDays;
-    setDriverDays(null);
+    if (!driverTarget) return;
+    const { ids, bulk } = driverTarget;
+    setDriverTarget(null);
     setDayDriver.mutate(
       { orderDayIds: ids, driverUserId, reason: null },
       {
         onSuccess: (res) => {
+          if (bulk) clearSelection();
           if (res.updated < ids.length) {
             showAlert('Sebagian Tidak Diubah', `${ids.length - res.updated} kiriman sudah berangkat sehingga drivernya tidak bisa diubah lagi.`, { tone: 'warning' });
           }
@@ -162,7 +323,7 @@ export default function AdminOrdersScreen() {
   const multiDay = range.from !== range.to || basis === 'CREATED';
 
   // Chip filter aktif (bisa dihapus satu per satu)
-  const chips = useMemo(() => {
+  const chips = (() => {
     const f = result?.facets;
     const label = (list: { id: string; label: string }[] | undefined, id: string) => list?.find((o) => o.id === id)?.label ?? id;
     const list: { key: string; text: string; remove: () => void }[] = [];
@@ -173,9 +334,12 @@ export default function AdminOrdersScreen() {
     if (isDays) filters.drivers.forEach((d) => list.push({ key: `d-${d}`, text: `Driver: ${label(f?.drivers, d)}`, remove: () => drop('drivers', d) }));
     filters.outlets.forEach((o) => list.push({ key: `o-${o}`, text: `Outlet: ${label(f?.outlets, o)}`, remove: () => drop('outlets', o) }));
     filters.categories.forEach((c) => list.push({ key: `c-${c}`, text: label(f?.categories, c), remove: () => drop('categories', c) }));
+    filters.payments.forEach((x) => list.push({ key: `p-${x}`, text: `Bayar: ${label(f?.payments, x)}`, remove: () => drop('payments', x) }));
+    filters.vouchers.forEach((x) => list.push({ key: `v-${x}`, text: x === 'NONE' ? 'Tanpa voucher' : `Voucher: ${x}`, remove: () => drop('vouchers', x) }));
+    filters.refunds.forEach((x) => list.push({ key: `r-${x}`, text: label(f?.refunds, x), remove: () => drop('refunds', x) }));
     if (filters.menu && isDays) list.push({ key: 'menu', text: `Menu: ${filters.menu.name}`, remove: () => setFilters((p) => ({ ...p, menu: null })) });
     return list;
-  }, [filters, result?.facets, isDays]);
+  })();
 
   const muted = { color: theme.textSecondary };
   const strong = { color: theme.text };
@@ -205,6 +369,34 @@ export default function AdminOrdersScreen() {
                 {range.from === range.to ? formatLongDate(range.from) : `${formatShortDate(range.from)} – ${formatShortDate(range.to)}`}
               </ThemedText>
             </View>
+            {newOrders + newlyPaid > 0 ? (
+              <Pressable
+                onPress={showNewOrders}
+                style={[styles.newPill, clickable, { backgroundColor: theme.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel="Tampilkan pesanan baru"
+              >
+                <ThemedText style={styles.newPillText}>
+                  🔔 {[newOrders > 0 ? `${newOrders} pesanan baru` : null, newlyPaid > 0 ? `${newlyPaid} baru dibayar` : null]
+                    .filter(Boolean)
+                    .join(' · ')}{' '}
+                  · Lihat
+                </ThemedText>
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => {
+                active.refetch();
+                activity.refetch();
+              }}
+              style={[styles.refresh, clickable]}
+              accessibilityRole="button"
+              accessibilityLabel="Muat ulang daftar"
+            >
+              <ThemedText style={[styles.small, muted]}>
+                {active.isFetching ? 'Memperbarui…' : active.dataUpdatedAt ? `Diperbarui ${formatTime(new Date(active.dataUpdatedAt).toISOString())}` : 'Muat ulang'} ⟳
+              </ThemedText>
+            </Pressable>
             {canSeeOrders ? (
               <View style={[styles.toggle, { backgroundColor: theme.backgroundElement }]}>
                 {(['days', 'orders'] as BoardView[]).map((v) => (
@@ -292,6 +484,28 @@ export default function AdminOrdersScreen() {
                 ↕ {sorts.find((s) => s.id === sort)?.label}
               </ThemedText>
             </Pressable>
+            {isDays && Platform.OS === 'web' ? (
+              <Pressable
+                onPress={runPrint}
+                disabled={printing}
+                style={[styles.sortBtn, clickable, { borderColor: theme.border, backgroundColor: theme.card }, printing && styles.disabled]}
+                accessibilityRole="button"
+              >
+                <ThemedText style={[styles.small, strong]} numberOfLines={1}>{printing ? 'Menyiapkan…' : '🖨 Cetak dapur'}</ThemedText>
+              </Pressable>
+            ) : null}
+            {canSeeOrders && Platform.OS === 'web' ? (
+              <Pressable
+                onPress={runExport}
+                disabled={exporting}
+                style={[styles.sortBtn, clickable, { borderColor: theme.border, backgroundColor: theme.card }, exporting && styles.disabled]}
+                accessibilityRole="button"
+              >
+                <ThemedText style={[styles.small, strong]} numberOfLines={1}>
+                  {exporting ? 'Mengekspor…' : isDays ? '⬇ Ekspor Excel' : '⬇ Ekspor transaksi'}
+                </ThemedText>
+              </Pressable>
+            ) : null}
           </View>
 
           {chips.length > 0 ? (
@@ -305,6 +519,21 @@ export default function AdminOrdersScreen() {
                 <ThemedText style={[styles.small, styles.bold, { color: theme.primary }]}>Reset</ThemedText>
               </Pressable>
             </View>
+          ) : null}
+
+          {canSelect && selection.size > 0 ? (
+            <BulkActionBar
+              count={selection.size}
+              targets={targets}
+              canAdvance={canAdvance}
+              canManage={isManager}
+              busy={bulkBusy}
+              onAdvance={bulkAdvance}
+              onAssignDriver={(ids) => setDriverTarget({ ids, bulk: true })}
+              onMarkRefund={(ids) => setRefundTarget({ ids, label: `${ids.length} hari kirim`, bulk: true })}
+              onCancel={(ids) => setCancelTarget({ kind: 'days', orderDayIds: ids, label: `${ids.length} hari kirim` })}
+              onClear={clearSelection}
+            />
           ) : null}
 
           {/* Daftar */}
@@ -329,15 +558,21 @@ export default function AdminOrdersScreen() {
               busyDayId={busyDayId}
               canAdvance={canAdvance}
               canAssignDriver={isManager}
+              canMarkRefund={isManager}
+              newSince={newSince}
+              selection={canSelect ? { ids: new Set(selection.keys()), onToggle: toggleRow, onTogglePage: togglePage } : null}
               onOpen={(r) => setDetail({ orderId: r.orderId, dayId: r.orderDayId })}
               onAdvance={(r) => {
                 const next = nextDayStatus(r.dayStatus, r.fulfillmentType);
                 if (next) advance(r.orderDayId, next);
               }}
-              onAssignDriver={(r) => setDriverDays([r.orderDayId])}
+              onAssignDriver={(r) => setDriverTarget({ ids: [r.orderDayId], bulk: false })}
+              onMarkRefund={(r) =>
+                setRefundTarget({ ids: [r.orderDayId], label: `${shortOrderNumber(r.orderNumber)} · ${formatShortDate(r.deliveryDate)}`, bulk: false })
+              }
             />
           ) : (
-            <OrderTable rows={ordersQuery.data?.items ?? []} onOpen={(r) => setDetail({ orderId: r.orderId, dayId: null })} />
+            <OrderTable rows={ordersQuery.data?.items ?? []} newSince={newSince} onOpen={(r) => setDetail({ orderId: r.orderId, dayId: null })} />
           )}
 
           {/* Paging */}
@@ -418,11 +653,14 @@ export default function AdminOrdersScreen() {
           busyDayId={busyDayId}
           onClose={() => setDetail(null)}
           onAdvanceDay={(day, next) => advance(day.id, next)}
-          onAssignDriver={(ids) => setDriverDays(ids)}
+          onAssignDriver={(ids) => setDriverTarget({ ids, bulk: false })}
           onCancelDay={(day, order) =>
             setCancelTarget({ kind: 'day', orderDayId: day.id, label: `${order.orderNumber} · ${formatShortDate(day.deliveryDate)}` })
           }
           onCancelOrder={(order) => setCancelTarget({ kind: 'order', orderId: order.id, label: order.orderNumber })}
+          onMarkRefund={(ids, order) =>
+            setRefundTarget({ ids, label: ids.length > 1 ? `${order.orderNumber} · ${ids.length} hari` : order.orderNumber, bulk: false })
+          }
         />
       ) : null}
 
@@ -440,8 +678,8 @@ export default function AdminOrdersScreen() {
       />
 
       <SelectModalPicker
-        visible={driverDays != null}
-        title={driverDays && driverDays.length > 1 ? `Driver untuk ${driverDays.length} hari kirim` : 'Pilih driver'}
+        visible={driverTarget != null}
+        title={driverTarget && driverTarget.ids.length > 1 ? `Driver untuk ${driverTarget.ids.length} hari kirim` : 'Pilih driver'}
         isLoading={drivers.isPending}
         items={[
           { value: ZONE_DRIVER, label: 'Ikuti zona', subtitle: 'Hapus penugasan manual, kembali ke driver zona' },
@@ -452,17 +690,31 @@ export default function AdminOrdersScreen() {
           })),
         ]}
         onSelect={(item) => assignDriver(item.value === ZONE_DRIVER ? null : item.value)}
-        onClose={() => setDriverDays(null)}
+        onClose={() => setDriverTarget(null)}
       />
 
       <ReasonModal
         visible={!!cancelTarget}
-        title={cancelTarget?.kind === 'day' ? '⚠ Batalkan Hari Kirim (Force Majeure)' : '✕ Batalkan Pesanan'}
+        title={cancelTarget?.kind === 'order' ? '✕ Batalkan Pesanan' : '⚠ Batalkan Hari Kirim (Force Majeure)'}
         description={cancelTarget ? `${cancelTarget.label}. Jika sudah dibayar, refund dilakukan manual di luar sistem.` : undefined}
         confirmLabel="Batalkan"
-        isSubmitting={cancelDay.isPending || cancelOrder.isPending}
+        isSubmitting={cancelDay.isPending || cancelOrder.isPending || bulkCancel.isPending}
         onCancel={() => setCancelTarget(null)}
         onSubmit={submitCancel}
+      />
+
+      <ReasonModal
+        visible={!!refundTarget}
+        title="✓ Tandai Sudah Direfund"
+        description={refundTarget ? `${refundTarget.label}. Pastikan dana sudah dikembalikan ke pelanggan di luar sistem.` : undefined}
+        placeholder="Catatan (opsional), mis. Transfer BCA 14/11 ref 123"
+        optional
+        maxLength={300}
+        tone="primary"
+        confirmLabel="Tandai direfund"
+        isSubmitting={markRefunded.isPending}
+        onCancel={() => setRefundTarget(null)}
+        onSubmit={submitRefund}
       />
     </View>
   );
@@ -490,6 +742,9 @@ const styles = StyleSheet.create({
   countText: { fontSize: 11, fontWeight: '800' },
   toolbar: { flexDirection: 'row', gap: 10 },
   search: { flex: 1, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+  newPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  newPillText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  refresh: { paddingHorizontal: 4, paddingVertical: 4 },
   sortBtn: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, justifyContent: 'center', maxWidth: 230 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   chip: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },

@@ -28,22 +28,40 @@ interface DayTableProps {
   busyDayId: string | null;
   canAdvance: boolean;
   canAssignDriver: boolean;
+  /** Admin: tandai refund manual selesai. */
+  canMarkRefund: boolean;
+  /** Pesanan yang dibuat setelah waktu ini diberi label "Baru". */
+  newSince: string | null;
+  /** Kolom centang untuk aksi massal (null = tanpa centang). */
+  selection: { ids: Set<string>; onToggle: (row: AdminDayRow) => void; onTogglePage: (rows: AdminDayRow[], select: boolean) => void } | null;
   onOpen: (row: AdminDayRow) => void;
   onAdvance: (row: AdminDayRow) => void;
   onAssignDriver: (row: AdminDayRow) => void;
+  onMarkRefund: (row: AdminDayRow) => void;
 }
 
 export const DayTable: React.FC<DayTableProps> = ({
-  rows, showDate, busyDayId, canAdvance, canAssignDriver, onOpen, onAdvance, onAssignDriver,
+  rows, showDate, busyDayId, canAdvance, canAssignDriver, canMarkRefund, newSince, selection,
+  onOpen, onAdvance, onAssignDriver, onMarkRefund,
 }) => {
   const theme = useTheme();
   const { isDark } = useThemeContext();
   const muted = { color: theme.textSecondary };
   const strong = { color: theme.text };
+  const pageSelected = !!selection && rows.length > 0 && rows.every((r) => selection.ids.has(r.orderDayId));
+  const pagePartly = !!selection && !pageSelected && rows.some((r) => selection.ids.has(r.orderDayId));
 
   return (
     <View style={[styles.table, { borderColor: theme.border, backgroundColor: theme.card }]}>
       <View style={[styles.headRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        {selection ? (
+          <CheckBox
+            checked={pageSelected}
+            mixed={pagePartly}
+            label={pageSelected ? 'Batal pilih semua di halaman ini' : 'Pilih semua di halaman ini'}
+            onPress={() => selection.onTogglePage(rows, !pageSelected)}
+          />
+        ) : null}
         <ThemedText style={[styles.head, styles.colOrder, muted]}>Pesanan / pelanggan</ThemedText>
         <ThemedText style={[styles.head, styles.colMenu, muted]}>Menu & porsi</ThemedText>
         <ThemedText style={[styles.head, styles.colPlace, muted]}>Pengantaran / pengambilan</ThemedText>
@@ -58,11 +76,17 @@ export const DayTable: React.FC<DayTableProps> = ({
         const blockedByDriver = next === 'OUT_FOR_DELIVERY' && !row.driverUserId;
         const busy = busyDayId === row.orderDayId;
         const isDelivery = row.fulfillmentType === 'DELIVERY';
+        const checked = !!selection?.ids.has(row.orderDayId);
+        const isNew = !!newSince && Date.parse(row.orderCreatedAt) > Date.parse(newSince);
 
         // Urutan: masalah pembayaran → driver (admin) → status berikutnya → lihat detail
         let action: { label: string; onPress: () => void; primary: boolean } = { label: 'Lihat detail', onPress: () => onOpen(row), primary: false };
         if (row.paymentNeedsReview) action = { label: 'Tinjau bayar', onPress: () => onOpen(row), primary: false };
-        else if (row.requiresManualRefund) action = { label: 'Lihat refund', onPress: () => onOpen(row), primary: false };
+        else if (row.refundPending) {
+          action = canMarkRefund
+            ? { label: 'Tandai direfund', onPress: () => onMarkRefund(row), primary: true }
+            : { label: 'Lihat refund', onPress: () => onOpen(row), primary: false };
+        }
         else if ((row.needsDriver || blockedByDriver) && isDelivery && canAssignDriver) action = { label: 'Atur driver', onPress: () => onAssignDriver(row), primary: true };
         else if (next && canAdvance && !blockedByDriver) action = { label: NEXT_DAY_ACTION[next] ?? 'Lanjut', onPress: () => onAdvance(row), primary: true };
 
@@ -75,15 +99,22 @@ export const DayTable: React.FC<DayTableProps> = ({
               clickable,
               { borderColor: theme.border },
               row.needsAttention && { backgroundColor: isDark ? '#2A2210' : '#FFF8E6' },
+              checked && { backgroundColor: theme.primaryLight },
               pressed && { opacity: 0.85 },
             ]}
             // Tanpa role "button": di web baris berisi tombol aksi, dan <button> tidak boleh bersarang
             accessibilityLabel={`Detail ${row.orderNumber}`}
           >
+            {selection ? (
+              <CheckBox checked={checked} label={`Pilih ${row.orderNumber}`} onPress={() => selection.onToggle(row)} />
+            ) : null}
             <View style={styles.colOrder}>
-              <ThemedText style={[styles.name, strong]} numberOfLines={1}>
-                {row.needsAttention ? '⚠ ' : ''}{row.customerName}
-              </ThemedText>
+              <View style={styles.nameRow}>
+                <ThemedText style={[styles.name, styles.shrink, strong]} numberOfLines={1}>
+                  {row.needsAttention ? '⚠ ' : ''}{row.customerName}
+                </ThemedText>
+                {isNew ? <NewBadge /> : null}
+              </View>
               <ThemedText style={[styles.small, muted]} numberOfLines={1}>
                 {shortOrderNumber(row.orderNumber)} · Hari {row.dayIndex} dari {row.dayCount}
                 {showDate ? ` · ${formatShortDate(row.deliveryDate)}` : ''}
@@ -171,7 +202,9 @@ export const DayTable: React.FC<DayTableProps> = ({
 // Per pesanan
 // ==========================================
 
-export const OrderTable: React.FC<{ rows: AdminOrderRow[]; onOpen: (row: AdminOrderRow) => void }> = ({ rows, onOpen }) => {
+export const OrderTable: React.FC<{ rows: AdminOrderRow[]; newSince: string | null; onOpen: (row: AdminOrderRow) => void }> = ({
+  rows, newSince, onOpen,
+}) => {
   const theme = useTheme();
   const { isDark } = useThemeContext();
   const muted = { color: theme.textSecondary };
@@ -208,9 +241,12 @@ export const OrderTable: React.FC<{ rows: AdminOrderRow[]; onOpen: (row: AdminOr
             accessibilityLabel={`Detail ${row.orderNumber}`}
           >
             <View style={styles.colOrder}>
-              <ThemedText style={[styles.name, strong]} numberOfLines={1}>
-                {row.needsAttention ? '⚠ ' : ''}{row.customerName}
-              </ThemedText>
+              <View style={styles.nameRow}>
+                <ThemedText style={[styles.name, styles.shrink, strong]} numberOfLines={1}>
+                  {row.needsAttention ? '⚠ ' : ''}{row.customerName}
+                </ThemedText>
+                {newSince && Date.parse(row.createdAt) > Date.parse(newSince) ? <NewBadge /> : null}
+              </View>
               <ThemedText style={[styles.small, muted]} numberOfLines={1}>
                 {shortOrderNumber(row.orderNumber)} · Dipesan {formatDateTime(row.createdAt)}
               </ThemedText>
@@ -264,6 +300,44 @@ export const OrderTable: React.FC<{ rows: AdminOrderRow[]; onOpen: (row: AdminOr
   );
 };
 
+// ==========================================
+// Bagian kecil
+// ==========================================
+
+const NewBadge: React.FC = () => {
+  const theme = useTheme();
+  return (
+    <View style={[styles.newBadge, { backgroundColor: theme.primary }]}>
+      <ThemedText style={styles.newBadgeText}>Baru</ThemedText>
+    </View>
+  );
+};
+
+const CheckBox: React.FC<{ checked: boolean; mixed?: boolean; label: string; onPress: () => void }> = ({
+  checked, mixed, label, onPress,
+}) => {
+  const theme = useTheme();
+  const on = checked || mixed;
+  return (
+    <Pressable
+      onPress={(e) => {
+        e.stopPropagation?.();
+        onPress();
+      }}
+      hitSlop={8}
+      style={[styles.checkCell, clickable]}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: mixed ? 'mixed' : checked }}
+      aria-checked={mixed ? 'mixed' : checked}
+      accessibilityLabel={label}
+    >
+      <View style={[styles.box, { borderColor: on ? theme.primary : theme.border, backgroundColor: on ? theme.primary : theme.card }]}>
+        {on ? <ThemedText style={styles.tick}>{mixed ? '–' : '✓'}</ThemedText> : null}
+      </View>
+    </Pressable>
+  );
+};
+
 const styles = StyleSheet.create({
   table: { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },
@@ -277,6 +351,13 @@ const styles = StyleSheet.create({
   colStatus: { flex: 1, gap: 4, minWidth: 0 },
   colAction: { width: 128, alignItems: 'stretch' },
   name: { fontSize: 14, fontWeight: '700' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
+  shrink: { flexShrink: 1 },
+  newBadge: { borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
+  newBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  checkCell: { width: 20, alignItems: 'center', justifyContent: 'center' },
+  box: { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  tick: { color: '#FFFFFF', fontSize: 11, lineHeight: 13, fontWeight: '800' },
   cell: { fontSize: 13 },
   small: { fontSize: 11, lineHeight: 15 },
   bold: { fontWeight: '700' },

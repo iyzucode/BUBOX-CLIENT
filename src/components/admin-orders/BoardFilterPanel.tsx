@@ -12,16 +12,20 @@ export interface BoardFilters {
   drivers: string[];
   outlets: string[];
   categories: string[];
+  payments: string[];
+  vouchers: string[];
+  refunds: string[];
   /** Dari klik rekap dapur. */
   menu: { id: string; name: string } | null;
 }
 
 export const EMPTY_FILTERS: BoardFilters = {
-  fulfillment: [], zones: [], drivers: [], outlets: [], categories: [], menu: null,
+  fulfillment: [], zones: [], drivers: [], outlets: [], categories: [], payments: [], vouchers: [], refunds: [], menu: null,
 };
 
 export const countActiveFilters = (f: BoardFilters, view: BoardView) =>
-  f.fulfillment.length + f.zones.length + (view === 'days' ? f.drivers.length : 0) + f.outlets.length + f.categories.length + (f.menu ? 1 : 0);
+  f.fulfillment.length + f.zones.length + (view === 'days' ? f.drivers.length : 0) + f.outlets.length + f.categories.length +
+  f.payments.length + f.vouchers.length + f.refunds.length + (f.menu ? 1 : 0);
 
 interface BoardFilterPanelProps {
   view: BoardView;
@@ -74,6 +78,20 @@ export const BoardFilterPanel: React.FC<BoardFilterPanelProps> = ({ view, facets
       </View>
     ) : null;
 
+  // Grup filter datar dengan garis pemisah; disembunyikan bila tidak ada opsi di periode ini
+  const group = (title: string, list: FacetOption[] | undefined, selected: string[], key: keyof BoardFilters) =>
+    list && list.length > 0 ? (
+      <>
+        <View style={[styles.sep, { backgroundColor: theme.border }]} />
+        <ThemedText style={[styles.section, muted]}>{title}</ThemedText>
+        {list.map((o) =>
+          checkRow(`${key}-${o.id}`, o.label, o.count, selected.includes(o.id), () =>
+            set({ [key]: toggle(selected, o.id) } as Partial<BoardFilters>)
+          )
+        )}
+      </>
+    ) : null;
+
   const active = countActiveFilters(value, view);
 
   return (
@@ -113,6 +131,10 @@ export const BoardFilterPanel: React.FC<BoardFilterPanelProps> = ({ view, facets
         checkRow(`c-${c.id}`, c.label, c.count, value.categories.includes(c.id), () => set({ categories: toggle(value.categories, c.id) }))
       )}
       {facets && facets.categories.length === 0 ? <ThemedText style={[styles.small, muted]}>Belum ada menu di periode ini.</ThemedText> : null}
+
+      {group('STATUS BAYAR', facets?.payments, value.payments, 'payments')}
+      {group('VOUCHER', facets?.vouchers, value.vouchers, 'vouchers')}
+      {group('REFUND MANUAL', facets?.refunds, value.refunds, 'refunds')}
 
       <View style={[styles.hint, { backgroundColor: theme.backgroundElement }]}>
         <ThemedText style={[styles.small, styles.bold, { color: theme.text }]}>Bisa pilih lebih dari satu.</ThemedText>

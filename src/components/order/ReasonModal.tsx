@@ -19,11 +19,18 @@ interface ReasonModalProps {
   description?: string;
   confirmLabel?: string;
   isSubmitting?: boolean;
+  /** Teks petunjuk isian. Default "Alasan…". */
+  placeholder?: string;
+  /** true = isian boleh kosong (mis. catatan refund). Default: wajib, minimal 3 karakter. */
+  optional?: boolean;
+  maxLength?: number;
+  /** 'primary' untuk aksi yang tidak membatalkan (mis. tandai refund). Default 'danger'. */
+  tone?: 'danger' | 'primary';
   onCancel: () => void;
   onSubmit: (reason: string) => void;
 }
 
-/** Modal input alasan (force majeure / pembatalan admin). Alasan wajib diisi. */
+/** Modal input alasan (force majeure / pembatalan admin) atau catatan. Alasan wajib diisi kecuali `optional`. */
 export const ReasonModal: React.FC<ReasonModalProps> = (props) => (
   <Modal visible={props.visible} transparent animationType="fade" onRequestClose={props.onCancel}>
     {/* Form di-mount ulang setiap modal dibuka, sehingga input selalu kosong */}
@@ -36,13 +43,18 @@ const ReasonForm: React.FC<ReasonModalProps> = ({
   description,
   confirmLabel = 'Kirim',
   isSubmitting = false,
+  placeholder = 'Alasan…',
+  optional = false,
+  maxLength = 500,
+  tone = 'danger',
   onCancel,
   onSubmit,
 }) => {
   const theme = useTheme();
   const [reason, setReason] = useState('');
 
-  const canSubmit = reason.trim().length >= 3 && !isSubmitting;
+  const canSubmit = (optional || reason.trim().length >= 3) && !isSubmitting;
+  const confirmColor = tone === 'primary' ? theme.primary : theme.danger;
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
@@ -54,10 +66,10 @@ const ReasonForm: React.FC<ReasonModalProps> = ({
           <TextInput
             value={reason}
             onChangeText={setReason}
-            placeholder="Alasan…"
+            placeholder={placeholder}
             placeholderTextColor={theme.textSecondary}
             multiline
-            maxLength={500}
+            maxLength={maxLength}
             autoFocus
             style={[
               styles.input,
@@ -71,7 +83,7 @@ const ReasonForm: React.FC<ReasonModalProps> = ({
             <Pressable
               onPress={() => canSubmit && onSubmit(reason.trim())}
               disabled={!canSubmit}
-              style={[styles.btn, styles.btnDanger, { backgroundColor: theme.danger, opacity: canSubmit ? 1 : 0.5 }]}
+              style={[styles.btn, styles.btnDanger, { backgroundColor: confirmColor, opacity: canSubmit ? 1 : 0.5 }]}
             >
               {isSubmitting ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />

@@ -37,11 +37,14 @@ interface OrderDetailPanelProps {
   onAssignDriver: (dayIds: string[]) => void;
   onCancelDay: (day: OrderDay, order: OrderDetail) => void;
   onCancelOrder: (order: OrderDetail) => void;
+  /** Tandai refund manual selesai untuk hari-hari ini. */
+  onMarkRefund: (dayIds: string[], order: OrderDetail) => void;
 }
 
 /** Panel kanan: detail pesanan lengkap + aksi per hari, tanpa meninggalkan daftar. */
 export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   orderId, focusDayId, canManage, canAdvance, busyDayId, onClose, onAdvanceDay, onAssignDriver, onCancelDay, onCancelOrder,
+  onMarkRefund,
 }) => {
   const theme = useTheme();
   const { isDark } = useThemeContext();
@@ -60,6 +63,7 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
     const isDelivery = order.fulfillmentType === 'DELIVERY';
     const unpaid = order.statusCode === 'AWAITING_PAYMENT';
     const activeDeliveryDays = order.days.filter((d) => ['CONFIRMED', 'PREPARING', 'READY'].includes(d.statusCode));
+    const refundPendingDays = order.days.filter((d) => d.requiresManualRefund && !assignment(d.id)?.refundedAt);
 
     return (
       <>
@@ -127,11 +131,18 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
         <View style={section}>
           <View style={styles.rowBetween}>
             <ThemedText style={[styles.sectionTitle, muted]}>HARI KIRIM ({order.days.length})</ThemedText>
-            {isDelivery && canManage && activeDeliveryDays.length > 1 ? (
-              <Pressable onPress={() => onAssignDriver(activeDeliveryDays.map((d) => d.id))} style={clickable}>
-                <ThemedText style={[styles.small, styles.bold, { color: theme.primary }]}>Atur driver semua hari</ThemedText>
-              </Pressable>
-            ) : null}
+            <View style={styles.headActions}>
+              {canManage && refundPendingDays.length > 1 ? (
+                <Pressable onPress={() => onMarkRefund(refundPendingDays.map((d) => d.id), order)} style={clickable}>
+                  <ThemedText style={[styles.small, styles.bold, { color: theme.primary }]}>Tandai semua direfund</ThemedText>
+                </Pressable>
+              ) : null}
+              {isDelivery && canManage && activeDeliveryDays.length > 1 ? (
+                <Pressable onPress={() => onAssignDriver(activeDeliveryDays.map((d) => d.id))} style={clickable}>
+                  <ThemedText style={[styles.small, styles.bold, { color: theme.primary }]}>Atur driver semua hari</ThemedText>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
           {order.days.map((day, i) => {
             const a = assignment(day.id);
@@ -140,6 +151,7 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
             const canCancelDay = canManage && ADMIN_CANCELLABLE_DAY_STATUSES.includes(day.statusCode);
             const focused = day.id === focusDayId;
             const busy = busyDayId === day.id;
+            const refundPending = canManage && day.requiresManualRefund && !a?.refundedAt;
             return (
               <View
                 key={day.id}
@@ -164,15 +176,32 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                     🗺️ {a?.zoneName ?? 'Belum ada zona'} · 🛵 {a?.driverName ?? 'Belum ada driver'}
                   </ThemedText>
                 ) : null}
-                {day.requiresManualRefund ? (
+                {day.requiresManualRefund && a?.refundedAt ? (
+                  <View style={[styles.alert, { backgroundColor: toneColors('success', isDark).bg }]}>
+                    <ThemedText style={[styles.small, styles.bold, { color: toneColors('success', isDark).text }]}>
+                      ✓ Sudah direfund · {formatRupiah(day.daySubtotal)}
+                    </ThemedText>
+                    <ThemedText style={[styles.small, { color: toneColors('success', isDark).text }]}>
+                      {formatDateTime(a.refundedAt)}{a.refundedByName ? ` · ${a.refundedByName}` : ''}{a.refundNote ? ` · ${a.refundNote}` : ''}
+                    </ThemedText>
+                  </View>
+                ) : day.requiresManualRefund ? (
                   <ThemedText style={[styles.small, styles.bold, { color: theme.danger }]}>
                     Refund manual tertunda · {formatRupiah(day.daySubtotal)}
                   </ThemedText>
                 ) : null}
                 {day.cancelReason ? <ThemedText style={[styles.small, muted]}>Alasan: {day.cancelReason}</ThemedText> : null}
 
-                {(next && canAdvance) || (isDelivery && canManage && ['CONFIRMED', 'PREPARING', 'READY'].includes(day.statusCode)) || canCancelDay ? (
+                {(next && canAdvance) || (isDelivery && canManage && ['CONFIRMED', 'PREPARING', 'READY'].includes(day.statusCode)) || canCancelDay || refundPending ? (
                   <View style={styles.actions}>
+                    {refundPending ? (
+                      <Pressable
+                        onPress={() => onMarkRefund([day.id], order)}
+                        style={[styles.btn, clickable, { backgroundColor: theme.primary, borderColor: theme.primary }]}
+                      >
+                        <ThemedText style={[styles.btnText, { color: '#FFFFFF' }]}>Tandai direfund</ThemedText>
+                      </Pressable>
+                    ) : null}
                     {isDelivery && canManage && ['CONFIRMED', 'PREPARING', 'READY'].includes(day.statusCode) ? (
                       <Pressable onPress={() => onAssignDriver([day.id])} style={[styles.btn, clickable, { borderColor: theme.border }]}>
                         <ThemedText style={[styles.btnText, strong]}>{a?.driverUserId ? 'Ganti driver' : 'Atur driver'}</ThemedText>
@@ -297,6 +326,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: '700' },
   link: { textDecorationLine: 'underline' },
   alert: { borderRadius: 10, padding: 10, gap: 2 },
+  headActions: { flexDirection: 'row', gap: 12 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   dayCard: { borderWidth: 1, borderRadius: 12, padding: 10, gap: 4 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },

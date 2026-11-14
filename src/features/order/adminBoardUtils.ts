@@ -1,5 +1,5 @@
 import { toDateKey } from '@/features/order/dateUtils';
-import { formatRupiah } from '@/features/order/orderStatus';
+import { formatRupiah, nextDayStatus } from '@/features/order/orderStatus';
 import type { StatusTone } from '@/features/order/orderStatus';
 import type { AdminDayRow, AdminOrderRow, DayTab, OrderTab } from '@/types/adminOrders';
 import type { OrderDayStatusCode } from '@/types/order';
@@ -79,7 +79,8 @@ export interface StatusNote {
 
 /** Keterangan di bawah status harian, mis. "Belum ada driver" / "Batas bayar 10.30". */
 export function dayStatusNote(row: AdminDayRow): StatusNote | null {
-  if (row.requiresManualRefund) return { text: 'Refund manual tertunda', tone: 'danger' };
+  if (row.refundPending) return { text: `Refund ${formatRupiah(row.daySubtotal)} tertunda`, tone: 'danger' };
+  if (row.requiresManualRefund && row.refundedAt) return { text: `Direfund ${formatShortDateTime(row.refundedAt)}`, tone: 'success' };
   if (row.paymentNeedsReview) return { text: 'Pembayaran perlu ditinjau', tone: 'warning' };
   if (row.orderStatus === 'AWAITING_PAYMENT') return { text: `Batas bayar ${formatTime(row.paymentDueAt)}`, tone: 'warning' };
   if (row.needsDriver) return { text: 'Belum ada driver', tone: 'warning' };
@@ -115,10 +116,80 @@ export function paymentSummary(row: AdminOrderRow): { title: string; note: strin
     case 'PAYMENT_FAILED':
       return { title: 'Gagal', note: 'Pembayaran gagal', tone: 'danger' };
     default:
-      return row.paidAt
-        ? { title: 'Lunas', note: `QRIS · ${formatTime(row.paidAt)}`, tone: 'success' }
-        : { title: 'Dibatalkan', note: 'Belum dibayar', tone: 'neutral' };
+      if (!row.paidAt) return { title: 'Dibatalkan', note: 'Belum dibayar', tone: 'neutral' };
+      return {
+        title: 'Lunas',
+        note: [
+          `QRIS · ${formatTime(row.paidAt)}`,
+          row.voucherCode ? `🎟 ${row.voucherCode}` : null,
+          row.refundedDays > 0 ? `${row.refundedDays} hari direfund` : null,
+        ].filter(Boolean).join(' · '),
+        tone: 'success',
+      };
   }
+}
+
+/** "14 Nov 10.30" (jam lokal). */
+export function formatShortDateTime(iso: string): string {
+  const d = new Date(iso);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${formatTime(iso)}`;
+}
+
+// ==========================================
+// Aksi massal
+// ==========================================
+
+/** Status hari yang drivernya masih boleh diatur (belum berangkat). */
+const DRIVER_EDITABLE: OrderDayStatusCode[] = ['SCHEDULED', 'CONFIRMED', 'PREPARING', 'READY'];
+/** Status hari yang boleh dibatalkan admin (force majeure). */
+const ADMIN_CANCELLABLE: OrderDayStatusCode[] = ['CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
+
+export interface BulkTargets {
+  /** Per status tujuan: hari yang bisa dimajukan ke status itu. */
+  advance: { status: OrderDayStatusCode; label: string; ids: string[] }[];
+  /** Hari yang mau berangkat tapi belum punya driver (dilewati). */
+  blockedNoDriver: number;
+  driver: string[];
+  refund: string[];
+  cancel: string[];
+}
+
+/** Kelompokkan baris terpilih menurut aksi yang berlaku, agar tiap tombol hanya mengirim hari yang valid. */
+export function bulkTargets(rows: AdminDayRow[]): BulkTargets {
+  const advance = new Map<OrderDayStatusCode, string[]>();
+  let blockedNoDriver = 0;
+  for (const row of rows) {
+    if (row.orderStatus === 'AWAITING_PAYMENT') continue;
+    const next = nextDayStatus(row.dayStatus, row.fulfillmentType);
+    if (!next) continue;
+    if (next === 'OUT_FOR_DELIVERY' && !row.driverUserId) {
+      blockedNoDriver++;
+      continue;
+    }
+    advance.set(next, [...(advance.get(next) ?? []), row.orderDayId]);
+  }
+
+  return {
+    advance: [...advance.entries()].map(([status, ids]) => ({ status, label: NEXT_DAY_ACTION[status] ?? status, ids })),
+    blockedNoDriver,
+    driver: rows.filter((r) => r.fulfillmentType === 'DELIVERY' && DRIVER_EDITABLE.includes(r.dayStatus)).map((r) => r.orderDayId),
+    refund: rows.filter((r) => r.refundPending).map((r) => r.orderDayId),
+    cancel: rows
+      .filter((r) => r.orderStatus !== 'AWAITING_PAYMENT' && ADMIN_CANCELLABLE.includes(r.dayStatus))
+      .map((r) => r.orderDayId),
+  };
+}
+
+/** Pesan hasil aksi massal: jumlah berhasil + daftar yang gagal (maks 5). */
+export function bulkResultMessage(succeeded: number, failed: { orderNumber: string | null; message: string }[], doneText: string) {
+  const lines = [`${succeeded} hari kirim ${doneText}.`];
+  if (failed.length > 0) {
+    lines.push('', `${failed.length} gagal:`);
+    failed.slice(0, 5).forEach((f) => lines.push(`• ${f.orderNumber ? shortOrderNumber(f.orderNumber) : '-'}: ${f.message}`));
+    if (failed.length > 5) lines.push(`• …dan ${failed.length - 5} lainnya`);
+  }
+  return lines.join('\n');
 }
 
 /** Tindakan utama baris per pesanan. */
