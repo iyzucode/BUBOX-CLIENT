@@ -1,7 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -9,7 +7,7 @@ import {
 import { useIsFocused, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { ThemedText } from '@/components/themed-text';
+import { CheckoutEmptyState } from '@/components/checkout/CheckoutEmptyState';
 import { CheckoutHeader } from '@/components/checkout/CheckoutHeader';
 import { CheckoutStickyFooter } from '@/components/checkout/CheckoutStickyFooter';
 import { FulfillmentMethodCard } from '@/components/checkout/FulfillmentMethodCard';
@@ -159,29 +157,7 @@ export default function CheckoutScreen() {
       >
         <View style={styles.mainContainer}>
           {isCartEmpty ? (
-            /* Empty Cart Placeholder if accessed without items */
-            <View style={[styles.emptyCard, { backgroundColor: palette.cardBg }]}>
-              <ThemedText style={[styles.emptyTitle, { color: palette.cardTitle }]}>
-                Keranjang Kosong
-              </ThemedText>
-              <ThemedText style={[styles.emptySubtitle, { color: palette.cardSubtext }]}>
-                Belum ada menu MPASI yang dipilih. Silakan tentukan tanggal dan porsi pesananmu terlebih dahulu.
-              </ThemedText>
-              <Pressable
-                onPress={() => router.replace('/order')}
-                style={({ pressed }) => [
-                  styles.backToOrderBtn,
-                  {
-                    backgroundColor: palette.actionPillBtnBg,
-                    opacity: pressed ? 0.8 : 1,
-                  },
-                ]}
-              >
-                <ThemedText style={[styles.backToOrderBtnText, { color: palette.actionPillBtnText }]}>
-                  Pilih Menu Katering
-                </ThemedText>
-              </Pressable>
-            </View>
+            <CheckoutEmptyState />
           ) : (
             <>
               {/* Card 1: Fulfillment Method (Pesan Antar vs Ambil Sendiri) */}
@@ -231,48 +207,5 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     gap: 16,
-  },
-  emptyCard: {
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 40,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-      },
-    }),
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-    maxWidth: 320,
-  },
-  backToOrderBtn: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  backToOrderBtnText: {
-    fontSize: 14,
-    fontWeight: '500',
   },
 });
