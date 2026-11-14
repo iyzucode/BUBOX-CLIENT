@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Platform,
   Pressable,
@@ -6,7 +6,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { ThemedText } from '@/components/themed-text';
@@ -20,6 +20,7 @@ import { PromoCodeCard } from '@/components/checkout/PromoCodeCard';
 import { useCheckoutPalette } from '@/components/checkout/checkoutPalette';
 import { ADDRESSES_QUERY_KEY, useAddresses } from '@/features/biodata/useAddresses';
 import { useCreateOrder } from '@/features/order/useOrders';
+import { useLeavePageWarning } from '@/hooks/use-leave-page-warning';
 import { useScrollActivity } from '@/hooks/use-scroll-activity';
 import { getApiErrorCode, getApiErrorMessage } from '@/services/apiError';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -49,6 +50,18 @@ export default function CheckoutScreen() {
   const { isScrolling, onScroll } = useScrollActivity();
 
   const isCartEmpty = selectedDateKeys.length === 0 || totalItemsCount === 0;
+  const isFocused = useIsFocused();
+  // true setelah pesanan dibuat: keranjang dikosongkan saat menuju /payment, jangan dialihkan ke /order
+  const orderPlacedRef = useRef(false);
+
+  // Keranjang hanya ada di memori: setelah refresh / buka langsung URL /checkout isinya hilang
+  useEffect(() => {
+    if (isFocused && isCartEmpty && !orderPlacedRef.current) {
+      router.replace('/order');
+    }
+  }, [isFocused, isCartEmpty, router]);
+
+  useLeavePageWarning(isFocused && !isCartEmpty);
 
   const handlePay = async () => {
     if (!token) {
@@ -103,6 +116,7 @@ export default function CheckoutScreen() {
       },
       {
         onSuccess: (order) => {
+          orderPlacedRef.current = true;
           clearCart();
           router.replace({ pathname: '/payment', params: { id: order.orderId } });
         },

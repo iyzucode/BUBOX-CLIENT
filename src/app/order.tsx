@@ -7,7 +7,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -16,6 +16,7 @@ import { MenuDetailModal } from '@/components/order/MenuDetailModal';
 import { MultiDateCalendarModal } from '@/components/order/MultiDateCalendarModal';
 import { OrderCategoryCard } from '@/components/order/OrderCategoryCard';
 import { OrderCheckoutBar } from '@/components/order/OrderCheckoutBar';
+import { useLeavePageWarning } from '@/hooks/use-leave-page-warning';
 import { useScrollActivity } from '@/hooks/use-scroll-activity';
 import { OrderDateCard } from '@/components/order/OrderDateCard';
 import { OrderHeroHeader } from '@/components/order/OrderHeroHeader';
@@ -58,6 +59,11 @@ export default function OrderScreen() {
     updateItemQty,
     calculateDaySubtotal,
   } = useOrderCart(weeklyData, mainCategories);
+
+  // Pilihan tanggal & menu hanya ada di memori: peringatkan sebelum refresh / tutup tab.
+  // Hanya saat layar ini aktif, karena di web layar order tetap terpasang di bawah checkout/payment.
+  const isFocused = useIsFocused();
+  useLeavePageWarning(isFocused && (selectedDateKeys.length > 0 || totalItemsCount > 0));
 
   // 3. UI States: Expanded Accordion, Calendar Modal, Menu Detail Modal
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
