@@ -142,6 +142,16 @@ export interface AdminBoardResult<T> {
   facets: AdminFacets;
   summary: AdminBoardSummary;
   production: ProductionMenuSummary[];
+  attention: AdminAttention;
+}
+
+/** Rincian "Perlu Tindakan" (setelah filter, sebelum tab). rows = hari kirim yang perlu tindakan (per hari kirim). */
+export interface AdminAttention {
+  total: number;
+  needsDriver: number;
+  refundPending: number;
+  paymentReview: number;
+  rows: AdminDayRow[];
 }
 
 export interface AdminDayAssignment {

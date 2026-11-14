@@ -1,24 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
-import { BoardFilterPanel, BoardFilters, EMPTY_FILTERS, countActiveFilters } from '@/components/admin-orders/BoardFilterPanel';
-import { BoardSummary } from '@/components/admin-orders/BoardSummary';
+import { BoardFilterDrawer, BoardFilters, EMPTY_FILTERS, countActiveFilters } from '@/components/admin-orders/BoardFilterDrawer';
+import { AttentionBanner, BoardSummary, KitchenRecap } from '@/components/admin-orders/BoardSummary';
 import { DayTable, OrderTable } from '@/components/admin-orders/BoardTables';
 import { BoardTopBar } from '@/components/admin-orders/BoardTopBar';
 import { BulkActionBar } from '@/components/admin-orders/BulkActionBar';
+import { MenuButton } from '@/components/admin-orders/MenuButton';
 import { OrderDetailPanel } from '@/components/admin-orders/OrderDetailPanel';
 import { ThemedText } from '@/components/themed-text';
-import { DeliveryBoard } from '@/components/order/DeliveryBoard';
 import { ReasonModal } from '@/components/order/ReasonModal';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SelectModalPicker } from '@/components/ui/SelectModalPicker';
 import { useDrivers, useSetDayDriver } from '@/features/delivery/useDelivery';
 import {
@@ -27,15 +18,14 @@ import {
   ORDER_SORTS,
   ORDER_TABS,
   PAGE_SIZES,
-  addDaysKey,
   bulkResultMessage,
   bulkTargets,
   formatTime,
   shortOrderNumber,
 } from '@/features/order/adminBoardUtils';
 import { toDateKey } from '@/features/order/dateUtils';
-import { formatLongDate, formatShortDate, nextDayStatus } from '@/features/order/orderStatus';
 import { buildKitchenSheetHtml, printHtml } from '@/features/order/kitchenSheetPrint';
+import { formatShortDate, nextDayStatus } from '@/features/order/orderStatus';
 import {
   downloadBoardExport,
   fetchKitchenSheet,
@@ -55,7 +45,6 @@ import type { AdminBoardParams, AdminDayRow, BoardView, DateBasis, DayTab, Order
 import type { OrderDayStatusCode } from '@/types/order';
 import { confirmAction, showAlert } from '@/utils/alert';
 
-type Mode = 'board' | 'delivery';
 type CancelTarget =
   | { kind: 'day'; orderDayId: string; label: string }
   | { kind: 'days'; orderDayIds: string[]; label: string }
@@ -65,14 +54,18 @@ type DriverTarget = { ids: string[]; bulk: boolean };
 type RefundTarget = { ids: string[]; label: string; bulk: boolean };
 
 const EMPTY_SELECTION = new Map<string, AdminDayRow>();
-
 const ZONE_DRIVER = '__ZONE__';
 const clickable = Platform.select({ web: { cursor: 'pointer' as const } }) ?? {};
 
+/** Tab yang selalu terlihat; sisanya masuk "Lainnya". */
+const DAY_MAIN_TABS: DayTab[] = ['ATTENTION', 'ALL', 'CONFIRMED', 'PREPARING'];
+const ORDER_MAIN_TABS: OrderTab[] = ['ATTENTION', 'ALL', 'PAID', 'IN_PROGRESS'];
+const tabLabel = (id: string, label: string) => (id === 'ATTENTION' ? 'Perlu tindakan' : label);
+
 /**
- * Layar Pesanan (Admin / Owner, juga Kitchen & Driver untuk tampilan per hari kirim):
- * periode, filter bertingkat, tab status, ringkasan, rekap dapur, daftar per hari kirim / per pesanan,
- * dan panel detail. Papan Antar (penugasan driver per hari) tetap sebagai tab tersendiri.
+ * Layar Pesanan (Admin / Owner, juga Kitchen & Driver untuk tampilan per hari kirim): periode, ringkasan,
+ * banner perlu tindakan, tab status, filter (panel samping), daftar per hari kirim / per pesanan, aksi massal,
+ * rekap dapur, dan panel detail.
  */
 export default function AdminOrdersScreen() {
   const theme = useTheme();
@@ -82,20 +75,22 @@ export default function AdminOrdersScreen() {
   const canAdvance = isManager || roles.includes('kitchen') || roles.includes('driver');
 
   const today = toDateKey(new Date());
-  const [mode, setMode] = useState<Mode>('board');
   const [view, setView] = useState<BoardView>('days');
   const [basis, setBasis] = useState<DateBasis>('DELIVERY');
   const [range, setRange] = useState({ from: today, to: today });
   const [filters, setFilters] = useState<BoardFilters>(EMPTY_FILTERS);
-  const [dayTab, setDayTab] = useState<DayTab>('ALL');
-  const [orderTab, setOrderTab] = useState<OrderTab>('ALL');
+  // Tab awal "Perlu tindakan"; bila ternyata kosong, otomatis pindah ke "Semua" (sekali, saat layar dibuka)
+  const [dayTab, setDayTab] = useState<DayTab>('ATTENTION');
+  const [orderTab, setOrderTab] = useState<OrderTab>('ATTENTION');
+  const [dayTabResolved, setDayTabResolved] = useState(false);
+  const [orderTabResolved, setOrderTabResolved] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const search = useDebouncedValue(searchInput.trim(), 400);
   const [daySort, setDaySort] = useState('DATE_ASC');
   const [orderSort, setOrderSort] = useState('NEWEST');
   const [pageState, setPageState] = useState({ key: '', page: 1 });
-  const [pageSize, setPageSize] = useState(20);
-  const [sortOpen, setSortOpen] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [detail, setDetail] = useState<{ orderId: string; dayId: string | null } | null>(null);
   const [driverTarget, setDriverTarget] = useState<DriverTarget | null>(null);
   const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
@@ -103,15 +98,15 @@ export default function AdminOrdersScreen() {
   const [selectionState, setSelectionState] = useState({ key: '', rows: EMPTY_SELECTION });
   const [exporting, setExporting] = useState(false);
   const [printing, setPrinting] = useState(false);
-  // Indikator pesanan baru: dihitung sejak `seenAt`; baris yang dibuat setelah `newSince` diberi label "Baru"
+  // Indikator pesanan baru: dihitung sejak `seenAt`
   const [seenAt, setSeenAt] = useState(() => new Date().toISOString());
-  const [newSince, setNewSince] = useState<string | null>(null);
 
   const isDays = view === 'days' || !canSeeOrders;
   const tab = isDays ? dayTab : orderTab;
   const sort = isDays ? daySort : orderSort;
 
-  const criteria: Omit<AdminBoardParams, 'page'> = {
+  // Kriteria daftar tanpa tab/urutan/halaman: pilihan centang tetap selama kriteria ini sama
+  const baseCriteria = {
     dateBasis: basis,
     dateFrom: range.from,
     dateTo: range.to,
@@ -125,21 +120,39 @@ export default function AdminOrdersScreen() {
     vouchers: filters.vouchers.join(',') || undefined,
     refunds: filters.refunds.join(',') || undefined,
     menuId: isDays ? filters.menu?.id : undefined,
-    tab,
-    sort,
-    pageSize,
   };
+  const criteria: Omit<AdminBoardParams, 'page'> = { ...baseCriteria, tab, sort, pageSize };
 
   // Halaman disimpan bersama kriterianya: kriteria berubah → otomatis kembali ke halaman 1
   const criteriaKey = JSON.stringify(criteria);
+  const selectionKey = JSON.stringify({ ...baseCriteria, isDays });
   const page = pageState.key === criteriaKey ? pageState.page : 1;
   const setPage = (update: (p: number) => number) => setPageState({ key: criteriaKey, page: update(page) });
   const params: AdminBoardParams = { ...criteria, page };
 
-  const daysQuery = useAdminBoardDays(params, mode === 'board' && isDays);
-  const ordersQuery = useAdminBoardOrders(params, mode === 'board' && !isDays);
+  const daysQuery = useAdminBoardDays(params, isDays);
+  const ordersQuery = useAdminBoardOrders(params, !isDays);
   const active = isDays ? daysQuery : ordersQuery;
   const result = active.data;
+
+  // Tab awal: "Perlu tindakan" bila ada, selain itu "Semua" (diputuskan dari hasil pertama)
+  if (!dayTabResolved && daysQuery.data && !daysQuery.isPlaceholderData) {
+    setDayTabResolved(true);
+    if (dayTab === 'ATTENTION' && (daysQuery.data.tabCounts.ATTENTION ?? 0) === 0) setDayTab('ALL');
+  }
+  if (!orderTabResolved && ordersQuery.data && !ordersQuery.isPlaceholderData) {
+    setOrderTabResolved(true);
+    if (orderTab === 'ATTENTION' && (ordersQuery.data.tabCounts.ATTENTION ?? 0) === 0) setOrderTab('ALL');
+  }
+  const chooseTab = (id: string) => {
+    if (isDays) {
+      setDayTabResolved(true);
+      setDayTab(id as DayTab);
+    } else {
+      setOrderTabResolved(true);
+      setOrderTab(id as OrderTab);
+    }
+  };
 
   const updateStatus = useUpdateDayStatus();
   const cancelDay = useCancelDayByAdmin();
@@ -149,21 +162,20 @@ export default function AdminOrdersScreen() {
   const bulkCancel = useBulkCancelDays();
   const markRefunded = useMarkDaysRefunded();
   const drivers = useDrivers(isManager && driverTarget != null);
-  const activity = useBoardActivity(seenAt, mode === 'board');
+  const activity = useBoardActivity(seenAt, true);
   const busyDayId = updateStatus.isPending ? updateStatus.variables?.orderDayId ?? null : null;
   const bulkBusy = bulkStatus.isPending || bulkCancel.isPending || markRefunded.isPending || setDayDriver.isPending;
 
   // ---------- Pilihan aksi massal (per hari kirim) ----------
-  // Pilihan disimpan bersama kriterianya: filter / tab / periode berubah → pilihan otomatis kosong
   const canSelect = isDays && (canAdvance || isManager);
-  const selection = selectionState.key === criteriaKey ? selectionState.rows : EMPTY_SELECTION;
-  const setSelection = (next: Map<string, AdminDayRow>) => setSelectionState({ key: criteriaKey, rows: next });
+  const selection = selectionState.key === selectionKey ? selectionState.rows : EMPTY_SELECTION;
+  const setSelection = (next: Map<string, AdminDayRow>) => setSelectionState({ key: selectionKey, rows: next });
   const clearSelection = () => setSelectionState({ key: '', rows: EMPTY_SELECTION });
   // Data baris terbaru (hasil refresh) menggantikan salinan saat dicentang
   const selectedRows = useMemo(() => {
-    const fresh = new Map((daysQuery.data?.items ?? []).map((r) => [r.orderDayId, r]));
+    const fresh = new Map([...(daysQuery.data?.items ?? []), ...(daysQuery.data?.attention.rows ?? [])].map((r) => [r.orderDayId, r]));
     return [...selection.values()].map((r) => fresh.get(r.orderDayId) ?? r);
-  }, [selection, daysQuery.data?.items]);
+  }, [selection, daysQuery.data?.items, daysQuery.data?.attention.rows]);
   const targets = useMemo(() => bulkTargets(selectedRows), [selectedRows]);
 
   const toggleRow = (row: AdminDayRow) => {
@@ -176,6 +188,17 @@ export default function AdminOrdersScreen() {
     const next = new Map(selection);
     rows.forEach((r) => (select ? next.set(r.orderDayId, r) : next.delete(r.orderDayId)));
     setSelection(next);
+  };
+
+  // ---------- Banner perlu tindakan: centang barisnya dulu, aksi lewat bar aksi massal ----------
+  const selectAttention = (pick: (r: AdminDayRow) => boolean) => {
+    const rows = (result?.attention.rows ?? []).filter(pick);
+    setSelection(new Map(rows.map((r) => [r.orderDayId, r])));
+    chooseTab('ATTENTION');
+  };
+  const reviewPayments = () => {
+    setFilters((f) => ({ ...f, payments: ['REVIEW'] }));
+    chooseTab('ALL');
   };
 
   const reportBulk = (title: string, res: { succeeded: number; failed: { orderNumber: string | null; message: string }[] }, doneText: string) =>
@@ -231,12 +254,31 @@ export default function AdminOrdersScreen() {
     }
   };
 
+  // Chip filter aktif (bisa dihapus satu per satu)
+  const chips = (() => {
+    const f = result?.facets;
+    const label = (list: { id: string; label: string }[] | undefined, id: string) => list?.find((o) => o.id === id)?.label ?? id;
+    const list: { key: string; text: string; remove: () => void }[] = [];
+    const drop = (key: keyof BoardFilters, id: string) =>
+      setFilters((prev) => ({ ...prev, [key]: (prev[key] as string[]).filter((x) => x !== id) }));
+    filters.fulfillment.forEach((m) => list.push({ key: `m-${m}`, text: m === 'DELIVERY' ? 'Pesan Antar' : 'Ambil Sendiri', remove: () => drop('fulfillment', m) }));
+    filters.zones.forEach((z) => list.push({ key: `z-${z}`, text: `Zona: ${label(f?.zones, z)}`, remove: () => drop('zones', z) }));
+    if (isDays) filters.drivers.forEach((d) => list.push({ key: `d-${d}`, text: `Driver: ${label(f?.drivers, d)}`, remove: () => drop('drivers', d) }));
+    filters.outlets.forEach((o) => list.push({ key: `o-${o}`, text: `Outlet: ${label(f?.outlets, o)}`, remove: () => drop('outlets', o) }));
+    filters.categories.forEach((c) => list.push({ key: `c-${c}`, text: label(f?.categories, c), remove: () => drop('categories', c) }));
+    filters.payments.forEach((x) => list.push({ key: `p-${x}`, text: `Bayar: ${label(f?.payments, x)}`, remove: () => drop('payments', x) }));
+    filters.vouchers.forEach((x) => list.push({ key: `v-${x}`, text: x === 'NONE' ? 'Tanpa voucher' : `Voucher: ${x}`, remove: () => drop('vouchers', x) }));
+    filters.refunds.forEach((x) => list.push({ key: `r-${x}`, text: label(f?.refunds, x), remove: () => drop('refunds', x) }));
+    if (filters.menu && isDays) list.push({ key: 'menu', text: `Menu: ${filters.menu.name}`, remove: () => setFilters((p) => ({ ...p, menu: null })) });
+    return list;
+  })();
+
   const runPrint = async () => {
     setPrinting(true);
     try {
       const sheet = await fetchKitchenSheet(params);
       const filterLabels = [
-        ...(tab !== 'ALL' ? [`Tab: ${DAY_TABS.find((t) => t.id === tab)?.label ?? tab}`] : []),
+        ...(tab !== 'ALL' ? [`Tab: ${tabLabel(tab, DAY_TABS.find((t) => t.id === tab)?.label ?? tab)}`] : []),
         ...(search ? [`Cari: "${search}"`] : []),
         ...chips.map((c) => c.text),
       ];
@@ -253,11 +295,12 @@ export default function AdminOrdersScreen() {
   const newlyPaid = activity.data?.newlyPaid ?? 0;
   const showNewOrders = () => {
     // Tampilkan pesanan sejak terakhir dilihat: acuan tanggal pesan, terbaru di atas, tanpa filter
-    setNewSince(seenAt);
     setSeenAt(activity.data?.serverTime ?? new Date().toISOString());
     setBasis('CREATED');
     setRange({ from: toDateKey(new Date(seenAt)), to: today });
     setFilters({ ...EMPTY_FILTERS });
+    setDayTabResolved(true);
+    setOrderTabResolved(true);
     setDayTab('ALL');
     setOrderTab('ALL');
     setDaySort('NEWEST');
@@ -317,58 +360,54 @@ export default function AdminOrdersScreen() {
     );
   };
 
-  const tabs = isDays ? DAY_TABS : ORDER_TABS;
+  const allTabs: { id: string; label: string }[] = isDays ? DAY_TABS : ORDER_TABS;
+  const mainIds: string[] = isDays ? DAY_MAIN_TABS : ORDER_MAIN_TABS;
+  const mainTabs = mainIds.map((id) => allTabs.find((t) => t.id === id)).filter((t): t is { id: string; label: string } => !!t);
+  const moreTabs = allTabs.filter((t) => !mainIds.includes(t.id));
+  const activeMore = moreTabs.find((t) => t.id === tab);
   const sorts = isDays ? DAY_SORTS : ORDER_SORTS;
   const totalPages = Math.max(1, Math.ceil((result?.totalCount ?? 0) / pageSize));
   const multiDay = range.from !== range.to || basis === 'CREATED';
-
-  // Chip filter aktif (bisa dihapus satu per satu)
-  const chips = (() => {
-    const f = result?.facets;
-    const label = (list: { id: string; label: string }[] | undefined, id: string) => list?.find((o) => o.id === id)?.label ?? id;
-    const list: { key: string; text: string; remove: () => void }[] = [];
-    const drop = (key: keyof BoardFilters, id: string) =>
-      setFilters((prev) => ({ ...prev, [key]: (prev[key] as string[]).filter((x) => x !== id) }));
-    filters.fulfillment.forEach((m) => list.push({ key: `m-${m}`, text: m === 'DELIVERY' ? 'Pesan Antar' : 'Ambil Sendiri', remove: () => drop('fulfillment', m) }));
-    filters.zones.forEach((z) => list.push({ key: `z-${z}`, text: `Zona: ${label(f?.zones, z)}`, remove: () => drop('zones', z) }));
-    if (isDays) filters.drivers.forEach((d) => list.push({ key: `d-${d}`, text: `Driver: ${label(f?.drivers, d)}`, remove: () => drop('drivers', d) }));
-    filters.outlets.forEach((o) => list.push({ key: `o-${o}`, text: `Outlet: ${label(f?.outlets, o)}`, remove: () => drop('outlets', o) }));
-    filters.categories.forEach((c) => list.push({ key: `c-${c}`, text: label(f?.categories, c), remove: () => drop('categories', c) }));
-    filters.payments.forEach((x) => list.push({ key: `p-${x}`, text: `Bayar: ${label(f?.payments, x)}`, remove: () => drop('payments', x) }));
-    filters.vouchers.forEach((x) => list.push({ key: `v-${x}`, text: x === 'NONE' ? 'Tanpa voucher' : `Voucher: ${x}`, remove: () => drop('vouchers', x) }));
-    filters.refunds.forEach((x) => list.push({ key: `r-${x}`, text: label(f?.refunds, x), remove: () => drop('refunds', x) }));
-    if (filters.menu && isDays) list.push({ key: 'menu', text: `Menu: ${filters.menu.name}`, remove: () => setFilters((p) => ({ ...p, menu: null })) });
-    return list;
-  })();
+  const activeFilters = countActiveFilters(filters, isDays ? 'days' : 'orders');
+  const unit = isDays ? 'pengiriman' : 'pesanan';
+  // Saat tab awal masih ditentukan / data berganti, jangan tampilkan "kosong" sebelum waktunya
+  const loadingList = active.isPending || (active.isFetching && (result?.items.length ?? 0) === 0);
 
   const muted = { color: theme.textSecondary };
   const strong = { color: theme.text };
+  const outline = [styles.toolBtn, clickable, { borderColor: theme.border, backgroundColor: theme.card }];
 
-  const renderBoard = () => (
-    <>
-      <BoardTopBar
-        basis={basis}
-        onBasisChange={setBasis}
-        from={range.from}
-        to={range.to}
-        onRangeChange={(from, to) => setRange({ from, to })}
-      />
-
-      <View style={styles.body}>
-        <View style={styles.side}>
-          <BoardFilterPanel view={isDays ? 'days' : 'orders'} facets={result?.facets} value={filters} onChange={setFilters} />
+  const tabButton = (t: { id: string; label: string }) => {
+    const selected = t.id === tab;
+    const count = result?.tabCounts[t.id] ?? 0;
+    return (
+      <Pressable
+        key={t.id}
+        onPress={() => chooseTab(t.id)}
+        style={[styles.tab, clickable, { borderBottomColor: selected ? theme.primary : 'transparent' }]}
+        accessibilityRole="tab"
+        accessibilityState={{ selected }}
+        aria-selected={selected}
+      >
+        <ThemedText style={[styles.tabText, { color: selected ? theme.primary : theme.text }]}>{tabLabel(t.id, t.label)}</ThemedText>
+        <View style={[styles.count, selected && { backgroundColor: theme.primaryLight }]}>
+          <ThemedText style={[styles.countText, { color: selected ? theme.primary : theme.textSecondary }]}>{count}</ThemedText>
         </View>
+      </Pressable>
+    );
+  };
 
-        <View style={styles.main}>
-          {/* Judul + sakelar tampilan */}
-          <View style={styles.titleRow}>
-            <View style={styles.flex}>
-              <ThemedText style={[styles.title, strong]}>{isDays ? 'Daftar pengiriman' : 'Daftar pesanan'}</ThemedText>
-              <ThemedText style={[styles.small, muted]}>
-                {result ? `${result.summary.rows} ${isDays ? 'pengiriman' : 'pesanan'}` : 'Memuat…'} ·{' '}
-                {range.from === range.to ? formatLongDate(range.from) : `${formatShortDate(range.from)} – ${formatShortDate(range.to)}`}
-              </ThemedText>
-            </View>
+  return (
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Judul & periode */}
+        <View style={styles.header}>
+          <View style={styles.flex}>
+            <ThemedText style={[styles.crumb, muted]}>OPERASIONAL  /  PESANAN</ThemedText>
+            <ThemedText style={[styles.title, strong]}>{isDays ? 'Daftar pengiriman' : 'Daftar pesanan'}</ThemedText>
+            <ThemedText style={[styles.subtitle, muted]}>Kelola jadwal, persiapan, dan pengantaran pesanan.</ThemedText>
+          </View>
+          <View style={styles.headerRight}>
             {newOrders + newlyPaid > 0 ? (
               <Pressable
                 onPress={showNewOrders}
@@ -384,19 +423,52 @@ export default function AdminOrdersScreen() {
                 </ThemedText>
               </Pressable>
             ) : null}
-            <Pressable
-              onPress={() => {
-                active.refetch();
-                activity.refetch();
-              }}
-              style={[styles.refresh, clickable]}
-              accessibilityRole="button"
-              accessibilityLabel="Muat ulang daftar"
-            >
-              <ThemedText style={[styles.small, muted]}>
-                {active.isFetching ? 'Memperbarui…' : active.dataUpdatedAt ? `Diperbarui ${formatTime(new Date(active.dataUpdatedAt).toISOString())}` : 'Muat ulang'} ⟳
-              </ThemedText>
-            </Pressable>
+            <BoardTopBar basis={basis} onBasisChange={setBasis} from={range.from} to={range.to} onRangeChange={(from, to) => setRange({ from, to })} />
+          </View>
+        </View>
+
+        <BoardSummary view={isDays ? 'days' : 'orders'} summary={result?.summary} />
+
+        <AttentionBanner
+          view={isDays ? 'days' : 'orders'}
+          attention={result?.attention}
+          canManage={isManager}
+          onAssignDrivers={() => selectAttention((r) => r.needsDriver)}
+          onMarkRefunds={() => selectAttention((r) => r.refundPending)}
+          onReviewPayments={reviewPayments}
+          onShowAll={() => chooseTab('ATTENTION')}
+        />
+
+        {/* Kartu daftar */}
+        <View style={[styles.listCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          {/* Tab status + sakelar tampilan */}
+          <View style={[styles.tabsRow, { borderColor: theme.border }]}>
+            <View style={styles.tabs}>
+              {mainTabs.map(tabButton)}
+              {moreTabs.length > 0 ? (
+                <MenuButton
+                  style={[styles.tab, { borderBottomColor: activeMore ? theme.primary : 'transparent' }]}
+                  accessibilityLabel="Tab status lainnya"
+                  items={moreTabs.map((t) => ({
+                    key: t.id,
+                    label: t.label,
+                    hint: String(result?.tabCounts[t.id] ?? 0),
+                    selected: t.id === tab,
+                    onPress: () => chooseTab(t.id),
+                  }))}
+                >
+                  <ThemedText style={[styles.tabText, { color: activeMore ? theme.primary : theme.text }]}>
+                    {activeMore ? activeMore.label : 'Lainnya'}
+                  </ThemedText>
+                  {activeMore ? (
+                    <View style={[styles.count, { backgroundColor: theme.primaryLight }]}>
+                      <ThemedText style={[styles.countText, { color: theme.primary }]}>{result?.tabCounts[activeMore.id] ?? 0}</ThemedText>
+                    </View>
+                  ) : null}
+                  <ThemedText style={[styles.tabText, muted]}>⌄</ThemedText>
+                </MenuButton>
+              ) : null}
+            </View>
             {canSeeOrders ? (
               <View style={[styles.toggle, { backgroundColor: theme.backgroundElement }]}>
                 {(['days', 'orders'] as BoardView[]).map((v) => (
@@ -407,8 +479,8 @@ export default function AdminOrdersScreen() {
                     accessibilityRole="button"
                     accessibilityState={{ selected: view === v }}
                   >
-                    <ThemedText style={[styles.toggleText, { color: view === v ? theme.primary : theme.textSecondary }]}>
-                      {v === 'days' ? 'Per Hari Kirim' : 'Per Pesanan'}
+                    <ThemedText style={[styles.toggleText, { color: view === v ? theme.text : theme.textSecondary }]}>
+                      {v === 'days' ? 'Per hari kirim' : 'Per pesanan'}
                     </ThemedText>
                   </Pressable>
                 ))}
@@ -416,94 +488,54 @@ export default function AdminOrdersScreen() {
             ) : null}
           </View>
 
-          <View style={[styles.info, { backgroundColor: theme.backgroundElement }]}>
-            <ThemedText style={[styles.small, muted]}>
-              ⓘ{' '}
-              {isDays
-                ? 'Satu baris = satu jadwal kirim. Pesanan 7 hari muncul sebagai 7 pengiriman dengan status masing-masing.'
-                : 'Satu baris = satu pesanan. Lihat pembayaran, total, dan progres seluruh hari kirim di satu tempat.'}
-            </ThemedText>
-          </View>
-
-          <BoardSummary
-            view={isDays ? 'days' : 'orders'}
-            summary={result?.summary}
-            production={result?.production ?? []}
-            activeMenuId={filters.menu?.id ?? null}
-            onMenuPress={(m) =>
-              setFilters((p) => ({ ...p, menu: p.menu?.id === m.menuId ? null : { id: m.menuId, name: m.menuName } }))
-            }
-            onAttentionPress={() => (isDays ? setDayTab('ATTENTION') : setOrderTab('ATTENTION'))}
-          />
-
-          {/* Tab status */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { borderColor: theme.border }]}>
-            {tabs.map((t) => {
-              const selected = t.id === tab;
-              const count = result?.tabCounts[t.id] ?? 0;
-              const attention = t.id === 'ATTENTION';
-              return (
-                <Pressable
-                  key={t.id}
-                  onPress={() => (isDays ? setDayTab(t.id as DayTab) : setOrderTab(t.id as OrderTab))}
-                  style={[
-                    styles.tab,
-                    clickable,
-                    { borderBottomColor: selected ? theme.primary : 'transparent' },
-                    attention && count > 0 && { backgroundColor: theme.primaryLight },
-                  ]}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected }}
-                >
-                  <ThemedText style={[styles.tabText, { color: selected ? theme.primary : attention && count > 0 ? theme.warning : theme.textSecondary }]}>
-                    {attention ? '⚠ ' : ''}{t.label}
-                  </ThemedText>
-                  <View style={[styles.count, { backgroundColor: selected ? theme.primary : theme.backgroundElement }]}>
-                    <ThemedText style={[styles.countText, { color: selected ? '#FFFFFF' : theme.textSecondary }]}>{count}</ThemedText>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {/* Cari + urutkan */}
+          {/* Cari, filter, urutkan, cetak, ekspor */}
           <View style={styles.toolbar}>
-            <TextInput
-              value={searchInput}
-              onChangeText={setSearchInput}
-              placeholder="🔍 Cari no. pesanan, nama pelanggan / penerima, email, atau no. HP"
-              placeholderTextColor={theme.textSecondary}
-              style={[styles.search, { color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
-            />
+            <View style={[styles.searchBox, { borderColor: theme.border, backgroundColor: theme.card }]}>
+              <ThemedText style={[styles.searchIcon, muted]}>⌕</ThemedText>
+              <TextInput
+                value={searchInput}
+                onChangeText={setSearchInput}
+                placeholder="Cari no. pesanan atau nama pelanggan…"
+                placeholderTextColor={theme.textSecondary}
+                style={[styles.search, { color: theme.text }]}
+              />
+            </View>
             <Pressable
-              onPress={() => setSortOpen(true)}
-              style={[styles.sortBtn, clickable, { borderColor: theme.border, backgroundColor: theme.card }]}
+              onPress={() => setFilterOpen(true)}
+              style={[...outline, activeFilters > 0 && { borderColor: theme.primary }]}
               accessibilityRole="button"
+              accessibilityLabel="Buka filter"
             >
-              <ThemedText style={[styles.small, strong]} numberOfLines={1}>
-                ↕ {sorts.find((s) => s.id === sort)?.label}
-              </ThemedText>
+              <ThemedText style={[styles.toolText, strong]}>☰ Filter</ThemedText>
+              {activeFilters > 0 ? (
+                <View style={[styles.filterBadge, { backgroundColor: theme.primary }]}>
+                  <ThemedText style={styles.filterBadgeText}>{activeFilters}</ThemedText>
+                </View>
+              ) : null}
             </Pressable>
+            <View style={styles.flex} />
+            <MenuButton
+              style={[...outline, styles.sortBtn]}
+              align="right"
+              accessibilityLabel="Urutkan"
+              items={sorts.map((s) => ({
+                key: s.id,
+                label: s.label,
+                selected: s.id === sort,
+                onPress: () => (isDays ? setDaySort(s.id) : setOrderSort(s.id)),
+              }))}
+            >
+              <ThemedText style={[styles.toolText, strong]} numberOfLines={1}>⇅ {sorts.find((s) => s.id === sort)?.label}</ThemedText>
+              <ThemedText style={[styles.toolText, muted]}>⌄</ThemedText>
+            </MenuButton>
             {isDays && Platform.OS === 'web' ? (
-              <Pressable
-                onPress={runPrint}
-                disabled={printing}
-                style={[styles.sortBtn, clickable, { borderColor: theme.border, backgroundColor: theme.card }, printing && styles.disabled]}
-                accessibilityRole="button"
-              >
-                <ThemedText style={[styles.small, strong]} numberOfLines={1}>{printing ? 'Menyiapkan…' : '🖨 Cetak dapur'}</ThemedText>
+              <Pressable onPress={runPrint} disabled={printing} style={[...outline, printing && styles.disabled]} accessibilityRole="button">
+                <ThemedText style={[styles.toolText, strong]}>{printing ? 'Menyiapkan…' : '🖨 Cetak'}</ThemedText>
               </Pressable>
             ) : null}
             {canSeeOrders && Platform.OS === 'web' ? (
-              <Pressable
-                onPress={runExport}
-                disabled={exporting}
-                style={[styles.sortBtn, clickable, { borderColor: theme.border, backgroundColor: theme.card }, exporting && styles.disabled]}
-                accessibilityRole="button"
-              >
-                <ThemedText style={[styles.small, strong]} numberOfLines={1}>
-                  {exporting ? 'Mengekspor…' : isDays ? '⬇ Ekspor Excel' : '⬇ Ekspor transaksi'}
-                </ThemedText>
+              <Pressable onPress={runExport} disabled={exporting} style={[...outline, exporting && styles.disabled]} accessibilityRole="button" accessibilityLabel={isDays ? 'Ekspor Excel per hari kirim' : 'Ekspor transaksi'}>
+                <ThemedText style={[styles.toolText, strong]}>{exporting ? 'Mengekspor…' : 'Ekspor'}</ThemedText>
               </Pressable>
             ) : null}
           </View>
@@ -515,40 +547,44 @@ export default function AdminOrdersScreen() {
                   <ThemedText style={[styles.small, strong]}>{c.text} ✕</ThemedText>
                 </Pressable>
               ))}
-              <Pressable onPress={() => setFilters({ ...EMPTY_FILTERS })} style={clickable}>
+              <Pressable onPress={() => setFilters({ ...EMPTY_FILTERS })} style={clickable} accessibilityRole="button">
                 <ThemedText style={[styles.small, styles.bold, { color: theme.primary }]}>Reset</ThemedText>
               </Pressable>
             </View>
           ) : null}
 
           {canSelect && selection.size > 0 ? (
-            <BulkActionBar
-              count={selection.size}
-              targets={targets}
-              canAdvance={canAdvance}
-              canManage={isManager}
-              busy={bulkBusy}
-              onAdvance={bulkAdvance}
-              onAssignDriver={(ids) => setDriverTarget({ ids, bulk: true })}
-              onMarkRefund={(ids) => setRefundTarget({ ids, label: `${ids.length} hari kirim`, bulk: true })}
-              onCancel={(ids) => setCancelTarget({ kind: 'days', orderDayIds: ids, label: `${ids.length} hari kirim` })}
-              onClear={clearSelection}
-            />
+            <View style={styles.bulkWrap}>
+              <BulkActionBar
+                count={selection.size}
+                targets={targets}
+                canAdvance={canAdvance}
+                canManage={isManager}
+                busy={bulkBusy}
+                onAdvance={bulkAdvance}
+                onAssignDriver={(ids) => setDriverTarget({ ids, bulk: true })}
+                onMarkRefund={(ids) => setRefundTarget({ ids, label: `${ids.length} hari kirim`, bulk: true })}
+                onCancel={(ids) => setCancelTarget({ kind: 'days', orderDayIds: ids, label: `${ids.length} hari kirim` })}
+                onClear={clearSelection}
+              />
+            </View>
           ) : null}
 
           {/* Daftar */}
-          {active.isPending ? (
+          {loadingList ? (
             <ActivityIndicator style={styles.loader} color={theme.primary} />
           ) : active.isError ? (
-            <Pressable onPress={() => active.refetch()} style={[styles.empty, { borderColor: theme.border }]}>
+            <Pressable onPress={() => active.refetch()} style={styles.empty}>
               <ThemedText style={[styles.small, muted]}>{getApiErrorMessage(active.error, 'Gagal memuat data.')} Ketuk untuk coba lagi.</ThemedText>
             </Pressable>
           ) : !result || result.items.length === 0 ? (
-            <View style={[styles.empty, { borderColor: theme.border }]}>
+            <View style={styles.empty}>
               <ThemedText style={[styles.small, muted]}>
-                {search || countActiveFilters(filters, view) > 0 || tab !== 'ALL'
-                  ? 'Tidak ada data yang cocok dengan pencarian / filter ini.'
-                  : 'Belum ada pesanan di periode ini.'}
+                {tab === 'ATTENTION' && !search && activeFilters === 0
+                  ? 'Tidak ada yang perlu ditindak. 🎉'
+                  : search || activeFilters > 0 || tab !== 'ALL'
+                    ? 'Tidak ada data yang cocok dengan pencarian / filter ini.'
+                    : 'Belum ada pesanan di periode ini.'}
               </ThemedText>
             </View>
           ) : isDays ? (
@@ -559,7 +595,6 @@ export default function AdminOrdersScreen() {
               canAdvance={canAdvance}
               canAssignDriver={isManager}
               canMarkRefund={isManager}
-              newSince={newSince}
               selection={canSelect ? { ids: new Set(selection.keys()), onToggle: toggleRow, onTogglePage: togglePage } : null}
               onOpen={(r) => setDetail({ orderId: r.orderId, dayId: r.orderDayId })}
               onAdvance={(r) => {
@@ -572,77 +607,78 @@ export default function AdminOrdersScreen() {
               }
             />
           ) : (
-            <OrderTable rows={ordersQuery.data?.items ?? []} newSince={newSince} onOpen={(r) => setDetail({ orderId: r.orderId, dayId: null })} />
+            <OrderTable rows={ordersQuery.data?.items ?? []} onOpen={(r) => setDetail({ orderId: r.orderId, dayId: null })} />
           )}
 
           {/* Paging */}
           {result && result.totalCount > 0 ? (
             <View style={styles.pager}>
               <ThemedText style={[styles.small, muted, styles.flex]}>
-                Menampilkan {(result.page - 1) * result.pageSize + 1}–{Math.min(result.page * result.pageSize, result.totalCount)} dari {result.totalCount}
-                {active.isFetching ? ' · memuat…' : ''}
+                Menampilkan {(result.page - 1) * result.pageSize + 1}–{Math.min(result.page * result.pageSize, result.totalCount)} dari {result.totalCount} {unit}
               </ThemedText>
-              <ThemedText style={[styles.small, muted]}>Baris</ThemedText>
-              {PAGE_SIZES.map((s) => (
-                <Pressable key={s} onPress={() => setPageSize(s)} style={[styles.pageBtn, clickable, s === pageSize && { backgroundColor: theme.primaryLight }]}>
-                  <ThemedText style={[styles.small, { color: s === pageSize ? theme.primary : theme.text }]}>{s}</ThemedText>
-                </Pressable>
-              ))}
+              <MenuButton
+                style={styles.pageSize}
+                align="right"
+                menuWidth={160}
+                accessibilityLabel="Jumlah baris per halaman"
+                items={PAGE_SIZES.map((s) => ({ key: String(s), label: `${s} per halaman`, selected: s === pageSize, onPress: () => setPageSize(s) }))}
+              >
+                <ThemedText style={[styles.small, muted]}>{pageSize} per halaman ⌄</ThemedText>
+              </MenuButton>
               <View style={styles.pageNav}>
-                <Pressable onPress={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={[styles.pageBtn, clickable, page <= 1 && styles.disabled]}>
+                <Pressable onPress={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={[styles.pageBtn, clickable, page <= 1 && styles.disabled]} accessibilityLabel="Halaman sebelumnya">
                   <ThemedText style={strong}>‹</ThemedText>
                 </Pressable>
                 <ThemedText style={[styles.small, strong]}>{page} / {totalPages}</ThemedText>
-                <Pressable onPress={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={[styles.pageBtn, clickable, page >= totalPages && styles.disabled]}>
+                <Pressable onPress={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={[styles.pageBtn, clickable, page >= totalPages && styles.disabled]} accessibilityLabel="Halaman berikutnya">
                   <ThemedText style={strong}>›</ThemedText>
                 </Pressable>
               </View>
             </View>
           ) : null}
         </View>
-      </View>
-    </>
-  );
 
-  return (
-    <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Pesanan" subtitle="Daftar pesanan · Papan antar" fallbackHref="/admin" />
+        {isDays ? (
+          <KitchenRecap
+            production={result?.production ?? []}
+            activeMenuId={filters.menu?.id ?? null}
+            onMenuPress={(m) => setFilters((p) => ({ ...p, menu: p.menu?.id === m.menuId ? null : { id: m.menuId, name: m.menuName } }))}
+          />
+        ) : null}
 
-      <View style={[styles.modeTabs, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-        {(['board', 'delivery'] as Mode[]).map((m) => (
+        {/* Kaki halaman */}
+        <View style={styles.footer}>
+          <ThemedText style={[styles.small, muted, styles.flex]}>
+            {isDays ? 'Satu baris mewakili satu jadwal kirim.' : 'Satu baris mewakili satu pesanan beserta seluruh hari kirimnya.'}
+          </ThemedText>
           <Pressable
-            key={m}
-            onPress={() => setMode(m)}
-            style={[styles.modeTab, clickable, { borderBottomColor: mode === m ? theme.primary : 'transparent' }]}
+            onPress={() => {
+              active.refetch();
+              activity.refetch();
+            }}
+            style={clickable}
+            accessibilityRole="button"
+            accessibilityLabel="Muat ulang daftar"
           >
-            <ThemedText style={[styles.small, styles.bold, { color: mode === m ? theme.primary : theme.textSecondary }]}>
-              {m === 'board' ? '🧾 Daftar Pesanan' : '🛵 Papan Antar'}
+            <ThemedText style={[styles.small, muted]}>
+              {active.isFetching ? 'Memperbarui…' : active.dataUpdatedAt ? `Terakhir diperbarui ${formatTime(new Date(active.dataUpdatedAt).toISOString())}` : 'Muat ulang'} ⟳
             </ThemedText>
           </Pressable>
-        ))}
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {mode === 'board' ? (
-          renderBoard()
-        ) : (
-          <View style={styles.deliveryWrap}>
-            <View style={[styles.dayNav, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Pressable onPress={() => setRange((r) => ({ from: addDaysKey(r.from, -1), to: addDaysKey(r.from, -1) }))} style={[styles.pageBtn, clickable]}>
-                <ThemedText style={strong}>‹</ThemedText>
-              </Pressable>
-              <Pressable onPress={() => setRange({ from: today, to: today })} style={[styles.flex, clickable]}>
-                <ThemedText style={[styles.dayNavText, strong]}>🗓️ {formatLongDate(range.from)}</ThemedText>
-              </Pressable>
-              <Pressable onPress={() => setRange((r) => ({ from: addDaysKey(r.from, 1), to: addDaysKey(r.from, 1) }))} style={[styles.pageBtn, clickable]}>
-                <ThemedText style={strong}>›</ThemedText>
-              </Pressable>
-            </View>
-            {/* key: pilihan kiriman direset saat tanggal berganti */}
-            <DeliveryBoard key={range.from} date={range.from} />
-          </View>
-        )}
+        </View>
       </ScrollView>
+
+      {filterOpen ? (
+        <BoardFilterDrawer
+          view={isDays ? 'days' : 'orders'}
+          facets={result?.facets}
+          value={filters}
+          onClose={() => setFilterOpen(false)}
+          onApply={(next) => {
+            setFilters(next);
+            setFilterOpen(false);
+          }}
+        />
+      ) : null}
 
       {detail ? (
         <OrderDetailPanel
@@ -663,19 +699,6 @@ export default function AdminOrdersScreen() {
           }
         />
       ) : null}
-
-      <SelectModalPicker
-        visible={sortOpen}
-        title="Urutkan"
-        items={sorts.map((s) => ({ value: s.id, label: s.label }))}
-        selectedValue={sort}
-        onSelect={(item) => {
-          if (isDays) setDaySort(item.value);
-          else setOrderSort(item.value);
-          setSortOpen(false);
-        }}
-        onClose={() => setSortOpen(false)}
-      />
 
       <SelectModalPicker
         visible={driverTarget != null}
@@ -722,41 +745,45 @@ export default function AdminOrdersScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { padding: 16, gap: 14, paddingBottom: 40, width: '100%', maxWidth: 1400, alignSelf: 'center' },
-  modeTabs: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 16 },
-  modeTab: { paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 2 },
-  body: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-  side: { width: 240 },
-  main: { flex: 1, gap: 12, minWidth: 0 },
+  scroll: { padding: 24, gap: 16, paddingBottom: 40, width: '100%', maxWidth: 1400, alignSelf: 'center' },
   flex: { flex: 1 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { fontSize: 20, fontWeight: '800' },
-  toggle: { flexDirection: 'row', borderRadius: 12, padding: 4 },
-  toggleBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 9 },
-  toggleText: { fontSize: 13, fontWeight: '700' },
-  info: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  tabs: { flexDirection: 'row', gap: 4, borderBottomWidth: 1 },
-  tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 9, borderBottomWidth: 2, borderTopLeftRadius: 8, borderTopRightRadius: 8 },
-  tabText: { fontSize: 13, fontWeight: '700' },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  crumb: { fontSize: 11, fontWeight: '600', letterSpacing: 0.4 },
+  title: { fontSize: 26, fontWeight: '700', marginTop: 6 },
+  subtitle: { fontSize: 13, marginTop: 2 },
+  newPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  newPillText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  listCard: { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
+  tabsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, borderBottomWidth: 1 },
+  tabs: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 6, paddingVertical: 14, borderBottomWidth: 2 },
+  tabText: { fontSize: 14, fontWeight: '500' },
   count: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 1, minWidth: 22, alignItems: 'center' },
-  countText: { fontSize: 11, fontWeight: '800' },
-  toolbar: { flexDirection: 'row', gap: 10 },
-  search: { flex: 1, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
-  newPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  newPillText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
-  refresh: { paddingHorizontal: 4, paddingVertical: 4 },
-  sortBtn: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, justifyContent: 'center', maxWidth: 230 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  countText: { fontSize: 12, fontWeight: '600' },
+  toggle: { flexDirection: 'row', borderRadius: 9, padding: 3 },
+  toggleBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 7 },
+  toggleText: { fontSize: 12, fontWeight: '600' },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, flexWrap: 'wrap' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, minWidth: 280, flexBasis: 380, flexShrink: 1 },
+  searchIcon: { fontSize: 16 },
+  search: { flex: 1, paddingVertical: 9, fontSize: 13 },
+  toolBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
+  toolText: { fontSize: 13, fontWeight: '500' },
+  sortBtn: { maxWidth: 240 },
+  filterBadge: { borderRadius: 999, minWidth: 18, paddingHorizontal: 5, alignItems: 'center' },
+  filterBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 12, marginTop: -4 },
   chip: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  bulkWrap: { paddingHorizontal: 16, paddingBottom: 12 },
   small: { fontSize: 12 },
   bold: { fontWeight: '700' },
-  loader: { marginTop: 40 },
-  empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, padding: 30, alignItems: 'center' },
-  pager: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pageNav: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 10 },
+  loader: { marginVertical: 40 },
+  empty: { padding: 40, alignItems: 'center' },
+  pager: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
+  pageSize: { paddingHorizontal: 6, paddingVertical: 4 },
+  pageNav: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pageBtn: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 },
   disabled: { opacity: 0.35 },
-  deliveryWrap: { gap: 12, maxWidth: 760, width: '100%', alignSelf: 'center' },
-  dayNav: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 10 },
-  dayNavText: { fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  footer: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 });

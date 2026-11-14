@@ -32,6 +32,7 @@ const CUSTOMER_NAV_ITEMS: NavItem[] = [
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'admin-dashboard', label: 'Ringkasan', path: '/admin' },
   { id: 'admin-orders', label: 'Pesanan', path: '/admin/orders' },
+  { id: 'admin-delivery-board', label: 'Papan Antar', path: '/admin/delivery-board' },
   { id: 'admin-delivery-areas', label: 'Wilayah Antar', path: '/admin/delivery-areas' },
   { id: 'admin-delivery-zones', label: 'Zona & Driver', path: '/admin/delivery-zones' },
   { id: 'admin-outlets', label: 'Outlet', path: '/admin/outlets' },
@@ -55,6 +56,19 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
           <line x1="9" y1="7" x2="15" y2="7" />
           <line x1="9" y1="11" x2="15" y2="11" />
           <line x1="9" y1="15" x2="13" y2="15" />
+        </svg>
+      );
+    }
+    if (name === 'admin-delivery-board') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <line x1="9" y1="4" x2="9" y2="20" />
+          <line x1="15" y1="4" x2="15" y2="20" />
+          <line x1="4.5" y1="9" x2="7.5" y2="9" />
+          <line x1="10.5" y1="9" x2="13.5" y2="9" />
+          <line x1="10.5" y1="13" x2="13.5" y2="13" />
+          <line x1="16.5" y1="9" x2="19.5" y2="9" />
         </svg>
       );
     }

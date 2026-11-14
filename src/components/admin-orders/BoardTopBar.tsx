@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { MenuButton } from '@/components/admin-orders/MenuButton';
 import { ThemedText } from '@/components/themed-text';
 import { addDaysKey, daysBetween } from '@/features/order/adminBoardUtils';
 import { toDateKey } from '@/features/order/dateUtils';
-import { formatLongDate, formatShortDate } from '@/features/order/orderStatus';
+import { formatDateRange, formatShortDate } from '@/features/order/orderStatus';
 import { useTheme } from '@/hooks/use-theme';
 import type { DateBasis } from '@/types/adminOrders';
-
-type Preset = 'TODAY' | 'TOMORROW' | 'WEEK' | 'RANGE';
 
 interface BoardTopBarProps {
   basis: DateBasis;
@@ -20,74 +19,58 @@ interface BoardTopBarProps {
 
 const MAX_RANGE_DAYS = 93;
 
-/** Acuan tanggal (kirim / pesan), pilihan cepat periode, dan navigasi periode. */
+/** Kontrol periode di header: acuan tanggal (dropdown) + periode (pilihan cepat di menu, tombol geser ‹ ›). */
 export const BoardTopBar: React.FC<BoardTopBarProps> = ({ basis, onBasisChange, from, to, onRangeChange }) => {
   const theme = useTheme();
   const [rangeOpen, setRangeOpen] = useState(false);
   const today = toDateKey(new Date());
+  const tomorrow = addDaysKey(today, 1);
   const length = daysBetween(from, to) + 1;
-
-  const preset: Preset =
-    from === today && to === today ? 'TODAY'
-    : from === addDaysKey(today, 1) && to === from ? 'TOMORROW'
-    : from === today && to === addDaysKey(today, 6) ? 'WEEK'
-    : 'RANGE';
-
-  const presets: { id: Preset; label: string; onPress: () => void }[] = [
-    { id: 'TODAY', label: 'Hari ini', onPress: () => onRangeChange(today, today) },
-    { id: 'TOMORROW', label: 'Besok', onPress: () => onRangeChange(addDaysKey(today, 1), addDaysKey(today, 1)) },
-    { id: 'WEEK', label: '7 hari', onPress: () => onRangeChange(today, addDaysKey(today, 6)) },
-    { id: 'RANGE', label: 'Rentang…', onPress: () => setRangeOpen(true) },
-  ];
 
   // Geser periode sepanjang panjang periode saat ini (1 hari / 7 hari / rentang)
   const shift = (dir: 1 | -1) => onRangeChange(addDaysKey(from, dir * length), addDaysKey(to, dir * length));
-  const label = from === to ? formatLongDate(from) : `${formatShortDate(from)} – ${formatShortDate(to)} · ${length} hari`;
-
-  const seg = (active: boolean) => [
-    styles.segBtn,
-    { backgroundColor: active ? theme.primaryLight : 'transparent', borderColor: active ? theme.primary : theme.border },
-  ];
+  const label = from === to ? formatShortDate(from) : formatDateRange(from, to);
+  const hint = from === to ? (from === today ? 'Hari ini' : from === tomorrow ? 'Besok' : '1 hari') : `${length} hari`;
+  const box = [styles.box, { backgroundColor: theme.card, borderColor: theme.border }];
 
   return (
-    <View style={[styles.bar, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={styles.group}>
-        <ThemedText style={[styles.caption, { color: theme.textSecondary }]}>TANGGAL ACUAN</ThemedText>
-        <View style={styles.row}>
-          {(['DELIVERY', 'CREATED'] as const).map((b) => (
-            <Pressable key={b} onPress={() => onBasisChange(b)} style={seg(basis === b)} accessibilityRole="button">
-              <ThemedText style={[styles.segText, { color: basis === b ? theme.primary : theme.text }]}>
-                {b === 'DELIVERY' ? 'Tanggal kirim' : 'Tanggal pesan'}
-              </ThemedText>
-            </Pressable>
-          ))}
-        </View>
-      </View>
+    <View style={styles.row}>
+      <MenuButton
+        style={[box, styles.basisBox]}
+        accessibilityLabel="Acuan tanggal"
+        items={(['DELIVERY', 'CREATED'] as const).map((b) => ({
+          key: b,
+          label: b === 'DELIVERY' ? 'Tanggal kirim' : 'Tanggal pesan',
+          selected: basis === b,
+          onPress: () => onBasisChange(b),
+        }))}
+      >
+        <ThemedText style={[styles.text, styles.flex, { color: theme.text }]}>{basis === 'DELIVERY' ? 'Tanggal kirim' : 'Tanggal pesan'}</ThemedText>
+        <ThemedText style={[styles.chevron, { color: theme.textSecondary }]}>⌄</ThemedText>
+      </MenuButton>
 
-      <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-      <View style={[styles.group, styles.flex]}>
-        <ThemedText style={[styles.caption, { color: theme.textSecondary }]}>
-          {basis === 'DELIVERY' ? 'PERIODE PENGIRIMAN' : 'PERIODE PEMESANAN'}
-        </ThemedText>
-        <View style={styles.row}>
-          {presets.map((p) => (
-            <Pressable key={p.id} onPress={p.onPress} style={seg(preset === p.id)} accessibilityRole="button">
-              <ThemedText style={[styles.segText, { color: preset === p.id ? theme.primary : theme.text }]}>{p.label}</ThemedText>
-            </Pressable>
-          ))}
-          <View style={[styles.nav, { borderColor: theme.border }]}>
-            <Pressable onPress={() => shift(-1)} style={styles.navBtn} accessibilityLabel="Periode sebelumnya">
-              <ThemedText style={{ color: theme.text }}>‹</ThemedText>
-            </Pressable>
-            <ThemedText style={[styles.navLabel, { color: theme.text }]} numberOfLines={1}>
-              📅 {label}
-            </ThemedText>
-            <Pressable onPress={() => shift(1)} style={styles.navBtn} accessibilityLabel="Periode berikutnya">
-              <ThemedText style={{ color: theme.text }}>›</ThemedText>
-            </Pressable>
-          </View>
-        </View>
+      <View style={[box, styles.periodBox]}>
+        <MenuButton
+          style={styles.periodBtn}
+          accessibilityLabel="Pilih periode"
+          menuWidth={200}
+          items={[
+            { key: 'today', label: 'Hari ini', selected: from === today && to === today, onPress: () => onRangeChange(today, today) },
+            { key: 'tomorrow', label: 'Besok', selected: from === tomorrow && to === tomorrow, onPress: () => onRangeChange(tomorrow, tomorrow) },
+            { key: 'week', label: '7 hari ke depan', selected: from === today && to === addDaysKey(today, 6), onPress: () => onRangeChange(today, addDaysKey(today, 6)) },
+            { key: 'range', label: 'Pilih rentang…', onPress: () => setRangeOpen(true) },
+          ]}
+        >
+          <ThemedText style={[styles.icon, { color: theme.textSecondary }]}>📅</ThemedText>
+          <ThemedText style={[styles.text, styles.bold, { color: theme.text }]} numberOfLines={1}>{label}</ThemedText>
+          <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>{hint}</ThemedText>
+        </MenuButton>
+        <Pressable onPress={() => shift(-1)} style={[styles.navBtn, clickable]} accessibilityRole="button" accessibilityLabel="Periode sebelumnya">
+          <ThemedText style={[styles.nav, { color: theme.text }]}>‹</ThemedText>
+        </Pressable>
+        <Pressable onPress={() => shift(1)} style={[styles.navBtn, clickable]} accessibilityRole="button" accessibilityLabel="Periode berikutnya">
+          <ThemedText style={[styles.nav, { color: theme.text }]}>›</ThemedText>
+        </Pressable>
       </View>
 
       <RangeModal
@@ -178,25 +161,29 @@ const RangeModal: React.FC<{
   );
 };
 
-const clickable = Platform.select({ web: { cursor: 'pointer' as const } });
+const clickable = Platform.select({ web: { cursor: 'pointer' as const } }) ?? {};
 
 const styles = StyleSheet.create({
-  bar: { flexDirection: 'row', alignItems: 'stretch', gap: 16, borderWidth: 1, borderRadius: 14, padding: 14 },
-  group: { gap: 6 },
-  flex: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  divider: { width: 1 },
+  flex: { flex: 1 },
+  box: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, minHeight: 40 },
+  basisBox: { width: 170, paddingHorizontal: 12, gap: 6 },
+  periodBox: { paddingLeft: 4, paddingRight: 4 },
+  periodBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: 8, minWidth: 220 },
+  icon: { fontSize: 13 },
+  text: { fontSize: 13 },
+  bold: { fontWeight: '600' },
+  hint: { fontSize: 12, marginLeft: 'auto', paddingLeft: 16 },
+  chevron: { fontSize: 14, marginTop: -6 },
+  navBtn: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 8 },
+  nav: { fontSize: 16 },
   caption: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
-  segBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, ...clickable },
-  segText: { fontSize: 13, fontWeight: '600' },
-  nav: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, marginLeft: 4 },
-  navBtn: { paddingHorizontal: 10, paddingVertical: 6, ...clickable },
-  navLabel: { fontSize: 13, fontWeight: '600', minWidth: 200, textAlign: 'center' },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   modal: { width: '100%', maxWidth: 420, borderWidth: 1, borderRadius: 16, padding: 18, gap: 12 },
   modalTitle: { fontSize: 16, fontWeight: '700' },
   dateField: { flex: 1, gap: 4 },
   textInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
   small: { fontSize: 12 },
+  segText: { fontSize: 13, fontWeight: '600' },
   modalBtn: { flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center', ...clickable },
 });

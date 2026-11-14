@@ -4,14 +4,8 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-
 import { ThemedText } from '@/components/themed-text';
 import { StatusBadge } from '@/components/order/StatusBadge';
 import { useThemeContext } from '@/context/ThemeContext';
-import {
-  NEXT_DAY_ACTION,
-  dayStatusNote,
-  orderAction,
-  paymentSummary,
-  shortOrderNumber,
-} from '@/features/order/adminBoardUtils';
-import { formatDateRange, formatDateTime, formatRupiah, formatShortDate, nextDayStatus, toneColors } from '@/features/order/orderStatus';
+import { NEXT_DAY_ACTION, orderAction, paymentSummary, shortOrderNumber } from '@/features/order/adminBoardUtils';
+import { formatDateRange, formatRupiah, formatShortDate, nextDayStatus, toneColors } from '@/features/order/orderStatus';
 import { useTheme } from '@/hooks/use-theme';
 import type { AdminDayRow, AdminOrderRow } from '@/types/adminOrders';
 
@@ -23,15 +17,13 @@ const clickable = Platform.select({ web: { cursor: 'pointer' as const } }) ?? {}
 
 interface DayTableProps {
   rows: AdminDayRow[];
-  /** Tampilkan tanggal di kolom pesanan (periode lebih dari satu hari). */
+  /** Tampilkan tanggal kirim di baris (periode lebih dari satu hari). */
   showDate: boolean;
   busyDayId: string | null;
   canAdvance: boolean;
   canAssignDriver: boolean;
   /** Admin: tandai refund manual selesai. */
   canMarkRefund: boolean;
-  /** Pesanan yang dibuat setelah waktu ini diberi label "Baru". */
-  newSince: string | null;
   /** Kolom centang untuk aksi massal (null = tanpa centang). */
   selection: { ids: Set<string>; onToggle: (row: AdminDayRow) => void; onTogglePage: (rows: AdminDayRow[], select: boolean) => void } | null;
   onOpen: (row: AdminDayRow) => void;
@@ -40,19 +32,35 @@ interface DayTableProps {
   onMarkRefund: (row: AdminDayRow) => void;
 }
 
-export const DayTable: React.FC<DayTableProps> = ({
-  rows, showDate, busyDayId, canAdvance, canAssignDriver, canMarkRefund, newSince, selection,
-  onOpen, onAdvance, onAssignDriver, onMarkRefund,
-}) => {
+/** Aksi utama satu hari kirim. Urutan: pembayaran → refund → driver (admin) → status berikutnya. */
+function dayAction(
+  row: AdminDayRow,
+  p: Pick<DayTableProps, 'canAdvance' | 'canAssignDriver' | 'canMarkRefund' | 'onOpen' | 'onAdvance' | 'onAssignDriver' | 'onMarkRefund'>
+): { label: string; onPress: () => void } | null {
+  const next = row.orderStatus === 'AWAITING_PAYMENT' ? null : nextDayStatus(row.dayStatus, row.fulfillmentType);
+  // Berangkat wajib punya driver (server menolak DRIVER_NOT_ASSIGNED)
+  const blockedByDriver = next === 'OUT_FOR_DELIVERY' && !row.driverUserId;
+  if (row.paymentNeedsReview) return { label: 'Tinjau bayar', onPress: () => p.onOpen(row) };
+  if (row.refundPending) {
+    return p.canMarkRefund ? { label: 'Tandai direfund', onPress: () => p.onMarkRefund(row) } : { label: 'Lihat refund', onPress: () => p.onOpen(row) };
+  }
+  if ((row.needsDriver || blockedByDriver) && row.fulfillmentType === 'DELIVERY' && p.canAssignDriver) {
+    return { label: 'Atur driver', onPress: () => p.onAssignDriver(row) };
+  }
+  if (next && p.canAdvance && !blockedByDriver) return { label: NEXT_DAY_ACTION[next] ?? 'Lanjut', onPress: () => p.onAdvance(row) };
+  return null;
+}
+
+export const DayTable: React.FC<DayTableProps> = (props) => {
+  const { rows, showDate, busyDayId, selection, onOpen } = props;
   const theme = useTheme();
-  const { isDark } = useThemeContext();
   const muted = { color: theme.textSecondary };
   const strong = { color: theme.text };
   const pageSelected = !!selection && rows.length > 0 && rows.every((r) => selection.ids.has(r.orderDayId));
   const pagePartly = !!selection && !pageSelected && rows.some((r) => selection.ids.has(r.orderDayId));
 
   return (
-    <View style={[styles.table, { borderColor: theme.border, backgroundColor: theme.card }]}>
+    <View>
       <View style={[styles.headRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
         {selection ? (
           <CheckBox
@@ -62,33 +70,19 @@ export const DayTable: React.FC<DayTableProps> = ({
             onPress={() => selection.onTogglePage(rows, !pageSelected)}
           />
         ) : null}
-        <ThemedText style={[styles.head, styles.colOrder, muted]}>Pesanan / pelanggan</ThemedText>
+        <ThemedText style={[styles.head, styles.colOrder, muted]}>Pelanggan / pesanan</ThemedText>
         <ThemedText style={[styles.head, styles.colMenu, muted]}>Menu & porsi</ThemedText>
-        <ThemedText style={[styles.head, styles.colPlace, muted]}>Pengantaran / pengambilan</ThemedText>
-        <ThemedText style={[styles.head, styles.colStatus, muted]}>Status harian</ThemedText>
+        <ThemedText style={[styles.head, styles.colPlace, muted]}>Pengantaran</ThemedText>
+        <ThemedText style={[styles.head, styles.colStatus, muted]}>Status</ThemedText>
         <ThemedText style={[styles.head, styles.colAction, muted]}>Tindakan</ThemedText>
+        <View style={styles.colChevron} />
       </View>
 
       {rows.map((row) => {
-        const note = dayStatusNote(row);
-        const next = row.orderStatus === 'AWAITING_PAYMENT' ? null : nextDayStatus(row.dayStatus, row.fulfillmentType);
-        // Berangkat wajib punya driver (server menolak DRIVER_NOT_ASSIGNED)
-        const blockedByDriver = next === 'OUT_FOR_DELIVERY' && !row.driverUserId;
+        const action = dayAction(row, props);
         const busy = busyDayId === row.orderDayId;
         const isDelivery = row.fulfillmentType === 'DELIVERY';
         const checked = !!selection?.ids.has(row.orderDayId);
-        const isNew = !!newSince && Date.parse(row.orderCreatedAt) > Date.parse(newSince);
-
-        // Urutan: masalah pembayaran → driver (admin) → status berikutnya → lihat detail
-        let action: { label: string; onPress: () => void; primary: boolean } = { label: 'Lihat detail', onPress: () => onOpen(row), primary: false };
-        if (row.paymentNeedsReview) action = { label: 'Tinjau bayar', onPress: () => onOpen(row), primary: false };
-        else if (row.refundPending) {
-          action = canMarkRefund
-            ? { label: 'Tandai direfund', onPress: () => onMarkRefund(row), primary: true }
-            : { label: 'Lihat refund', onPress: () => onOpen(row), primary: false };
-        }
-        else if ((row.needsDriver || blockedByDriver) && isDelivery && canAssignDriver) action = { label: 'Atur driver', onPress: () => onAssignDriver(row), primary: true };
-        else if (next && canAdvance && !blockedByDriver) action = { label: NEXT_DAY_ACTION[next] ?? 'Lanjut', onPress: () => onAdvance(row), primary: true };
 
         return (
           <Pressable
@@ -98,7 +92,6 @@ export const DayTable: React.FC<DayTableProps> = ({
               styles.row,
               clickable,
               { borderColor: theme.border },
-              row.needsAttention && { backgroundColor: isDark ? '#2A2210' : '#FFF8E6' },
               checked && { backgroundColor: theme.primaryLight },
               pressed && { opacity: 0.85 },
             ]}
@@ -109,13 +102,8 @@ export const DayTable: React.FC<DayTableProps> = ({
               <CheckBox checked={checked} label={`Pilih ${row.orderNumber}`} onPress={() => selection.onToggle(row)} />
             ) : null}
             <View style={styles.colOrder}>
-              <View style={styles.nameRow}>
-                <ThemedText style={[styles.name, styles.shrink, strong]} numberOfLines={1}>
-                  {row.needsAttention ? '⚠ ' : ''}{row.customerName}
-                </ThemedText>
-                {isNew ? <NewBadge /> : null}
-              </View>
-              <ThemedText style={[styles.small, muted]} numberOfLines={1}>
+              <ThemedText style={[styles.name, strong]} numberOfLines={1}>{row.customerName}</ThemedText>
+              <ThemedText style={[styles.sub, muted]} numberOfLines={1}>
                 {shortOrderNumber(row.orderNumber)} · Hari {row.dayIndex} dari {row.dayCount}
                 {showDate ? ` · ${formatShortDate(row.deliveryDate)}` : ''}
               </ThemedText>
@@ -124,32 +112,16 @@ export const DayTable: React.FC<DayTableProps> = ({
             <View style={styles.colMenu}>
               <ThemedText style={[styles.cell, strong]} numberOfLines={1}>
                 {row.firstMenuName ?? '-'}
-                {row.menuCount > 1 ? <ThemedText style={[styles.small, muted]}> +{row.menuCount - 1} menu</ThemedText> : null}
+                {row.menuCount > 1 ? <ThemedText style={[styles.sub, muted]}> +{row.menuCount - 1} menu</ThemedText> : null}
               </ThemedText>
-              <ThemedText style={[styles.small, muted]} numberOfLines={1}>
-                {row.portions} porsi{row.notes ? '  📝 ada catatan' : ''}
-              </ThemedText>
+              <ThemedText style={[styles.sub, muted]}>{row.portions} porsi</ThemedText>
             </View>
 
             <View style={styles.colPlace}>
-              <ThemedText style={[styles.cell, strong]} numberOfLines={1}>
-                {isDelivery ? `🛵 Pesan Antar · ${row.zoneName ?? 'Belum ada zona'}` : `🏪 Ambil Sendiri · ${row.outletName ?? '-'}`}
+              <ThemedText style={[styles.cell, strong]} numberOfLines={1}>{isDelivery ? 'Pesan Antar' : 'Ambil Sendiri'}</ThemedText>
+              <ThemedText style={[styles.sub, muted]} numberOfLines={1}>
+                {isDelivery ? row.zoneName ?? 'Belum ada zona' : row.outletName ?? '-'}
               </ThemedText>
-              {isDelivery ? (
-                <>
-                  <ThemedText style={[styles.small, muted]} numberOfLines={1}>
-                    {row.addressLine ?? '-'}
-                  </ThemedText>
-                  <ThemedText style={[styles.small, row.driverName ? muted : { color: theme.warning }]} numberOfLines={1}>
-                    {row.recipientName ?? ''}{row.recipientPhone ? ` · ${row.recipientPhone}` : ''} · {row.driverName ?? 'Tanpa driver'}
-                  </ThemedText>
-                </>
-              ) : (
-                <ThemedText style={[styles.small, muted]} numberOfLines={1}>
-                  {row.pickupHours ? `Ambil ${row.pickupHours}` : 'Jam ambil belum diatur'}
-                  {row.customerPhone ? ` · ${row.customerPhone}` : ''}
-                </ThemedText>
-              )}
             </View>
 
             <View style={styles.colStatus}>
@@ -158,39 +130,25 @@ export const DayTable: React.FC<DayTableProps> = ({
               ) : (
                 <StatusBadge kind="day" status={row.dayStatus} size="sm" />
               )}
-              {note ? (
-                <ThemedText style={[styles.small, { color: note.tone === 'neutral' ? theme.textSecondary : toneColors(note.tone, isDark).text }]} numberOfLines={1}>
-                  {note.text}
-                </ThemedText>
-              ) : null}
             </View>
 
             <View style={styles.colAction}>
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation?.();
-                  action.onPress();
-                }}
-                disabled={busy}
-                style={[
-                  styles.actionBtn,
-                  clickable,
-                  action.primary
-                    ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                    : { borderColor: row.needsAttention ? theme.warning : theme.border },
-                  busy && { opacity: 0.6 },
-                ]}
-                accessibilityRole="button"
-              >
-                {busy ? (
-                  <ActivityIndicator size="small" color={action.primary ? '#FFFFFF' : theme.primary} />
-                ) : (
-                  <ThemedText style={[styles.actionText, { color: action.primary ? '#FFFFFF' : row.needsAttention ? theme.warning : theme.text }]}>
-                    {action.label}
-                  </ThemedText>
-                )}
-              </Pressable>
+              {busy ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : action ? (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    action.onPress();
+                  }}
+                  style={[styles.actionLink, clickable]}
+                  accessibilityRole="button"
+                >
+                  <ThemedText style={[styles.actionText, { color: theme.primary }]}>{action.label}</ThemedText>
+                </Pressable>
+              ) : null}
             </View>
+            <ThemedText style={[styles.colChevron, styles.chevron, muted]}>›</ThemedText>
           </Pressable>
         );
       })}
@@ -202,23 +160,22 @@ export const DayTable: React.FC<DayTableProps> = ({
 // Per pesanan
 // ==========================================
 
-export const OrderTable: React.FC<{ rows: AdminOrderRow[]; newSince: string | null; onOpen: (row: AdminOrderRow) => void }> = ({
-  rows, newSince, onOpen,
-}) => {
+export const OrderTable: React.FC<{ rows: AdminOrderRow[]; onOpen: (row: AdminOrderRow) => void }> = ({ rows, onOpen }) => {
   const theme = useTheme();
   const { isDark } = useThemeContext();
   const muted = { color: theme.textSecondary };
   const strong = { color: theme.text };
 
   return (
-    <View style={[styles.table, { borderColor: theme.border, backgroundColor: theme.card }]}>
+    <View>
       <View style={[styles.headRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-        <ThemedText style={[styles.head, styles.colOrder, muted]}>Pesanan / pelanggan</ThemedText>
-        <ThemedText style={[styles.head, styles.colMenu, muted]}>Periode & progres kirim</ThemedText>
+        <ThemedText style={[styles.head, styles.colOrder, muted]}>Pelanggan / pesanan</ThemedText>
+        <ThemedText style={[styles.head, styles.colMenu, muted]}>Periode & progres</ThemedText>
         <ThemedText style={[styles.head, styles.colPay, muted]}>Pembayaran</ThemedText>
         <ThemedText style={[styles.head, styles.colTotal, muted]}>Total</ThemedText>
-        <ThemedText style={[styles.head, styles.colStatus, muted]}>Status pesanan</ThemedText>
+        <ThemedText style={[styles.head, styles.colStatus, muted]}>Status</ThemedText>
         <ThemedText style={[styles.head, styles.colAction, muted]}>Tindakan</ThemedText>
+        <View style={styles.colChevron} />
       </View>
 
       {rows.map((row) => {
@@ -230,25 +187,14 @@ export const OrderTable: React.FC<{ rows: AdminOrderRow[]; newSince: string | nu
           <Pressable
             key={row.orderId}
             onPress={() => onOpen(row)}
-            style={({ pressed }) => [
-              styles.row,
-              clickable,
-              { borderColor: theme.border },
-              row.needsAttention && { backgroundColor: isDark ? '#2A2210' : '#FFF8E6' },
-              pressed && { opacity: 0.85 },
-            ]}
+            style={({ pressed }) => [styles.row, clickable, { borderColor: theme.border }, pressed && { opacity: 0.85 }]}
             accessibilityRole="button"
             accessibilityLabel={`Detail ${row.orderNumber}`}
           >
             <View style={styles.colOrder}>
-              <View style={styles.nameRow}>
-                <ThemedText style={[styles.name, styles.shrink, strong]} numberOfLines={1}>
-                  {row.needsAttention ? '⚠ ' : ''}{row.customerName}
-                </ThemedText>
-                {newSince && Date.parse(row.createdAt) > Date.parse(newSince) ? <NewBadge /> : null}
-              </View>
-              <ThemedText style={[styles.small, muted]} numberOfLines={1}>
-                {shortOrderNumber(row.orderNumber)} · Dipesan {formatDateTime(row.createdAt)}
+              <ThemedText style={[styles.name, strong]} numberOfLines={1}>{row.customerName}</ThemedText>
+              <ThemedText style={[styles.sub, muted]} numberOfLines={1}>
+                {shortOrderNumber(row.orderNumber)} · {row.fulfillmentType === 'DELIVERY' ? 'Pesan Antar' : 'Ambil Sendiri'}
               </ThemedText>
             </View>
 
@@ -256,9 +202,8 @@ export const OrderTable: React.FC<{ rows: AdminOrderRow[]; newSince: string | nu
               <ThemedText style={[styles.cell, strong]} numberOfLines={1}>
                 {formatDateRange(row.firstDeliveryDate, row.lastDeliveryDate)} · {row.dayCount} hari
               </ThemedText>
-              <ThemedText style={[styles.small, muted]} numberOfLines={1}>
-                {row.doneDays}/{active} hari selesai · {row.portions} porsi
-                {row.cancelledDays > 0 ? ` · ${row.cancelledDays} batal` : ''}
+              <ThemedText style={[styles.sub, muted]} numberOfLines={1}>
+                {row.doneDays}/{active} selesai · {row.portions} porsi{row.cancelledDays > 0 ? ` · ${row.cancelledDays} batal` : ''}
               </ThemedText>
               <View style={[styles.progressTrack, { backgroundColor: theme.backgroundElement }]}>
                 <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: theme.success }]} />
@@ -266,33 +211,24 @@ export const OrderTable: React.FC<{ rows: AdminOrderRow[]; newSince: string | nu
             </View>
 
             <View style={styles.colPay}>
-              <ThemedText style={[styles.cell, styles.bold, { color: pay.tone === 'neutral' ? theme.textSecondary : toneColors(pay.tone, isDark).text }]}>
+              <ThemedText style={[styles.cell, { color: pay.tone === 'neutral' ? theme.textSecondary : toneColors(pay.tone, isDark).text }]} numberOfLines={1}>
                 {pay.title}
               </ThemedText>
-              <ThemedText style={[styles.small, muted]} numberOfLines={1}>{pay.note}</ThemedText>
+              <ThemedText style={[styles.sub, muted]} numberOfLines={1}>{pay.note}</ThemedText>
             </View>
 
             <View style={styles.colTotal}>
-              <ThemedText style={[styles.cell, styles.bold, strong]}>{formatRupiah(row.grandTotal)}</ThemedText>
+              <ThemedText style={[styles.cell, strong]}>{formatRupiah(row.grandTotal)}</ThemedText>
             </View>
 
             <View style={styles.colStatus}>
               <StatusBadge kind="order" status={row.orderStatus} size="sm" />
-              <ThemedText style={[styles.small, muted]} numberOfLines={1}>
-                {row.fulfillmentType === 'DELIVERY' ? `Pesan Antar${row.zoneName ? ` · ${row.zoneName}` : ''}` : `Ambil · ${row.outletName ?? '-'}`}
-              </ThemedText>
             </View>
 
             <View style={styles.colAction}>
-              <View
-                style={[
-                  styles.actionBtn,
-                  { borderColor: act.emphasis ? theme.warning : theme.border },
-                ]}
-              >
-                <ThemedText style={[styles.actionText, { color: act.emphasis ? theme.warning : theme.text }]}>{act.label}</ThemedText>
-              </View>
+              {act.emphasis ? <ThemedText style={[styles.actionText, { color: theme.primary }]}>{act.label}</ThemedText> : null}
             </View>
+            <ThemedText style={[styles.colChevron, styles.chevron, muted]}>›</ThemedText>
           </Pressable>
         );
       })}
@@ -303,15 +239,6 @@ export const OrderTable: React.FC<{ rows: AdminOrderRow[]; newSince: string | nu
 // ==========================================
 // Bagian kecil
 // ==========================================
-
-const NewBadge: React.FC = () => {
-  const theme = useTheme();
-  return (
-    <View style={[styles.newBadge, { backgroundColor: theme.primary }]}>
-      <ThemedText style={styles.newBadgeText}>Baru</ThemedText>
-    </View>
-  );
-};
 
 const CheckBox: React.FC<{ checked: boolean; mixed?: boolean; label: string; onPress: () => void }> = ({
   checked, mixed, label, onPress,
@@ -339,30 +266,26 @@ const CheckBox: React.FC<{ checked: boolean; mixed?: boolean; label: string; onP
 };
 
 const styles = StyleSheet.create({
-  table: { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
-  headRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },
-  head: { fontSize: 11, fontWeight: '700' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth },
-  colOrder: { flex: 1.3, gap: 2, minWidth: 0 },
-  colMenu: { flex: 1.2, gap: 2, minWidth: 0 },
-  colPlace: { flex: 1.6, gap: 2, minWidth: 0 },
-  colPay: { flex: 1, gap: 2, minWidth: 0 },
+  headRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1 },
+  head: { fontSize: 12, fontWeight: '500' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  colOrder: { flex: 1.3, gap: 3, minWidth: 0 },
+  colMenu: { flex: 1.5, gap: 3, minWidth: 0 },
+  colPlace: { flex: 1.3, gap: 3, minWidth: 0 },
+  colPay: { flex: 1.1, gap: 3, minWidth: 0 },
   colTotal: { flex: 0.8, minWidth: 0 },
-  colStatus: { flex: 1, gap: 4, minWidth: 0 },
-  colAction: { width: 128, alignItems: 'stretch' },
-  name: { fontSize: 14, fontWeight: '700' },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
-  shrink: { flexShrink: 1 },
-  newBadge: { borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
-  newBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  colStatus: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
+  colAction: { width: 120, alignItems: 'flex-start' },
+  colChevron: { width: 14 },
+  chevron: { fontSize: 18, textAlign: 'center' },
+  name: { fontSize: 14, fontWeight: '600' },
+  cell: { fontSize: 13, fontWeight: '500' },
+  sub: { fontSize: 12 },
+  actionLink: { paddingVertical: 4 },
+  actionText: { fontSize: 13, fontWeight: '600' },
+  progressTrack: { height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 3 },
+  progressFill: { height: 4, borderRadius: 2 },
   checkCell: { width: 20, alignItems: 'center', justifyContent: 'center' },
   box: { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   tick: { color: '#FFFFFF', fontSize: 11, lineHeight: 13, fontWeight: '800' },
-  cell: { fontSize: 13 },
-  small: { fontSize: 11, lineHeight: 15 },
-  bold: { fontWeight: '700' },
-  actionBtn: { borderWidth: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', minHeight: 34 },
-  actionText: { fontSize: 12, fontWeight: '700' },
-  progressTrack: { height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 3 },
-  progressFill: { height: 4, borderRadius: 2 },
 });
