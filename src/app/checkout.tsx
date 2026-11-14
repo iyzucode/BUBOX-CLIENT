@@ -17,11 +17,13 @@ import { PaymentMethodCard } from '@/components/checkout/PaymentMethodCard';
 import { PromoCodeCard } from '@/components/checkout/PromoCodeCard';
 import { useCheckoutPalette } from '@/components/checkout/checkoutPalette';
 import { ADDRESSES_QUERY_KEY, useAddresses } from '@/features/biodata/useAddresses';
-import { useCreateOrder } from '@/features/order/useOrders';
+import { useCheckoutTotals } from '@/features/order/useCheckoutTotals';
+import { ORDER_QUERY_KEYS, useCreateOrder } from '@/features/order/useOrders';
 import { OUTLET_QUERY_KEYS } from '@/features/outlet/useOutlets';
 import { useLeavePageWarning } from '@/hooks/use-leave-page-warning';
 import { useScrollActivity } from '@/hooks/use-scroll-activity';
 import { getApiErrorCode, getApiErrorMessage } from '@/services/apiError';
+import type { CreateOrderRequest } from '@/types/order';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCartStore } from '@/store/useCartStore';
 import { confirmAction, showAlert } from '@/utils/alert';
@@ -44,6 +46,7 @@ export default function CheckoutScreen() {
   const selectedVoucher = useCartStore((s) => s.selectedVoucher);
   const setSelectedVoucher = useCartStore((s) => s.setSelectedVoucher);
   const subtotal = useCartStore((s) => s.getSubtotal());
+  const { grandTotal } = useCheckoutTotals();
 
   const createOrder = useCreateOrder();
   const queryClient = useQueryClient();
@@ -112,7 +115,7 @@ export default function CheckoutScreen() {
       voucherCode = null;
     }
 
-    createOrder.mutate(
+    placeOrder(
       {
         fulfillmentType,
         addressId: fulfillmentType === 'DELIVERY' ? selectedAddressId : null,
@@ -121,14 +124,29 @@ export default function CheckoutScreen() {
         days,
         voucherCode,
       },
+      // Total yang sedang dilihat customer; server menolak (PRICE_CHANGED) bila tarif berubah sejak itu
+      grandTotal
+    );
+  };
+
+  const placeOrder = (request: CreateOrderRequest, expectedGrandTotal: number) => {
+    createOrder.mutate(
+      { ...request, expectedGrandTotal },
       {
         onSuccess: (order) => {
           orderPlacedRef.current = true;
           clearCart();
           router.replace({ pathname: '/payment', params: { id: order.orderId } });
         },
-        onError: (error) => {
+        onError: async (error) => {
           const code = getApiErrorCode(error);
+          if (code === 'PRICE_CHANGED') {
+            // Admin mengubah ongkir / biaya layanan / pajak sejak checkout dibuka. Pesanan belum dibuat:
+            // muat ulang tarif agar rincian di layar menampilkan total terbaru, lalu customer menekan Bayar lagi.
+            await queryClient.invalidateQueries({ queryKey: ORDER_QUERY_KEYS.cutoff });
+            showAlert('Maaf, Total Pesanan Berubah', 'Harap periksa kembali.', { tone: 'warning' });
+            return;
+          }
           if (code === 'VOUCHER_NOT_APPLICABLE' || code === 'VOUCHER_NOT_FOUND') {
             // Voucher berakhir / sudah dipakai sejak dipilih: lepas supaya pengguna bisa lanjut
             setSelectedVoucher(null);

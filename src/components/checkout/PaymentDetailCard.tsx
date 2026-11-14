@@ -8,12 +8,14 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { formatPercent, serviceFeeLabel } from '@/features/order/orderCharges';
 import { useCheckoutTotals } from '@/features/order/useCheckoutTotals';
+import { useCartStore } from '@/store/useCartStore';
 import { useCheckoutPalette } from './checkoutPalette';
 
 export const PaymentDetailCard: React.FC = () => {
   const palette = useCheckoutPalette();
-  const { subtotal, deliveryFee, discount, voucher, grandTotal, serviceFee, serviceFeePercent, taxAmount, taxPercent } =
+  const { subtotal, deliveryFee, deliveryFeeNote, discount, voucher, grandTotal, serviceFee, serviceFeePercent, taxAmount, taxPercent } =
     useCheckoutTotals();
+  const isPickup = useCartStore((s) => s.fulfillmentType) === 'PICKUP';
 
   return (
     <View style={[styles.card, { backgroundColor: palette.cardBg }]}>
@@ -44,11 +46,16 @@ export const PaymentDetailCard: React.FC = () => {
         </View>
       ) : null}
 
-      {/* 3. Biaya Pengantaran */}
+      {/* 3. Biaya Pengantaran / Ambil Sendiri */}
       <View style={styles.detailRow}>
-        <ThemedText style={[styles.label, { color: palette.financeLabel }]}>
-          Biaya Pengantaran
-        </ThemedText>
+        <View style={styles.labelCol}>
+          <ThemedText style={[styles.label, { color: palette.financeLabel }]}>
+            {isPickup ? 'Biaya Ambil Sendiri' : 'Biaya Pengantaran'}
+          </ThemedText>
+          {deliveryFeeNote ? (
+            <ThemedText style={[styles.note, { color: palette.financeLabel }]}>{deliveryFeeNote}</ThemedText>
+          ) : null}
+        </View>
         <ThemedText style={[styles.value, { color: palette.financeValue }]}>
           {deliveryFee === 0 ? 'Gratis' : `Rp ${deliveryFee.toLocaleString('id-ID')}`}
         </ThemedText>
@@ -132,6 +139,14 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '400',
+  },
+  labelCol: {
+    flexShrink: 1,
+    gap: 2,
+  },
+  note: {
+    fontSize: 11,
+    opacity: 0.85,
   },
   value: {
     fontSize: 13,

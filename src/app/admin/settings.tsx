@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { FeeRuleDraft, FeeRuleEditor, draftToRule, ruleToDraft } from '@/components/order/FeeRuleEditor';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { computeOrderCharges, formatPercent, serviceFeeLabel } from '@/features/order/orderCharges';
 import { formatDateTime, formatShortDate } from '@/features/order/orderStatus';
@@ -71,7 +72,8 @@ const SettingsForm: React.FC<{ settings: OrderSettings }> = ({ settings }) => {
   const [daysBefore, setDaysBefore] = useState(settings.cutoffDaysBefore);
   const [cutoffTime, setCutoffTime] = useState(settings.cutoffTime);
   const [timeout, setTimeoutMinutes] = useState(String(settings.paymentTimeoutMinutes));
-  const [deliveryFee, setDeliveryFee] = useState(String(settings.deliveryFee));
+  const [deliveryRule, setDeliveryRule] = useState<FeeRuleDraft>(() => ruleToDraft(settings.deliveryFeeRule));
+  const [pickupRule, setPickupRule] = useState<FeeRuleDraft>(() => ruleToDraft(settings.pickupFeeRule));
   const [serviceFeeType, setServiceFeeType] = useState<ServiceFeeType>(settings.serviceFeeType);
   const [serviceFeeValue, setServiceFeeValue] = useState(String(settings.serviceFeeValue).replace('.', ','));
   const [taxPercent, setTaxPercent] = useState(String(settings.taxPercent).replace('.', ','));
@@ -109,6 +111,15 @@ const SettingsForm: React.FC<{ settings: OrderSettings }> = ({ settings }) => {
       showAlert('Pajak Tidak Valid', 'Isi persen antara 0 sampai 100, maksimal 2 angka desimal (contoh 11).', { tone: 'warning' });
       return;
     }
+    const delivery = draftToRule(deliveryRule, 'Pesan Antar');
+    const pickup = draftToRule(pickupRule, 'Ambil Sendiri');
+    for (const r of [delivery, pickup]) {
+      if ('error' in r) {
+        showAlert('Ongkir Tidak Valid', r.error, { tone: 'warning' });
+        return;
+      }
+    }
+    if ('error' in delivery || 'error' in pickup) return;
 
     update.mutate(
       {
@@ -116,7 +127,8 @@ const SettingsForm: React.FC<{ settings: OrderSettings }> = ({ settings }) => {
         cutoffTime: cutoffTime.trim(),
         timeZone: settings.timeZone,
         paymentTimeoutMinutes: Number(timeout) || 0,
-        deliveryFee: Number(deliveryFee) || 0,
+        deliveryFeeRule: delivery.rule,
+        pickupFeeRule: pickup.rule,
         serviceFeeType,
         serviceFeeValue: parsedService,
         taxPercent: parsedTax,
@@ -187,7 +199,7 @@ const SettingsForm: React.FC<{ settings: OrderSettings }> = ({ settings }) => {
         </ThemedText>
       </View>
 
-      {/* Pembayaran & ongkir */}
+      {/* Pembayaran */}
       <View style={card}>
         <ThemedText style={[styles.label, strong]}>⏱ Batas waktu bayar QRIS (menit)</ThemedText>
         <TextInput
@@ -196,14 +208,14 @@ const SettingsForm: React.FC<{ settings: OrderSettings }> = ({ settings }) => {
           keyboardType="number-pad"
           style={input}
         />
+      </View>
 
-        <ThemedText style={[styles.label, strong]}>🛵 Ongkir per pesanan (Rp)</ThemedText>
-        <TextInput
-          value={deliveryFee}
-          onChangeText={(v) => setDeliveryFee(v.replace(/[^0-9]/g, ''))}
-          keyboardType="number-pad"
-          style={input}
-        />
+      {/* Ongkir per metode pemesanan */}
+      <View style={card}>
+        <FeeRuleEditor title="🛵 Ongkir Pesan Antar" value={deliveryRule} onChange={setDeliveryRule} />
+      </View>
+      <View style={card}>
+        <FeeRuleEditor title="🏪 Biaya Ambil Sendiri" value={pickupRule} onChange={setPickupRule} />
       </View>
 
       {/* Biaya layanan & pajak */}

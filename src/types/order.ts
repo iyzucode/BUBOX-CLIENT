@@ -47,6 +47,21 @@ export interface CreateOrderRequest {
   voucherCode?: string | null;
   /** Wajib untuk PICKUP: outlet tempat ambil. */
   outletId?: string | null;
+  /** Total yang dilihat customer; bila berbeda dengan hitungan server → error PRICE_CHANGED + OrderPrice. */
+  expectedGrandTotal?: number | null;
+}
+
+/** Rincian harga terbaru dari server (data pada error PRICE_CHANGED). */
+export interface OrderPrice {
+  subtotal: number;
+  discountAmount: number;
+  deliveryFee: number;
+  deliveryFeeNote: string | null;
+  serviceFee: number;
+  serviceFeePercent: number | null;
+  taxAmount: number;
+  taxPercent: number;
+  grandTotal: number;
 }
 
 export interface UpdateDayStatusRequest {
@@ -201,6 +216,8 @@ export interface OrderDetail {
   serviceFeePercent: number | null;
   taxAmount: number;
   taxPercent: number;
+  /** Keterangan ongkir, mis. "10 hari × Rp 1.500" (null bila gratis / nominal tetap). */
+  deliveryFeeNote?: string | null;
 }
 
 export interface DailyOrderDay {
@@ -247,12 +264,33 @@ export interface DailyProduction {
 /** PERCENT = persen dari subtotal − diskon; FIXED = Rupiah per pesanan. */
 export type ServiceFeeType = 'PERCENT' | 'FIXED';
 
+/** FREE = gratis; FIXED = Rupiah per pesanan; PER_DAY = jumlah hari × tarif tingkat. */
+export type FulfillmentFeeMode = 'FREE' | 'FIXED' | 'PER_DAY';
+
+/** Tingkat tarif per hari: berlaku mulai minDays hari kirim dalam satu pesanan. */
+export interface FeeTier {
+  minDays: number;
+  perDay: number;
+}
+
+/** Aturan ongkir satu metode pemesanan. */
+export interface FulfillmentFeeRule {
+  mode: FulfillmentFeeMode;
+  /** Untuk FIXED. */
+  amount: number;
+  /** Untuk PER_DAY, urut dari minDays terkecil. */
+  tiers: FeeTier[];
+}
+
 export interface OrderSettings {
   cutoffDaysBefore: number;
   cutoffTime: string; // HH:mm
   timeZone: string;
   paymentTimeoutMinutes: number;
-  deliveryFee: number;
+  /** Aturan ongkir Pesan Antar. */
+  deliveryFeeRule: FulfillmentFeeRule;
+  /** Aturan biaya Ambil Sendiri. */
+  pickupFeeRule: FulfillmentFeeRule;
   serviceFeeType: ServiceFeeType;
   /** Persen atau Rupiah, sesuai serviceFeeType. */
   serviceFeeValue: number;
@@ -270,7 +308,8 @@ export interface OrderCutoffInfo {
   serverTimeUtc: string;
   earliestDeliveryDate: string;
   latestDeliveryDate: string;
-  deliveryFee: number;
+  deliveryFeeRule: FulfillmentFeeRule;
+  pickupFeeRule: FulfillmentFeeRule;
   serviceFeeType: ServiceFeeType;
   serviceFeeValue: number;
   taxPercent: number;

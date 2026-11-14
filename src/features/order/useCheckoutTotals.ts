@@ -1,4 +1,5 @@
 import { estimateVoucherDiscount } from '@/features/voucher/voucherUtils';
+import { computeFulfillmentFee } from './fulfillmentFee';
 import { computeOrderCharges } from './orderCharges';
 import { useCartStore } from '@/store/useCartStore';
 import { useOrderCutoffInfo } from './useOrders';
@@ -10,10 +11,13 @@ import { useOrderCutoffInfo } from './useOrders';
 export function useCheckoutTotals() {
   const fulfillmentType = useCartStore((s) => s.fulfillmentType);
   const subtotal = useCartStore((s) => s.getSubtotal());
+  // Jumlah hari kirim yang benar-benar berisi menu (dasar ongkir per hari)
+  const dayCount = useCartStore((s) => s.buildOrderDays().length);
   const voucher = useCartStore((s) => s.selectedVoucher);
   const { data: cutoff } = useOrderCutoffInfo();
 
-  const deliveryFee = fulfillmentType === 'DELIVERY' ? cutoff?.deliveryFee ?? 0 : 0;
+  const feeRule = fulfillmentType === 'DELIVERY' ? cutoff?.deliveryFeeRule : cutoff?.pickupFeeRule;
+  const { fee: deliveryFee, note: deliveryFeeNote } = computeFulfillmentFee(feeRule, dayCount);
   const discount = voucher ? estimateVoucherDiscount(voucher, subtotal) : 0;
   // Keranjang berubah sehingga minimal pembelian tidak lagi terpenuhi
   const voucherBelowMinimum = !!voucher && subtotal < voucher.minSubtotal;
@@ -22,6 +26,7 @@ export function useCheckoutTotals() {
   return {
     subtotal,
     deliveryFee,
+    deliveryFeeNote,
     discount,
     voucher,
     voucherBelowMinimum,

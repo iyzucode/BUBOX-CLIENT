@@ -238,7 +238,7 @@ export const OrderBreakdown: React.FC<OrderBreakdownProps> = ({
               />
             ) : null}
             <Line
-              label={order.fulfillmentType === 'PICKUP' ? 'Ambil sendiri' : 'Ongkos kirim'}
+              label={`${order.fulfillmentType === 'PICKUP' ? 'Biaya ambil sendiri' : 'Ongkos kirim'}${order.deliveryFeeNote ? ` (${order.deliveryFeeNote})` : ''}`}
               value={order.deliveryFee > 0 ? formatRupiah(order.deliveryFee) : 'Gratis'}
             />
             {order.serviceFee > 0 ? (

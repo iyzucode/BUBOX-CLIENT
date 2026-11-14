@@ -21,3 +21,9 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 export function getApiErrorCode(error: unknown): string | undefined {
   return (error as AxiosError<ApiErrorBody> | undefined)?.response?.data?.errorCode;
 }
+
+/** Data tambahan dari backend (field "data", mis. rincian harga terbaru untuk PRICE_CHANGED). */
+export function getApiErrorData<T>(error: unknown): T | undefined {
+  const data = (error as AxiosError<ApiErrorBody & { data?: T | null }> | undefined)?.response?.data?.data;
+  return data ?? undefined;
+}
