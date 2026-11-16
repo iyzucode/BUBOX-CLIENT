@@ -248,7 +248,7 @@ export const OrderItemsSummaryCard: React.FC = () => {
                     {group.categoryName}
                   </ThemedText>
                   <ThemedText style={[styles.groupBadge, { color: palette.cardSubtext }]}>
-                    Total {group.totalQty} Porsi
+                    {group.totalQty} Porsi
                   </ThemedText>
                 </View>
 

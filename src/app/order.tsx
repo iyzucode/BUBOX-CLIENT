@@ -22,7 +22,7 @@ import { OrderDateCard } from '@/components/order/OrderDateCard';
 import { OrderHeroHeader } from '@/components/order/OrderHeroHeader';
 import { useOrderPalette } from '@/components/order/orderPalette';
 import { MaxContentWidth } from '@/constants/theme';
-import { useGetMainCategories, useGetWeeklyMenu } from '@/features/menu/useMenu';
+import { useGetMainCategories, useGetMenuCategories, useGetWeeklyMenu } from '@/features/menu/useMenu';
 import { CategoryId, CATEGORY_KEYWORDS, useOrderCart } from '@/features/order/useOrderCart';
 import { useOrderCutoffInfo } from '@/features/order/useOrders';
 import { showAlert } from '@/utils/alert';
@@ -39,6 +39,8 @@ export default function OrderScreen() {
   // 1. Fetch weekly menu and main categories from API
   const { data: weeklyData, isLoading, isError, refetch } = useGetWeeklyMenu();
   const { data: mainCategories } = useGetMainCategories();
+  // Semua kategori (utama & pelengkap) untuk judul & urutan kelompok menu per hari
+  const { data: allCategories } = useGetMenuCategories();
   // Batas tanggal kirim (cutoff H-N jam X) dari pengaturan admin di server
   const { data: cutoffInfo } = useOrderCutoffInfo();
 
@@ -254,6 +256,7 @@ export default function OrderScreen() {
                     subtotal={subtotal}
                     onUpdateQty={(menuId, delta) => updateItemQty(entry.key, menuId, delta)}
                     onOpenDetailModal={(menu) => setSelectedDetailMenu(menu)}
+                    categories={allCategories}
                   />
                 );
               })

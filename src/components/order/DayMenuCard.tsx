@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Platform,
   Pressable,
@@ -11,7 +11,7 @@ import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { DateEntry } from '@/features/order/useOrderCart';
-import { Menu } from '@/types/menu';
+import { Menu, MenuCategory } from '@/types/menu';
 import { ConfirmRemoveButton } from './ConfirmRemoveButton';
 import { useOrderPalette } from './orderPalette';
 
@@ -27,6 +27,43 @@ interface DayMenuCardProps {
   subtotal: number;
   onUpdateQty: (menuId: string, deltaOrValue: number | string) => void;
   onOpenDetailModal: (menu: Menu) => void;
+  /** Semua kategori (utama & pelengkap) untuk judul & urutan kelompok menu. */
+  categories?: MenuCategory[];
+}
+
+interface MenuGroup {
+  key: string;
+  label: string;
+  menus: Menu[];
+}
+
+/**
+ * Kelompokkan menu per kategori. Urutan: kategori utama lalu pelengkap, masing-masing sesuai urutan tampil
+ * yang diatur admin; kategori yang tidak dikenal di akhir sesuai urutan kemunculannya.
+ */
+function groupByCategory(menus: Menu[], categories: MenuCategory[] | undefined): MenuGroup[] {
+  const ordered = [...(categories ?? [])].sort(
+    (a, b) => (a.categoryType === b.categoryType ? 0 : a.categoryType === 'UTAMA' ? -1 : 1) || a.displayOrder - b.displayOrder
+  );
+  const findCategory = (menu: Menu) =>
+    ordered.find((c) => (menu.categoryId && c.id.toLowerCase() === menu.categoryId.toLowerCase()) || c.name.toLowerCase() === (menu.category || '').toLowerCase());
+
+  const groups = new Map<string, MenuGroup & { rank: number }>();
+  menus.forEach((menu, index) => {
+    const category = findCategory(menu);
+    const key = (category?.id ?? menu.categoryId ?? menu.category ?? 'lainnya').toLowerCase();
+    const existing = groups.get(key);
+    if (existing) existing.menus.push(menu);
+    else {
+      groups.set(key, {
+        key,
+        label: category?.name ?? (menu.category || 'Lainnya'),
+        menus: [menu],
+        rank: category ? ordered.indexOf(category) : ordered.length + index,
+      });
+    }
+  });
+  return [...groups.values()].sort((a, b) => a.rank - b.rank);
 }
 
 export const DayMenuCard: React.FC<DayMenuCardProps> = ({
@@ -39,9 +76,11 @@ export const DayMenuCard: React.FC<DayMenuCardProps> = ({
   subtotal,
   onUpdateQty,
   onOpenDetailModal,
+  categories,
 }) => {
   const palette = useOrderPalette();
   const hasSelectedItems = Object.values(dayCart).some((qty) => qty > 0);
+  const groups = useMemo(() => groupByCategory(availableMenus, categories), [availableMenus, categories]);
 
   return (
     <View style={styles.cardWrapper}>
@@ -122,117 +161,127 @@ export const DayMenuCard: React.FC<DayMenuCardProps> = ({
                   </ThemedText>
                 </View>
               ) : (
-                availableMenus.map((menu, index) => {
-                  const currentQty = dayCart[menu.id] || 0;
+                groups.map((group, groupIndex) => (
+                  <View key={group.key} style={[styles.categoryGroup, groupIndex > 0 && styles.categoryGroupGap]}>
+                    {/* Judul kategori sebagai pemisah antarkelompok */}
+                    <View style={[styles.categoryHeader, { borderBottomColor: palette.dashedDivider }]}>
+                      <ThemedText style={[styles.categoryTitle, { color: palette.dayMenuText }]} accessibilityRole="header">
+                        {group.label}
+                      </ThemedText>
+                    </View>
+                    {group.menus.map((menu, index) => {
+                      const currentQty = dayCart[menu.id] || 0;
 
-                  return (
-                    <View
-                      key={menu.id}
-                      style={[
-                        styles.menuItemRow,
-                        // Garis tipis pemisah antarmenu (tidak untuk menu pertama)
-                        index > 0 && [styles.menuItemSeparator, { borderTopColor: palette.dashedDivider }],
-                      ]}
-                    >
-                      {/* Atas: Dish info selebar penuh (click to view details) */}
-                      <Pressable
-                        onPress={() => onOpenDetailModal(menu)}
-                        style={styles.menuInfoPressable}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Lihat rincian ${menu.name}`}
-                      >
-                        {/* Foto 1:1 setinggi 1 baris nama + 1 baris harga (tetap walau nama 2 baris) */}
-                        <Image
-                          source={menu.imageUrl ? { uri: menu.imageUrl } : FALLBACK_IMAGE}
-                          placeholder={FALLBACK_IMAGE}
-                          style={[styles.menuThumb, { backgroundColor: palette.stepperBg }]}
-                          contentFit="cover"
-                          accessibilityLabel={menu.name}
-                        />
-                        <View style={styles.menuTextCol}>
-                          <ThemedText
-                            style={[styles.menuName, { color: palette.dayMenuText }]}
-                            numberOfLines={2}
+                      return (
+                        <View
+                          key={menu.id}
+                          style={[
+                            styles.menuItemRow,
+                            // Garis tipis pemisah antarmenu (tidak untuk menu pertama)
+                            index > 0 && [styles.menuItemSeparator, { borderTopColor: palette.dashedDivider }],
+                          ]}
+                        >
+                          {/* Atas: Dish info selebar penuh (click to view details) */}
+                          <Pressable
+                            onPress={() => onOpenDetailModal(menu)}
+                            style={styles.menuInfoPressable}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Lihat rincian ${menu.name}`}
                           >
-                            {menu.name}
-                          </ThemedText>
-                          <ThemedText
-                            style={[styles.menuPrice, { color: palette.dayMenuSubtext }]}
-                          >
-                            ↳ Rp{Number(menu.price).toLocaleString('id-ID')}
-                          </ThemedText>
-                        </View>
-                      </Pressable>
+                            {/* Foto 1:1 setinggi 1 baris nama + 1 baris harga (tetap walau nama 2 baris) */}
+                            <Image
+                              source={menu.imageUrl ? { uri: menu.imageUrl } : FALLBACK_IMAGE}
+                              placeholder={FALLBACK_IMAGE}
+                              style={[styles.menuThumb, { backgroundColor: palette.stepperBg }]}
+                              contentFit="cover"
+                              accessibilityLabel={menu.name}
+                            />
+                            <View style={styles.menuTextCol}>
+                              <ThemedText
+                                style={[styles.menuName, { color: palette.dayMenuText }]}
+                                numberOfLines={2}
+                              >
+                                {menu.name}
+                              </ThemedText>
+                              <ThemedText
+                                style={[styles.menuPrice, { color: palette.dayMenuSubtext }]}
+                              >
+                                ↳ Rp{Number(menu.price).toLocaleString('id-ID')}
+                              </ThemedText>
+                            </View>
+                          </Pressable>
 
-                      {/* Bawah, rata kanan: Quantity Stepper (− dan jumlah hanya tampil bila porsi > 0) */}
-                      <View style={styles.qtyControlRow}>
-                        {currentQty > 0 ? (
-                          <>
+                          {/* Bawah, rata kanan: Quantity Stepper (− dan jumlah hanya tampil bila porsi > 0) */}
+                          <View style={styles.qtyControlRow}>
+                            {currentQty > 0 ? (
+                              <>
+                                <Pressable
+                                  onPress={() => onUpdateQty(menu.id, -1)}
+                                  style={({ pressed }) => [
+                                    styles.stepperBtn,
+                                    {
+                                      borderColor: palette.stepperBorder,
+                                      backgroundColor: palette.stepperBg,
+                                    },
+                                    pressed && styles.pressed,
+                                  ]}
+                                  accessibilityLabel="Kurangi porsi"
+                                >
+                                  <ThemedText
+                                    style={[styles.stepperBtnText, { color: palette.stepperText }]}
+                                  >
+                                    −
+                                  </ThemedText>
+                                </Pressable>
+
+                                <TextInput
+                                  style={[
+                                    styles.qtyInput,
+                                    {
+                                      borderColor: palette.stepperActiveBorder,
+                                      backgroundColor: palette.stepperActiveBg,
+                                      color: palette.stepperActiveText,
+                                    },
+                                  ]}
+                                  keyboardType="numeric"
+                                  value={String(currentQty)}
+                                  // Isi kosong diabaikan agar input tidak langsung hilang saat angka dihapus untuk diganti
+                                  onChangeText={(val) => {
+                                    if (val.trim() !== '') onUpdateQty(menu.id, val);
+                                  }}
+                                  selectTextOnFocus
+                                  accessibilityLabel="Jumlah porsi"
+                                />
+                              </>
+                            ) : null}
+
                             <Pressable
-                              onPress={() => onUpdateQty(menu.id, -1)}
+                              onPress={() => onUpdateQty(menu.id, 1)}
                               style={({ pressed }) => [
                                 styles.stepperBtn,
                                 {
-                                  borderColor: palette.stepperBorder,
-                                  backgroundColor: palette.stepperBg,
+                                  borderColor: palette.stepperActiveBorder,
+                                  backgroundColor: palette.stepperActiveBg,
                                 },
                                 pressed && styles.pressed,
                               ]}
-                              accessibilityLabel="Kurangi porsi"
+                              accessibilityLabel="Tambah porsi"
                             >
                               <ThemedText
-                                style={[styles.stepperBtnText, { color: palette.stepperText }]}
+                                style={[
+                                  styles.stepperBtnText,
+                                  { color: palette.stepperActiveText },
+                                ]}
                               >
-                                −
+                                +
                               </ThemedText>
                             </Pressable>
-
-                            <TextInput
-                              style={[
-                                styles.qtyInput,
-                                {
-                                  borderColor: palette.stepperActiveBorder,
-                                  backgroundColor: palette.stepperActiveBg,
-                                  color: palette.stepperActiveText,
-                                },
-                              ]}
-                              keyboardType="numeric"
-                              value={String(currentQty)}
-                              // Isi kosong diabaikan agar input tidak langsung hilang saat angka dihapus untuk diganti
-                              onChangeText={(val) => {
-                                if (val.trim() !== '') onUpdateQty(menu.id, val);
-                              }}
-                              selectTextOnFocus
-                              accessibilityLabel="Jumlah porsi"
-                            />
-                          </>
-                        ) : null}
-
-                        <Pressable
-                          onPress={() => onUpdateQty(menu.id, 1)}
-                          style={({ pressed }) => [
-                            styles.stepperBtn,
-                            {
-                              borderColor: palette.stepperActiveBorder,
-                              backgroundColor: palette.stepperActiveBg,
-                            },
-                            pressed && styles.pressed,
-                          ]}
-                          accessibilityLabel="Tambah porsi"
-                        >
-                          <ThemedText
-                            style={[
-                              styles.stepperBtnText,
-                              { color: palette.stepperActiveText },
-                            ]}
-                          >
-                            +
-                          </ThemedText>
-                        </Pressable>
-                      </View>
-                    </View>
-                  );
-                })
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ))
               )}
             </View>
 
@@ -344,6 +393,21 @@ const styles = StyleSheet.create({
   },
   menuItemsList: {
     gap: 0, // jarak antarmenu diatur oleh padding + garis pemisah di menuItemRow
+  },
+  categoryGroup: {
+    gap: 0,
+  },
+  categoryGroupGap: {
+    marginTop: 14,
+  },
+  categoryHeader: {
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+  },
+  categoryTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   emptyNotice: {
     paddingVertical: 12,
