@@ -32,6 +32,8 @@ const CUSTOMER_NAV_ITEMS: NavItem[] = [
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'admin-dashboard', label: 'Ringkasan', path: '/admin' },
   { id: 'admin-orders', label: 'Pesanan', path: '/admin/orders' },
+  { id: 'admin-kitchen-validation', label: 'Validasi Dapur', path: '/admin/kitchen-validation' },
+  { id: 'admin-kitchen', label: 'Dapur', path: '/admin/kitchen' },
   { id: 'admin-delivery-board', label: 'Papan Antar', path: '/admin/delivery-board' },
   { id: 'admin-delivery-areas', label: 'Wilayah Antar', path: '/admin/delivery-areas' },
   { id: 'admin-delivery-zones', label: 'Zona & Driver', path: '/admin/delivery-zones' },
@@ -56,6 +58,24 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
           <line x1="9" y1="7" x2="15" y2="7" />
           <line x1="9" y1="11" x2="15" y2="11" />
           <line x1="9" y1="15" x2="13" y2="15" />
+        </svg>
+      );
+    }
+    if (name === 'admin-kitchen-validation') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="3" width="14" height="18" rx="2" />
+          <path d="M9 3h6v3H9z" />
+          <polyline points="9 13 11 15 15 11" />
+        </svg>
+      );
+    }
+    if (name === 'admin-kitchen') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 13.9V20h12v-6.1" />
+          <path d="M6 14a4 4 0 0 1-.8-7.9A5 5 0 0 1 12 3a5 5 0 0 1 6.8 3.1A4 4 0 0 1 18 14" />
+          <line x1="6" y1="17" x2="18" y2="17" />
         </svg>
       );
     }

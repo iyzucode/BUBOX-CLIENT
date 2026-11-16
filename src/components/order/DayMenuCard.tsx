@@ -10,6 +10,7 @@ import {
 import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
+import { groupByCategory } from '@/features/menu/categoryOrder';
 import { DateEntry } from '@/features/order/useOrderCart';
 import { Menu, MenuCategory } from '@/types/menu';
 import { ConfirmRemoveButton } from './ConfirmRemoveButton';
@@ -31,41 +32,6 @@ interface DayMenuCardProps {
   categories?: MenuCategory[];
 }
 
-interface MenuGroup {
-  key: string;
-  label: string;
-  menus: Menu[];
-}
-
-/**
- * Kelompokkan menu per kategori. Urutan: kategori utama lalu pelengkap, masing-masing sesuai urutan tampil
- * yang diatur admin; kategori yang tidak dikenal di akhir sesuai urutan kemunculannya.
- */
-function groupByCategory(menus: Menu[], categories: MenuCategory[] | undefined): MenuGroup[] {
-  const ordered = [...(categories ?? [])].sort(
-    (a, b) => (a.categoryType === b.categoryType ? 0 : a.categoryType === 'UTAMA' ? -1 : 1) || a.displayOrder - b.displayOrder
-  );
-  const findCategory = (menu: Menu) =>
-    ordered.find((c) => (menu.categoryId && c.id.toLowerCase() === menu.categoryId.toLowerCase()) || c.name.toLowerCase() === (menu.category || '').toLowerCase());
-
-  const groups = new Map<string, MenuGroup & { rank: number }>();
-  menus.forEach((menu, index) => {
-    const category = findCategory(menu);
-    const key = (category?.id ?? menu.categoryId ?? menu.category ?? 'lainnya').toLowerCase();
-    const existing = groups.get(key);
-    if (existing) existing.menus.push(menu);
-    else {
-      groups.set(key, {
-        key,
-        label: category?.name ?? (menu.category || 'Lainnya'),
-        menus: [menu],
-        rank: category ? ordered.indexOf(category) : ordered.length + index,
-      });
-    }
-  });
-  return [...groups.values()].sort((a, b) => a.rank - b.rank);
-}
-
 export const DayMenuCard: React.FC<DayMenuCardProps> = ({
   dateEntry,
   isExpanded,
@@ -80,7 +46,10 @@ export const DayMenuCard: React.FC<DayMenuCardProps> = ({
 }) => {
   const palette = useOrderPalette();
   const hasSelectedItems = Object.values(dayCart).some((qty) => qty > 0);
-  const groups = useMemo(() => groupByCategory(availableMenus, categories), [availableMenus, categories]);
+  const groups = useMemo(
+    () => groupByCategory(availableMenus, (m) => ({ id: m.categoryId, name: m.category }), categories),
+    [availableMenus, categories]
+  );
 
   return (
     <View style={styles.cardWrapper}>
@@ -169,7 +138,7 @@ export const DayMenuCard: React.FC<DayMenuCardProps> = ({
                         {group.label}
                       </ThemedText>
                     </View>
-                    {group.menus.map((menu, index) => {
+                    {group.items.map((menu, index) => {
                       const currentQty = dayCart[menu.id] || 0;
 
                       return (
