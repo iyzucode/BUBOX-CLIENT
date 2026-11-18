@@ -11,9 +11,11 @@ import { AppDialogHost } from '@/components/ui/AppDialog';
 import { CUSTOMER_MAX_WIDTH } from '@/hooks/use-customer-layout';
 import { useDesktopViewport } from '@/hooks/use-desktop-viewport';
 import { useHydrated } from '@/hooks/use-hydrated';
+import { useSessionExpiryRedirect } from '@/features/auth/useSessionExpiryRedirect';
 
 
 function RootLayoutContent() {
+  useSessionExpiryRedirect();
   const { theme, isDark } = useThemeContext();
   const { width } = useWindowDimensions();
   const pathname = usePathname();
