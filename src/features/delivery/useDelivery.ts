@@ -74,7 +74,7 @@ export const useSearchWilayah = (query: string) => {
 
 export const useSetCoverage = () => {
   const queryClient = useQueryClient();
-  return useMutation<AreaNode, ApiError, { wilayahCode: string; isCovered: boolean | null }>({
+  return useMutation<AreaNode, ApiError, { wilayahCode: string; isCovered: boolean }>({
     mutationFn: async (data) => (await api.put<AreaNode>('/DeliveryAdmin/SetCoverage', data)).data,
     onSuccess: () => invalidateDelivery(queryClient),
   });

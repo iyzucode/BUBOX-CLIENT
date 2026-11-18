@@ -24,7 +24,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { getApiErrorMessage } from '@/services/apiError';
 import { AreaNode, WilayahSearchItem } from '@/types/delivery';
-import { showAlert } from '@/utils/alert';
+import { confirmAction, showAlert } from '@/utils/alert';
 
 const LEVEL_LABEL = WILAYAH_LEVEL_LABEL;
 
@@ -35,12 +35,7 @@ const CHILD_LEVEL_LABEL: Record<number, string> = {
   3: 'kelurahan/desa',
 };
 
-const INHERIT = '__inherit__';
-
-type CoverageChoice = 'inherit' | 'covered' | 'excluded';
-
-const toChoice = (rule: boolean | null): CoverageChoice =>
-  rule === null ? 'inherit' : rule ? 'covered' : 'excluded';
+const NO_ZONE = '__no_zone__';
 
 /** Induk langsung sebuah kode wilayah: 34.71.01.1001 → 34.71.01, 34 → null. */
 function parentOf(code: string): string | null {
@@ -50,7 +45,8 @@ function parentOf(code: string): string | null {
 
 /**
  * Admin: wilayah mana yang terjangkau pengantaran dan masuk zona mana.
- * Aturan paling spesifik menang (kelurahan > kecamatan > kab/kota > provinsi); tanpa aturan = ikut induk.
+ * Pilihan di suatu wilayah langsung berlaku ke semua wilayah di bawahnya; setelah itu wilayah di bawahnya
+ * masih bisa diubah satu per satu sebagai pengecualian.
  */
 export default function AdminDeliveryAreasScreen() {
   const theme = useTheme();
@@ -72,7 +68,7 @@ export default function AdminDeliveryAreasScreen() {
 
   const zoneItems = useMemo<PickerItem[]>(() => {
     const items: PickerItem[] = [
-      { value: INHERIT, label: 'Ikut induk', subtitle: 'Hapus pemetaan zona di wilayah ini' },
+      { value: NO_ZONE, label: 'Tanpa zona', subtitle: 'Lepas zona dari wilayah ini dan semua wilayah di bawahnya' },
     ];
     (zones.data ?? []).forEach((z) =>
       items.push({
@@ -87,20 +83,31 @@ export default function AdminDeliveryAreasScreen() {
   const onError = (title: string) => (error: unknown) =>
     showAlert(title, getApiErrorMessage(error, 'Perubahan tidak tersimpan.'), { tone: 'error' });
 
-  const handleCoverage = (node: AreaNode, choice: CoverageChoice) => {
-    if (choice === toChoice(node.coverageRule)) return;
-    setCoverage.mutate(
-      { wilayahCode: node.code, isCovered: choice === 'inherit' ? null : choice === 'covered' },
-      { onError: onError('Gagal Mengubah Jangkauan') }
-    );
+  /** Pengaturan berbeda di wilayah bawahan akan tertimpa: minta konfirmasi dulu. */
+  const confirmOverwrite = (node: AreaNode, count: number) =>
+    count === 0
+      ? Promise.resolve(true)
+      : confirmAction(
+          'Ubah semua wilayah di bawahnya?',
+          `${count} wilayah di bawah ${node.name} punya pengaturan berbeda dan akan ikut berubah.`,
+          { confirmText: 'Ubah semua', tone: 'warning' }
+        );
+
+  const handleCoverage = async (node: AreaNode, isCovered: boolean) => {
+    const overwritten = isCovered ? node.excludedRulesBelow : node.coveredRulesBelow;
+    if (isCovered === node.isCovered && overwritten === 0) return;
+    if (!(await confirmOverwrite(node, overwritten))) return;
+    setCoverage.mutate({ wilayahCode: node.code, isCovered }, { onError: onError('Gagal Mengubah Jangkauan') });
   };
 
-  const handlePickZone = (item: PickerItem) => {
+  const handlePickZone = async (item: PickerItem) => {
     const node = zonePickerFor;
     setZonePickerFor(null);
     if (!node) return;
-    const zoneId = item.value === INHERIT ? null : item.value;
-    if (zoneId === node.zoneRuleId) return;
+    const zoneId = item.value === NO_ZONE ? null : item.value;
+    const overwritten = node.zoneRulesBelowByZone.filter((r) => r.zoneId !== zoneId).reduce((sum, r) => sum + r.count, 0);
+    if (zoneId === node.zoneId && overwritten === 0) return;
+    if (!(await confirmOverwrite(node, overwritten))) return;
     setZoneArea.mutate({ wilayahCode: node.code, zoneId }, { onError: onError('Gagal Mengubah Zona') });
   };
 
@@ -115,20 +122,18 @@ export default function AdminDeliveryAreasScreen() {
   const card = [styles.card, { backgroundColor: theme.card, borderColor: theme.border }];
 
   const renderCoverageControl = (node: AreaNode) => {
-    const current = toChoice(node.coverageRule);
-    const options: { key: CoverageChoice; label: string; color: string }[] = [
-      { key: 'inherit', label: 'Ikut induk', color: theme.textSecondary },
-      { key: 'covered', label: 'Terjangkau', color: theme.success },
-      { key: 'excluded', label: 'Tidak', color: theme.danger },
+    const options = [
+      { isCovered: true, label: 'Terjangkau', color: theme.success },
+      { isCovered: false, label: 'Tidak', color: theme.danger },
     ];
     return (
       <View style={[styles.segment, { backgroundColor: theme.backgroundElement }]}>
         {options.map((o) => {
-          const active = o.key === current;
+          const active = o.isCovered === node.isCovered;
           return (
             <Pressable
-              key={o.key}
-              onPress={() => handleCoverage(node, o.key)}
+              key={o.label}
+              onPress={() => handleCoverage(node, o.isCovered)}
               disabled={busyCode === node.code}
               style={[styles.segmentBtn, active && { backgroundColor: theme.card, borderColor: o.color }]}
               accessibilityRole="radio"
@@ -151,48 +156,42 @@ export default function AdminDeliveryAreasScreen() {
       disabled={busyCode === node.code}
       style={({ pressed }) => [
         styles.zoneBtn,
-        { borderColor: node.zoneRuleId ? theme.secondary : theme.border, opacity: pressed ? 0.8 : 1 },
+        { borderColor: node.zoneId ? theme.secondary : theme.border, opacity: pressed ? 0.8 : 1 },
       ]}
       accessibilityRole="button"
       accessibilityLabel={`Pilih zona untuk ${node.name}`}
     >
       <ThemedText style={[styles.tiny, muted]}>Zona</ThemedText>
       <ThemedText style={[styles.small, styles.bold, strong]} numberOfLines={1}>
-        {node.zoneRuleId ? node.zoneName : 'Ikut induk'}
+        {node.zoneId ? node.zoneName : 'Tanpa zona'}
       </ThemedText>
     </Pressable>
   );
 
-  /** Keterangan efektif: terjangkau/tidak dan zona beserta asal aturannya. */
+  /** Keterangan status wilayah: terjangkau/tidak, zona & driver, dan pengecualian di bawahnya. */
   const renderEffective = (node: AreaNode) => {
-    const coverageFrom =
-      node.coverageSourceCode && node.coverageSourceCode !== node.code ? ` · dari ${node.coverageSourceName}` : '';
-    const zoneFrom = node.zoneSourceCode && node.zoneSourceCode !== node.code ? ` · dari ${node.zoneSourceName}` : '';
     return (
       <View style={styles.effectiveCol}>
         <View style={styles.inlineRow}>
           <View style={[styles.dot, { backgroundColor: node.isCovered ? theme.success : theme.textSecondary }]} />
           <ThemedText style={[styles.tiny, { color: node.isCovered ? theme.success : theme.textSecondary }]}>
-            {node.isCovered ? 'Terjangkau' : node.coverageSourceCode ? 'Tidak terjangkau' : 'Belum diatur'}
-            {coverageFrom}
+            {node.isCovered ? 'Terjangkau' : 'Tidak terjangkau'}
           </ThemedText>
         </View>
         {node.zoneId ? (
           <ThemedText style={[styles.tiny, muted]} numberOfLines={1}>
             🗺️ {node.zoneName}
-            {node.zoneIsActive ? '' : ' (nonaktif)'}
-            {zoneFrom} · 🛵 {node.driverName ?? 'belum ada driver'}
+            {node.zoneIsActive ? '' : ' (nonaktif)'} · 🛵 {node.driverName ?? 'belum ada driver'}
           </ThemedText>
         ) : null}
         {node.coverageRulesBelow + node.zoneRulesBelow > 0 ? (
           <ThemedText style={[styles.tiny, muted]}>
             {[
-              node.coverageRulesBelow > 0 ? `${node.coverageRulesBelow} aturan jangkauan` : null,
-              node.zoneRulesBelow > 0 ? `${node.zoneRulesBelow} pemetaan zona` : null,
+              node.coverageRulesBelow > 0 ? `${node.coverageRulesBelow} wilayah di bawahnya beda jangkauan` : null,
+              node.zoneRulesBelow > 0 ? `${node.zoneRulesBelow} wilayah di bawahnya beda zona` : null,
             ]
               .filter(Boolean)
-              .join(' · ')}{' '}
-            di wilayah bawahnya
+              .join(' · ')}
           </ThemedText>
         ) : null}
         {node.warning ? (
@@ -255,9 +254,9 @@ export default function AdminDeliveryAreasScreen() {
       >
         <View style={[card, styles.helpCard]}>
           <ThemedText style={[styles.small, muted]}>
-            Atur di level mana saja. Aturan paling spesifik yang berlaku: mis. Kota Yogyakarta “Terjangkau” tetapi
-            Kecamatan Jetis “Tidak”. Wilayah tanpa aturan sama sekali dianggap tidak terjangkau, dan pesanan ke
-            sana ditolak.
+            Pilihan di suatu wilayah langsung berlaku ke semua wilayah di bawahnya. Setelah itu, wilayah di bawahnya
+            masih bisa diubah satu per satu, mis. Kota Yogyakarta “Terjangkau” tetapi Kecamatan Jetis “Tidak”.
+            Wilayah yang belum diatur dianggap tidak terjangkau, dan pesanan ke sana ditolak.
           </ThemedText>
         </View>
 
@@ -352,7 +351,7 @@ export default function AdminDeliveryAreasScreen() {
         placeholder="Cari zona..."
         items={zoneItems}
         isLoading={zones.isLoading}
-        selectedValue={zonePickerFor ? zonePickerFor.zoneRuleId ?? INHERIT : undefined}
+        selectedValue={zonePickerFor ? zonePickerFor.zoneId ?? NO_ZONE : undefined}
         onSelect={handlePickZone}
         onClose={() => setZonePickerFor(null)}
       />

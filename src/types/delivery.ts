@@ -9,22 +9,20 @@ export interface AreaNode {
   name: string;
   level: WilayahLevel;
   hasChildren: boolean;
-  /** Aturan cakupan tepat di wilayah ini; null = ikut induk. */
-  coverageRule: boolean | null;
-  /** Hasil akhir (tanpa aturan sama sekali = tidak terjangkau). */
+  /** Status jangkauan wilayah ini (belum pernah diatur = tidak terjangkau). */
   isCovered: boolean;
-  coverageSourceCode: string | null;
-  coverageSourceName: string | null;
-  /** Zona yang dipetakan tepat di wilayah ini; null = ikut induk. */
-  zoneRuleId: string | null;
+  /** Zona wilayah ini; null = tanpa zona. */
   zoneId: string | null;
   zoneName: string | null;
   zoneIsActive: boolean;
-  zoneSourceCode: string | null;
-  zoneSourceName: string | null;
   driverName: string | null;
+  /** Jumlah wilayah di bawahnya yang berbeda dari status wilayah ini. */
   coverageRulesBelow: number;
   zoneRulesBelow: number;
+  /** Rincian pengaturan di bawahnya, untuk menghitung yang akan tertimpa oleh pilihan baru. */
+  coveredRulesBelow: number;
+  excludedRulesBelow: number;
+  zoneRulesBelowByZone: { zoneId: string | null; count: number }[];
   warning: string | null;
 }
 
