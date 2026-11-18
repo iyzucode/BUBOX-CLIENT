@@ -23,6 +23,9 @@ export interface OrderPalette {
   summaryChipText: string;
   dateChipBg: string;
   dateChipText: string;
+  // Chip tanggal yang sudah ada menunya
+  dateChipFilledBg: string;
+  dateChipFilledText: string;
 
   // Action buttons inside cards (Pilih tanggal, Kategori items)
   buttonBg: string;
@@ -81,6 +84,8 @@ export const OrderPalettes: { light: OrderPalette; dark: OrderPalette } = {
     summaryChipText: '#113366',
     dateChipBg: '#FDE8E3',
     dateChipText: '#D0011B',
+    dateChipFilledBg: '#C8391A',
+    dateChipFilledText: '#FFFFFF',
 
     buttonBg: '#FDEEEA',
     buttonText: '#113366',
@@ -133,6 +138,8 @@ export const OrderPalettes: { light: OrderPalette; dark: OrderPalette } = {
     summaryChipText: '#F4F4F5',
     dateChipBg: '#2E1610',
     dateChipText: '#FF8A70',
+    dateChipFilledBg: '#C8391A',
+    dateChipFilledText: '#FFFFFF',
 
     buttonBg: '#2E2E33',
     buttonText: '#F4F4F5',

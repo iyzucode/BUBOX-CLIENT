@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { DayMenuCard } from '@/components/order/DayMenuCard';
+import { DATE_CHIP_HEIGHT, DateChipsRow, TrackedDay } from '@/components/order/DateChipsRow';
 import { MenuDetailModal } from '@/components/order/MenuDetailModal';
 import { MultiDateCalendarModal } from '@/components/order/MultiDateCalendarModal';
 import { OrderCategoryCard } from '@/components/order/OrderCategoryCard';
@@ -24,10 +25,14 @@ import { useOrderPalette } from '@/components/order/orderPalette';
 import { MaxContentWidth } from '@/constants/theme';
 import { useGetMainCategories, useGetMenuCategories, useGetWeeklyMenu } from '@/features/menu/useMenu';
 import { CategoryId, CATEGORY_KEYWORDS, useOrderCart } from '@/features/order/useOrderCart';
+import { useDayTracker } from '@/features/order/useDayTracker';
 import { useOrderCutoffInfo } from '@/features/order/useOrders';
-import { showAlert } from '@/utils/alert';
+import { confirmAction, showAlert } from '@/utils/alert';
 import { Menu } from '@/types/menu';
 import { useCartStore } from '@/store/useCartStore';
+
+// Jarak atas & bawah deretan tanggal saat menempel di atas layar
+const PINNED_ROW_PADDING = 8;
 
 export default function OrderScreen() {
   const router = useRouter();
@@ -35,6 +40,8 @@ export default function OrderScreen() {
   const insets = useSafeAreaInsets();
   const { isScrolling, onScroll } = useScrollActivity();
   const stickyTop = insets.top > 0 ? insets.top : 0;
+  const pinnedHeight = stickyTop + DATE_CHIP_HEIGHT + PINNED_ROW_PADDING * 2;
+  const { scrollRef, rootRef, chipsRowRef, activeKey, isPinned, registerDay, handleScroll, jumpTo } = useDayTracker(pinnedHeight);
 
   // 1. Fetch weekly menu and main categories from API
   const { data: weeklyData, isLoading, isError, refetch } = useGetWeeklyMenu();
@@ -82,8 +89,26 @@ export default function OrderScreen() {
 
   const setOrderData = useCartStore((s) => s.setOrderData);
 
+  // Status tiap hari untuk strip pelacak & peringatan hari kosong (hitungan sama dengan totalItemsCount)
+  const trackedDays: TrackedDay[] = orderDates.map((entry) => ({
+    key: entry.key,
+    label: entry.formattedChip,
+    fullLabel: entry.formattedFull,
+    portions: Object.entries(cart[entry.key] ?? {}).reduce(
+      (sum, [menuId, qty]) => (allMenusMap.has(menuId) && qty > 0 ? sum + qty : sum),
+      0
+    ),
+  }));
+  const emptyDays = trackedDays.filter((d) => d.portions === 0);
+
+  // Buka kartu hari lalu gulir ke sana
+  const openDay = (key: string) => {
+    setExpandedDays((prev) => ({ ...prev, [key]: true }));
+    jumpTo(key);
+  };
+
   // Checkout submission handler
-  const handleProceed = () => {
+  const handleProceed = async () => {
     if (orderDates.length === 0) {
       showAlert(
         'Tanggal Belum Dipilih',
@@ -102,9 +127,25 @@ export default function OrderScreen() {
       return;
     }
 
+    // Hari yang belum diisi: isi dulu, atau lanjut tanpa hari itu
+    if (emptyDays.length > 0) {
+      const proceedWithout = await confirmAction(`${emptyDays.length} hari belum ada pesanan menu`, undefined, {
+        confirmText: 'Lanjut pesan',
+        cancelText: 'Isi dulu',
+        tone: 'warning',
+      });
+      if (!proceedWithout) {
+        openDay(emptyDays[0].key);
+        return;
+      }
+    }
+
+    const emptyKeys = new Set(emptyDays.map((d) => d.key));
+    const keptDateKeys = selectedDateKeys.filter((k) => !emptyKeys.has(k));
+
     // Tanggal yang terpilih sebelum cutoff lewat (halaman dibuka lama) harus diganti dulu
     const earliest = cutoffInfo?.earliestDeliveryDate;
-    const passed = earliest ? selectedDateKeys.filter((k) => k < earliest) : [];
+    const passed = earliest ? keptDateKeys.filter((k) => k < earliest) : [];
     if (passed.length > 0) {
       showAlert(
         'Batas Pemesanan Lewat',
@@ -120,8 +161,11 @@ export default function OrderScreen() {
       menusRecord[id] = m;
     });
 
+    // Hari kosong yang dilewati ikut dihapus dari pilihan tanggal
+    emptyDays.forEach((d) => handleRemoveDate(d.key));
+
     setOrderData({
-      selectedDateKeys,
+      selectedDateKeys: keptDateKeys,
       categoryQuantities,
       cart,
       allMenus: menusRecord,
@@ -178,12 +222,16 @@ export default function OrderScreen() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.pageBg }]}>
+    <View ref={rootRef} collapsable={false} style={[styles.root, { backgroundColor: palette.pageBg }]}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        onScroll={onScroll}
+        onScroll={(event) => {
+          onScroll();
+          handleScroll(event);
+        }}
         scrollEventThrottle={16}
       >
         {/* 1. HERO HEADER IMAGE (~200px) WITH CLOSE 'X' & 'PESAN MENU LUANNA' */}
@@ -195,8 +243,10 @@ export default function OrderScreen() {
           <View style={[styles.configPanel, { backgroundColor: palette.panelBg }]}>
             {/* Card 1: Tanggal Pemesanan */}
             <OrderDateCard
-              orderDates={orderDates}
+              days={trackedDays}
               onOpenCalendar={() => setIsCalendarOpen(true)}
+              onSelectDay={openDay}
+              chipsRowRef={chipsRowRef}
             />
 
             {/* Card 2: Kategori Menu */}
@@ -245,19 +295,26 @@ export default function OrderScreen() {
                 const subtotal = calculateDaySubtotal(entry.key);
 
                 return (
-                  <DayMenuCard
+                  <View
                     key={entry.key}
-                    dateEntry={entry}
-                    isExpanded={isExpanded}
-                    onToggleExpand={() => handleToggleExpand(entry.key)}
-                    onRemoveDay={() => handleRemoveDate(entry.key)}
-                    availableMenus={availableMenus}
-                    dayCart={dayCart}
-                    subtotal={subtotal}
-                    onUpdateQty={(menuId, delta) => updateItemQty(entry.key, menuId, delta)}
-                    onOpenDetailModal={(menu) => setSelectedDetailMenu(menu)}
-                    categories={allCategories}
-                  />
+                    collapsable={false}
+                    ref={(node) => {
+                      registerDay(entry.key, node);
+                    }}
+                  >
+                    <DayMenuCard
+                      dateEntry={entry}
+                      isExpanded={isExpanded}
+                      onToggleExpand={() => handleToggleExpand(entry.key)}
+                      onRemoveDay={() => handleRemoveDate(entry.key)}
+                      availableMenus={availableMenus}
+                      dayCart={dayCart}
+                      subtotal={subtotal}
+                      onUpdateQty={(menuId, delta) => updateItemQty(entry.key, menuId, delta)}
+                      onOpenDetailModal={(menu) => setSelectedDetailMenu(menu)}
+                      categories={allCategories}
+                    />
+                  </View>
                 );
               })
             )}
@@ -265,16 +322,31 @@ export default function OrderScreen() {
         </View>
       </ScrollView>
 
-      {/* 4. STICKY BOTTOM CHECKOUT BAR */}
+      {/* 4. DERETAN TANGGAL MENEMPEL DI ATAS: muncul setelah deretan aslinya tergulir keluar layar */}
+      {isPinned && orderDates.length > 0 ? (
+        <View
+          style={[
+            styles.pinnedRow,
+            { backgroundColor: palette.cardBg, height: pinnedHeight, paddingTop: stickyTop + PINNED_ROW_PADDING },
+          ]}
+        >
+          <View style={styles.pinnedRowInner}>
+            <DateChipsRow days={trackedDays} onSelectDay={openDay} followKey={activeKey ?? orderDates[0].key} />
+          </View>
+        </View>
+      ) : null}
+
+      {/* 5. STICKY BOTTOM CHECKOUT BAR */}
       <OrderCheckoutBar
         totalItemsCount={totalItemsCount}
+        filledDaysCount={trackedDays.length - emptyDays.length}
         activeDaysCount={orderDates.length}
         grandTotal={grandTotal}
         onProceed={handleProceed}
         compact={isScrolling}
       />
 
-      {/* 5. MODAL: MULTI-DATE CALENDAR */}
+      {/* 6. MODAL: MULTI-DATE CALENDAR */}
       <MultiDateCalendarModal
         visible={isCalendarOpen}
         selectedDateKeys={selectedDateKeys}
@@ -284,7 +356,7 @@ export default function OrderScreen() {
         maxDateKey={cutoffInfo?.latestDeliveryDate}
       />
 
-      {/* 6. MODAL: MENU DETAIL / NUTRITION INFO */}
+      {/* 7. MODAL: MENU DETAIL / NUTRITION INFO */}
       <MenuDetailModal
         menu={selectedDetailMenu}
         onClose={() => setSelectedDetailMenu(null)}
@@ -333,6 +405,34 @@ const styles = StyleSheet.create({
   menuSection: {
     marginTop: 18,
     gap: 14,
+  },
+  pinnedRow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 6px 16px rgba(0, 0, 0, 0.18)',
+      },
+    }),
+  },
+  pinnedRowInner: {
+    maxWidth: MaxContentWidth,
+    width: '100%',
+    alignSelf: 'center',
+    // Ditambah jarak bawaan label "N hari" (8), teksnya sejajar dengan tepi kartu di bawahnya (16)
+    paddingLeft: 8,
   },
   loadingWrapper: {
     paddingVertical: 40,

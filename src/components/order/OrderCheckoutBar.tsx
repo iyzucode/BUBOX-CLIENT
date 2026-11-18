@@ -7,6 +7,9 @@ import { useOrderPalette } from './orderPalette';
 
 interface OrderCheckoutBarProps {
   totalItemsCount: number;
+  /** Hari yang sudah ada menunya. */
+  filledDaysCount: number;
+  /** Semua hari yang dipilih. */
   activeDaysCount: number;
   grandTotal: number;
   onProceed: () => void;
@@ -38,6 +41,7 @@ const FastCartIcon: React.FC<{ size: number; color: string }> = ({ size, color }
 
 export const OrderCheckoutBar: React.FC<OrderCheckoutBarProps> = ({
   totalItemsCount,
+  filledDaysCount,
   activeDaysCount,
   grandTotal,
   onProceed,
@@ -70,7 +74,7 @@ export const OrderCheckoutBar: React.FC<OrderCheckoutBarProps> = ({
         </Animated.Text>
         <Animated.View style={{ height: lerp(16, 0), opacity: lerp(1, 0), overflow: 'hidden' }}>
           <Text numberOfLines={1} style={[styles.summaryText, { color: palette.checkoutSubtext }]}>
-            {totalItemsCount} porsi · {activeDaysCount} hari
+            {totalItemsCount} porsi · {filledDaysCount} dari {activeDaysCount} hari
           </Text>
         </Animated.View>
       </View>

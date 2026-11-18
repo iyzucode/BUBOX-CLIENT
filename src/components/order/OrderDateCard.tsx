@@ -2,23 +2,27 @@ import React from 'react';
 import {
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { DateEntry } from '@/features/order/useOrderCart';
+import { DateChipsRow, TrackedDay } from './DateChipsRow';
 import { useOrderPalette } from './orderPalette';
 
 interface OrderDateCardProps {
-  orderDates: DateEntry[];
+  days: TrackedDay[];
   onOpenCalendar: () => void;
+  onSelectDay: (key: string) => void;
+  /** Penanda posisi deretan tanggal, untuk tahu kapan deretan ini sudah tergulir keluar layar. */
+  chipsRowRef: React.RefObject<View | null>;
 }
 
 export const OrderDateCard: React.FC<OrderDateCardProps> = ({
-  orderDates,
+  days,
   onOpenCalendar,
+  onSelectDay,
+  chipsRowRef,
 }) => {
   const palette = useOrderPalette();
 
@@ -60,35 +64,10 @@ export const OrderDateCard: React.FC<OrderDateCardProps> = ({
         </ThemedText>
       </View>
 
-      {/* Date Chips Row: Sticky Summary (N hari) + horizontal scrollable list of dates.
-          Disembunyikan selama belum ada tanggal yang dipilih. */}
-      {orderDates.length > 0 ? (
-        <View style={styles.chipsRowContainer}>
-          {/* Sticky Summary Chip on the left: "N hari" */}
-          <View style={styles.summaryChipSticky}>
-            <ThemedText style={[styles.summaryChipText, { color: palette.summaryChipText }]}>
-              {orderDates.length} hari
-            </ThemedText>
-          </View>
-
-          {/* Date Chips: "Sen, 18 Okt", etc. */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsScrollContent}
-            style={styles.chipsScrollView}
-          >
-            {orderDates.map((entry) => (
-              <View
-                key={entry.key}
-                style={[styles.dateChip, { backgroundColor: palette.dateChipBg }]}
-              >
-                <ThemedText style={[styles.dateChipText, { color: palette.dateChipText }]}>
-                  {entry.formattedChip}
-                </ThemedText>
-              </View>
-            ))}
-          </ScrollView>
+      {/* Deretan tanggal; disembunyikan selama belum ada tanggal yang dipilih */}
+      {days.length > 0 ? (
+        <View ref={chipsRowRef} collapsable={false}>
+          <DateChipsRow days={days} onSelectDay={onSelectDay} />
         </View>
       ) : null}
 
@@ -133,43 +112,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     letterSpacing: -0.2,
-  },
-  chipsRowContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  summaryChipSticky: {
-    flexShrink: 0,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  summaryChipText: {
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: -0.2,
-  },
-  chipsScrollView: {
-    flex: 1,
-  },
-  chipsScrollContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingRight: 6,
-  },
-  dateChip: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dateChipText: {
-    fontSize: 12,
-    fontWeight: '500',
   },
   actionBtn: {
     width: '100%',
