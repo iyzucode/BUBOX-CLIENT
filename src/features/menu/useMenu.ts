@@ -24,7 +24,7 @@ export const MENU_QUERY_KEYS = {
   detail: (id: string) => [...MENU_QUERY_KEYS.all, 'detail', id] as const,
   master: (categoryId?: string, search?: string) => [...MENU_QUERY_KEYS.all, 'master', categoryId || '', search || ''] as const,
   masterDetail: (id: string) => [...MENU_QUERY_KEYS.all, 'masterDetail', id] as const,
-  categories: (type?: string) => ['menuCategories', type || 'all'] as const,
+  categories: (type?: string, includeInactive = false) => ['menuCategories', type || 'all', includeInactive] as const,
   mainCategories: () => ['menuCategories', 'main'] as const,
 };
 
@@ -34,7 +34,7 @@ export const MENU_QUERY_KEYS = {
 
 export const useGetMenuCategories = (categoryType?: string, includeInactive = false) => {
   return useQuery<MenuCategory[], AxiosError<{ message?: string }>>({
-    queryKey: MENU_QUERY_KEYS.categories(categoryType),
+    queryKey: MENU_QUERY_KEYS.categories(categoryType, includeInactive),
     queryFn: async () => {
       const response = await api.get<MenuCategory[]>('/MenuCategory/GetCategories', {
         params: { categoryType, includeInactive },

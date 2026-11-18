@@ -74,6 +74,7 @@ function RootLayoutContent() {
             <Stack.Screen name="admin/index" />
             <Stack.Screen name="admin/menu" />
             <Stack.Screen name="admin/menu-form" />
+            <Stack.Screen name="admin/menu-categories" />
             <Stack.Screen name="admin/orders" />
             <Stack.Screen name="admin/delivery-board" />
             <Stack.Screen name="admin/kitchen-validation" />

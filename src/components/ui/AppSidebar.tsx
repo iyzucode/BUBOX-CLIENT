@@ -39,6 +39,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'admin-delivery-zones', label: 'Zona & Driver', path: '/admin/delivery-zones' },
   { id: 'admin-outlets', label: 'Outlet', path: '/admin/outlets' },
   { id: 'admin-menu', label: 'Kelola Menu', path: '/admin/menu' },
+  { id: 'admin-menu-categories', label: 'Kelola Kategori Menu', path: '/admin/menu-categories' },
   { id: 'admin-vouchers', label: 'Voucher', path: '/admin/vouchers' },
   { id: 'admin-settings', label: 'Cutoff & Bayar', path: '/admin/settings' },
 ];
@@ -226,6 +227,14 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
           <rect x="14" y="3" width="7" height="7" />
           <rect x="14" y="14" width="7" height="7" />
           <rect x="3" y="14" width="7" height="7" />
+        </svg>
+      );
+    }
+    if (name === 'admin-menu-categories') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" />
+          <circle cx="8" cy="8" r="1.2" />
         </svg>
       );
     }
@@ -507,7 +516,7 @@ export const AppSidebar: React.FC = () => {
                   <View style={styles.labelFadeWrapper}>
                     <ThemedText
                       type="default"
-                      numberOfLines={1}
+                      numberOfLines={2}
                       style={[
                         styles.navItemLabel,
                         {

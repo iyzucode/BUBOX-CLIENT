@@ -24,7 +24,7 @@ import { OrderHeroHeader } from '@/components/order/OrderHeroHeader';
 import { useOrderPalette } from '@/components/order/orderPalette';
 import { MaxContentWidth } from '@/constants/theme';
 import { useGetMainCategories, useGetMenuCategories, useGetWeeklyMenu } from '@/features/menu/useMenu';
-import { CategoryId, CATEGORY_KEYWORDS, useOrderCart } from '@/features/order/useOrderCart';
+import { useOrderCart } from '@/features/order/useOrderCart';
 import { useDayTracker } from '@/features/order/useDayTracker';
 import { useOrderCutoffInfo } from '@/features/order/useOrders';
 import { confirmAction, showAlert } from '@/utils/alert';
@@ -56,7 +56,6 @@ export default function OrderScreen() {
     selectedDateKeys,
     orderDates,
     categoryQuantities,
-    activeCategories,
     cart,
     allMenusMap,
     grandTotal,
@@ -174,51 +173,10 @@ export default function OrderScreen() {
     router.push('/checkout');
   };
 
-  // Helper to get available menus for a specific dayOfWeek filtered by active categories
-  const getDisplayedMenusForDay = (dayOfWeek: number, dateKey: string): Menu[] => {
-    if (!weeklyData?.days) return [];
-    const daySchedule = weeklyData.days.find((d) => d.dayOfWeek === dayOfWeek);
-    if (!daySchedule) return [];
-
-    const allDayMenus = [...daySchedule.mainMenus, ...daySchedule.secondaryMenus];
-    if (activeCategories.length === 0) {
-      return allDayMenus;
-    }
-
-    const dayCart = cart[dateKey] || {};
-
-    return allDayMenus.filter((menu) => {
-      // 1. Always show secondary menus (Snack / Pelengkap) so parents can add them as complements
-      if (menu.menuType === 'SEKUNDER') return true;
-
-      // 2. Always show if already in cart with qty > 0
-      if ((dayCart[menu.id] || 0) > 0) return true;
-
-      // 3. Match against active categories
-      return activeCategories.some((catKey) => {
-        const target = catKey.toLowerCase();
-        const catObj = mainCategories?.find((c) => c.id.toLowerCase() === target || c.code.toLowerCase() === target);
-
-        // Match by UUID
-        if (menu.categoryId && menu.categoryId.toLowerCase() === target) return true;
-        if (catObj && menu.categoryId && menu.categoryId.toLowerCase() === catObj.id.toLowerCase()) return true;
-
-        // Match by Category Name
-        const catLower = (menu.category || '').toLowerCase();
-        if (catObj && catObj.name && (catLower === catObj.name.toLowerCase() || catLower.includes(catObj.name.toLowerCase()))) {
-          return true;
-        }
-        if (catLower && (catLower === target || target.includes(catLower) || catLower.includes(target))) {
-          return true;
-        }
-
-        // Match by Fallback Keywords
-        const codeOrTarget = (catObj?.code || catKey).toUpperCase();
-        const keywords = CATEGORY_KEYWORDS[codeOrTarget] || [];
-        const nameLower = (menu.name || '').toLowerCase();
-        return keywords.some((kw) => catLower.includes(kw) || nameLower.includes(kw));
-      });
-    });
+  // Semua menu pada hari itu. Memilih kategori hanya mengisi porsinya, menu kategori lain tetap bisa dipilih.
+  const getDisplayedMenusForDay = (dayOfWeek: number): Menu[] => {
+    const daySchedule = weeklyData?.days?.find((d) => d.dayOfWeek === dayOfWeek);
+    return daySchedule ? [...daySchedule.mainMenus, ...daySchedule.secondaryMenus] : [];
   };
 
   return (
@@ -290,7 +248,7 @@ export default function OrderScreen() {
             ) : orderDates.length === 0 ? null : (
               orderDates.map((entry) => {
                 const isExpanded = expandedDays[entry.key] !== false; // Default true
-                const availableMenus = getDisplayedMenusForDay(entry.dayOfWeek, entry.key);
+                const availableMenus = getDisplayedMenusForDay(entry.dayOfWeek);
                 const dayCart = cart[entry.key] || {};
                 const subtotal = calculateDaySubtotal(entry.key);
 

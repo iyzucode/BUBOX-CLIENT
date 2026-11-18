@@ -84,7 +84,7 @@ export const OrderPalettes: { light: OrderPalette; dark: OrderPalette } = {
     summaryChipText: '#113366',
     dateChipBg: '#FDE8E3',
     dateChipText: '#D0011B',
-    dateChipFilledBg: '#C8391A',
+    dateChipFilledBg: '#EE4D2D',
     dateChipFilledText: '#FFFFFF',
 
     buttonBg: '#FDEEEA',
@@ -138,7 +138,7 @@ export const OrderPalettes: { light: OrderPalette; dark: OrderPalette } = {
     summaryChipText: '#F4F4F5',
     dateChipBg: '#2E1610',
     dateChipText: '#FF8A70',
-    dateChipFilledBg: '#C8391A',
+    dateChipFilledBg: '#EE4D2D',
     dateChipFilledText: '#FFFFFF',
 
     buttonBg: '#2E2E33',

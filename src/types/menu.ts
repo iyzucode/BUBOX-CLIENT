@@ -12,7 +12,8 @@ export interface MenuCategory {
 }
 
 export interface CreateMenuCategoryRequest {
-  code: string;
+  /** Kosong = dibuat otomatis dari nama. */
+  code?: string;
   name: string;
   categoryType: MenuType;
   displayOrder?: number;
