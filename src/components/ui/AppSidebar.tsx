@@ -19,6 +19,8 @@ interface NavItem {
   label: string;
   path: string;
   badge?: string;
+  /** Judul kelompok; menu berurutan dengan judul sama tampil di bawah satu judul. */
+  group?: string;
 }
 
 const CUSTOMER_NAV_ITEMS: NavItem[] = [
@@ -31,17 +33,19 @@ const CUSTOMER_NAV_ITEMS: NavItem[] = [
 
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'admin-dashboard', label: 'Ringkasan', path: '/admin' },
-  { id: 'admin-orders', label: 'Pesanan', path: '/admin/orders' },
-  { id: 'admin-kitchen-validation', label: 'Validasi Dapur', path: '/admin/kitchen-validation' },
-  { id: 'admin-kitchen', label: 'Dapur', path: '/admin/kitchen' },
-  { id: 'admin-delivery-board', label: 'Papan Antar', path: '/admin/delivery-board' },
-  { id: 'admin-delivery-areas', label: 'Wilayah Antar', path: '/admin/delivery-areas' },
-  { id: 'admin-delivery-zones', label: 'Zona & Driver', path: '/admin/delivery-zones' },
-  { id: 'admin-outlets', label: 'Outlet', path: '/admin/outlets' },
-  { id: 'admin-menu', label: 'Kelola Menu', path: '/admin/menu' },
-  { id: 'admin-menu-categories', label: 'Kelola Kategori Menu', path: '/admin/menu-categories' },
-  { id: 'admin-vouchers', label: 'Voucher', path: '/admin/vouchers' },
-  { id: 'admin-settings', label: 'Cutoff & Bayar', path: '/admin/settings' },
+  // Urutan mengikuti alur kerja harian: pesanan masuk → divalidasi → dimasak → diantar
+  { id: 'admin-orders', label: 'Pesanan', path: '/admin/orders', group: 'Operasional' },
+  { id: 'admin-kitchen-validation', label: 'Validasi Dapur', path: '/admin/kitchen-validation', group: 'Operasional' },
+  { id: 'admin-kitchen', label: 'Dapur', path: '/admin/kitchen', group: 'Operasional' },
+  { id: 'admin-delivery-board', label: 'Papan Antar', path: '/admin/delivery-board', group: 'Operasional' },
+  { id: 'admin-delivery-areas', label: 'Wilayah Antar', path: '/admin/delivery-areas', group: 'Pengantaran' },
+  { id: 'admin-delivery-zones', label: 'Zona & Driver', path: '/admin/delivery-zones', group: 'Pengantaran' },
+  { id: 'admin-outlets', label: 'Outlet', path: '/admin/outlets', group: 'Pengantaran' },
+  { id: 'admin-menu', label: 'Daftar Menu', path: '/admin/menu', group: 'Menu' },
+  { id: 'admin-menu-categories', label: 'Kategori Menu', path: '/admin/menu-categories', group: 'Menu' },
+  { id: 'admin-vouchers', label: 'Voucher', path: '/admin/vouchers', group: 'Pengaturan' },
+  { id: 'admin-cutoff', label: 'Cutoff', path: '/admin/cutoff', group: 'Pengaturan' },
+  { id: 'admin-payment', label: 'Pembayaran', path: '/admin/payment', group: 'Pengaturan' },
 ];
 
 interface SidebarIconProps {
@@ -132,12 +136,21 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
         </svg>
       );
     }
-    if (name === 'admin-settings') {
+    if (name === 'admin-cutoff') {
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="13" r="8" />
           <polyline points="12 9 12 13 15 15" />
           <line x1="9" y1="2" x2="15" y2="2" />
+        </svg>
+      );
+    }
+    if (name === 'admin-payment') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3" />
+          <path d="M3 7h16a2 2 0 0 1 2 2v7h-5a2.5 2.5 0 0 1 0-5h5" />
+          <circle cx="16" cy="13.5" r="0.6" />
         </svg>
       );
     }
@@ -289,7 +302,8 @@ const SidebarIcon: React.FC<SidebarIconProps> = ({ name, color, size = 22 }) => 
     'admin-delivery-areas': '🗺️',
     'admin-delivery-zones': '🛵',
     'admin-outlets': '🏪',
-    'admin-settings': '⏰',
+    'admin-cutoff': '⏰',
+    'admin-payment': '💳',
     'admin-vouchers': '🎟️',
     'go-admin': '⚙️',
   };
@@ -481,16 +495,30 @@ export const AppSidebar: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.navItemsList}>
-          {currentNavItems.map((item) => {
+          {currentNavItems.map((item: NavItem, index) => {
             const active = isTabActive(item.path);
             const isSwitchBtn = item.id === 'go-admin';
             const activeColor = theme.primary;
             const inactiveColor = isSwitchBtn ? theme.secondary : theme.textSecondary;
             const itemColor = active ? activeColor : inactiveColor;
+            const startsGroup = !!item.group && item.group !== (currentNavItems[index - 1] as NavItem | undefined)?.group;
 
             return (
+              <React.Fragment key={item.id}>
+              {/* Judul kelompok; saat sidebar tertutup diganti garis pemisah dengan tinggi yang sama
+                  agar ikon tidak bergeser naik-turun ketika sidebar dibuka/ditutup. */}
+              {startsGroup ? (
+                <View style={styles.groupHeader} accessibilityRole="header">
+                  {!isCollapsed && showText ? (
+                    <ThemedText style={[styles.groupHeaderText, { color: theme.textSecondary }]} numberOfLines={1}>
+                      {item.group}
+                    </ThemedText>
+                  ) : (
+                    <View style={[styles.groupDivider, { backgroundColor: theme.border }]} />
+                  )}
+                </View>
+              ) : null}
               <Pressable
-                key={item.id}
                 onPress={() => handleNavPress(item.path)}
                 style={({ pressed }) => [
                   styles.navItem,
@@ -530,6 +558,7 @@ export const AppSidebar: React.FC = () => {
                   </View>
                 )}
               </Pressable>
+              </React.Fragment>
             );
           })}
         </View>
@@ -768,6 +797,26 @@ const styles = StyleSheet.create({
   navItemsList: {
     gap: 8,
     width: '100%',
+  },
+  // Tinggi tetap di kedua keadaan sidebar (teks / garis pemisah)
+  groupHeader: {
+    height: 26,
+    marginTop: 6,
+    justifyContent: 'flex-end',
+    paddingLeft: NAV_ICON_INSET,
+    paddingBottom: 2,
+  },
+  groupHeaderText: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  groupDivider: {
+    height: 1,
+    width: 28,
+    marginBottom: 6,
   },
   navItem: {
     flexDirection: 'row',

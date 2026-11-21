@@ -86,6 +86,8 @@ function RootLayoutContent() {
             <Stack.Screen name="admin/outlets" />
             <Stack.Screen name="admin/outlet-form" />
             <Stack.Screen name="admin/settings" />
+            <Stack.Screen name="admin/cutoff" />
+            <Stack.Screen name="admin/payment" />
             <Stack.Screen name="admin/vouchers" />
             <Stack.Screen name="admin/voucher-form" />
           </Stack>

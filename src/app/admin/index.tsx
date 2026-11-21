@@ -236,7 +236,7 @@ export default function AdminDashboardScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => router.push('/admin/settings')}
+                onPress={() => router.push('/admin/cutoff')}
                 style={({ pressed }) => [
                   styles.actionCard,
                   { backgroundColor: theme.card, borderColor: theme.border },
@@ -247,8 +247,26 @@ export default function AdminDashboardScreen() {
                   <ThemedText style={{ fontSize: 24 }}>⏰</ThemedText>
                 </View>
                 <View style={styles.actionInfo}>
-                  <ThemedText style={[styles.actionTitle, { color: theme.secondary }]}>Cutoff & Pembayaran</ThemedText>
-                  <ThemedText style={styles.actionDesc}>Jam batas pesan (H-N), batas waktu bayar QRIS, ongkir.</ThemedText>
+                  <ThemedText style={[styles.actionTitle, { color: theme.secondary }]}>Cutoff</ThemedText>
+                  <ThemedText style={styles.actionDesc}>Batas hari (H-N) dan jam pemesanan.</ThemedText>
+                </View>
+                <ThemedText style={[styles.actionArrow, { color: '#64748B' }]}>➔</ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/admin/payment')}
+                style={({ pressed }) => [
+                  styles.actionCard,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: '#F1F5F9' }]}>
+                  <ThemedText style={{ fontSize: 24 }}>💳</ThemedText>
+                </View>
+                <View style={styles.actionInfo}>
+                  <ThemedText style={[styles.actionTitle, { color: theme.secondary }]}>Pembayaran</ThemedText>
+                  <ThemedText style={styles.actionDesc}>Batas waktu bayar QRIS, ongkir, biaya layanan, dan pajak.</ThemedText>
                 </View>
                 <ThemedText style={[styles.actionArrow, { color: '#64748B' }]}>➔</ThemedText>
               </Pressable>
