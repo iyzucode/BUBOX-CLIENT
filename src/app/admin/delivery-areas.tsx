@@ -122,6 +122,7 @@ export default function AdminDeliveryAreasScreen() {
   const card = [styles.card, { backgroundColor: theme.card, borderColor: theme.border }];
 
   const renderCoverageControl = (node: AreaNode) => {
+    const mixed = isCoverageMixed(node);
     const options = [
       { isCovered: true, label: 'Terjangkau', color: theme.success },
       { isCovered: false, label: 'Tidak', color: theme.danger },
@@ -129,7 +130,7 @@ export default function AdminDeliveryAreasScreen() {
     return (
       <View style={[styles.segment, { backgroundColor: theme.backgroundElement }]}>
         {options.map((o) => {
-          const active = o.isCovered === node.isCovered;
+          const active = !mixed && o.isCovered === node.isCovered;
           return (
             <Pressable
               key={o.label}
@@ -138,7 +139,7 @@ export default function AdminDeliveryAreasScreen() {
               style={[styles.segmentBtn, active && { backgroundColor: theme.card, borderColor: o.color }]}
               accessibilityRole="radio"
               aria-checked={active}
-              accessibilityLabel={`${o.label} untuk ${node.name}`}
+              accessibilityLabel={`${o.label} untuk ${node.name}${mixed ? ' dan semua wilayah di bawahnya' : ''}`}
             >
               <ThemedText style={[styles.tiny, styles.bold, { color: active ? o.color : theme.textSecondary }]}>
                 {o.label}
@@ -150,32 +151,42 @@ export default function AdminDeliveryAreasScreen() {
     );
   };
 
-  const renderZoneControl = (node: AreaNode) => (
-    <Pressable
-      onPress={() => setZonePickerFor(node)}
-      disabled={busyCode === node.code}
-      style={({ pressed }) => [
-        styles.zoneBtn,
-        { borderColor: node.zoneId ? theme.secondary : theme.border, opacity: pressed ? 0.8 : 1 },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={`Pilih zona untuk ${node.name}`}
-    >
-      <ThemedText style={[styles.tiny, muted]}>Zona</ThemedText>
-      <ThemedText style={[styles.small, styles.bold, strong]} numberOfLines={1}>
-        {node.zoneId ? node.zoneName : 'Tanpa zona'}
-      </ThemedText>
-    </Pressable>
-  );
+  const renderZoneControl = (node: AreaNode) => {
+    const mixed = isZoneMixed(node);
+    return (
+      <Pressable
+        onPress={() => setZonePickerFor(node)}
+        disabled={busyCode === node.code}
+        style={({ pressed }) => [
+          styles.zoneBtn,
+          {
+            borderColor: mixed ? theme.warning : node.zoneId ? theme.secondary : theme.border,
+            opacity: pressed ? 0.8 : 1,
+          },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Pilih zona untuk ${node.name}${mixed ? ' (saat ini campuran)' : ''}`}
+      >
+        <ThemedText style={[styles.tiny, muted]}>Zona</ThemedText>
+        <ThemedText
+          style={[styles.small, styles.bold, mixed ? { color: theme.warning } : strong]}
+          numberOfLines={1}
+        >
+          {mixed ? 'Campuran' : node.zoneId ? node.zoneName : 'Tanpa zona'}
+        </ThemedText>
+      </Pressable>
+    );
+  };
 
   /** Keterangan status wilayah: terjangkau/tidak, zona & driver, dan pengecualian di bawahnya. */
   const renderEffective = (node: AreaNode) => {
+    const coverageColor = isCoverageMixed(node) ? theme.warning : node.isCovered ? theme.success : theme.textSecondary;
     return (
       <View style={styles.effectiveCol}>
         <View style={styles.inlineRow}>
-          <View style={[styles.dot, { backgroundColor: node.isCovered ? theme.success : theme.textSecondary }]} />
-          <ThemedText style={[styles.tiny, { color: node.isCovered ? theme.success : theme.textSecondary }]}>
-            {node.isCovered ? 'Terjangkau' : 'Tidak terjangkau'}
+          <View style={[styles.dot, { backgroundColor: coverageColor }]} />
+          <ThemedText style={[styles.tiny, { color: coverageColor }]}>
+            {isCoverageMixed(node) ? 'Sebagian terjangkau' : node.isCovered ? 'Terjangkau' : 'Tidak terjangkau'}
           </ThemedText>
         </View>
         {node.zoneId ? (
@@ -187,7 +198,9 @@ export default function AdminDeliveryAreasScreen() {
         {node.coverageRulesBelow + node.zoneRulesBelow > 0 ? (
           <ThemedText style={[styles.tiny, muted]}>
             {[
-              node.coverageRulesBelow > 0 ? `${node.coverageRulesBelow} wilayah di bawahnya beda jangkauan` : null,
+              node.coverageRulesBelow > 0
+                ? `${node.coverageRulesBelow} wilayah di bawahnya ${node.isCovered ? 'tidak terjangkau' : 'terjangkau'}`
+                : null,
               node.zoneRulesBelow > 0 ? `${node.zoneRulesBelow} wilayah di bawahnya beda zona` : null,
             ]
               .filter(Boolean)
@@ -256,7 +269,8 @@ export default function AdminDeliveryAreasScreen() {
           <ThemedText style={[styles.small, muted]}>
             Pilihan di suatu wilayah langsung berlaku ke semua wilayah di bawahnya. Setelah itu, wilayah di bawahnya
             masih bisa diubah satu per satu, mis. Kota Yogyakarta “Terjangkau” tetapi Kecamatan Jetis “Tidak”.
-            Wilayah yang belum diatur dianggap tidak terjangkau, dan pesanan ke sana ditolak.
+            Wilayah yang belum diatur dianggap tidak terjangkau, dan pesanan ke sana ditolak. “Sebagian” dan
+            “Campuran” berarti wilayah di bawahnya punya pengaturan berbeda: memilih salah satu akan menyamakan semuanya.
           </ThemedText>
         </View>
 
@@ -351,12 +365,22 @@ export default function AdminDeliveryAreasScreen() {
         placeholder="Cari zona..."
         items={zoneItems}
         isLoading={zones.isLoading}
-        selectedValue={zonePickerFor ? zonePickerFor.zoneId ?? NO_ZONE : undefined}
+        selectedValue={zonePickerFor && !isZoneMixed(zonePickerFor) ? zonePickerFor.zoneId ?? NO_ZONE : undefined}
         onSelect={handlePickZone}
         onClose={() => setZonePickerFor(null)}
       />
     </View>
   );
+}
+
+/** Wilayah di bawahnya ada yang beda jangkauan: tidak bisa disebut terjangkau atau tidak. */
+function isCoverageMixed(node: AreaNode) {
+  return node.coverageRulesBelow > 0;
+}
+
+/** Wilayah di bawahnya ada yang masuk zona lain. */
+function isZoneMixed(node: AreaNode) {
+  return node.zoneRulesBelow > 0;
 }
 
 const styles = StyleSheet.create({
