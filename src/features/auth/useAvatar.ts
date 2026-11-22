@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Platform } from 'react-native';
 
+import type { AvatarCropRect, AvatarCropSource } from '@/components/profile/AvatarCropModal';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { User } from '@/types/auth';
@@ -13,10 +14,10 @@ const AVATAR_SIZE = 512;
 const AVATAR_QUALITY = 0.82;
 
 /**
- * Buka galeri, potong jadi persegi di tengah, perkecil ke 512px (JPEG).
- * Null bila pengguna membatalkan.
+ * Buka galeri dan baca ukuran asli foto (dalam koordinat yang sama dengan crop).
+ * Null bila pengguna membatalkan. Posisi & zoom lalu diatur pengguna di AvatarCropModal.
  */
-export async function pickAvatarImage(): Promise<string | null> {
+export async function pickAvatarSource(): Promise<AvatarCropSource | null> {
   if (Platform.OS !== 'web') {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -26,25 +27,25 @@ export async function pickAvatarImage(): Promise<string | null> {
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    // Editor potong bawaan hanya ada di Android/iOS; di web dipotong otomatis di bawah.
-    allowsEditing: Platform.OS !== 'web',
-    aspect: [1, 1],
+    // Editor bawaan Android/iOS tidak dipakai: semua platform memakai AvatarCropModal (lingkaran).
+    allowsEditing: false,
     quality: 1,
   });
   if (result.canceled || !result.assets?.[0]) return null;
 
-  const { uri, width, height } = result.assets[0];
-  const side = Math.min(width, height);
-  const context = ImageManipulator.ImageManipulator.manipulate(uri);
-  if (width !== height && side > 0) {
-    context.crop({
-      originX: Math.floor((width - side) / 2),
-      originY: Math.floor((height - side) / 2),
-      width: side,
-      height: side,
-    });
+  const { uri } = result.assets[0];
+  // Ukuran dibaca lewat manipulator (ukuran dari picker bisa 0) agar sama persis dengan dasar crop.
+  const loaded = await ImageManipulator.ImageManipulator.manipulate(uri).renderAsync();
+  if (!loaded.width || !loaded.height) {
+    throw new Error('Foto tidak bisa dibaca. Coba pilih foto lain.');
   }
-  if (side > AVATAR_SIZE || side === 0) {
+  return { uri, width: loaded.width, height: loaded.height };
+}
+
+/** Potong area pilihan pengguna, perkecil ke 512px, simpan sebagai JPEG. */
+export async function renderAvatar(uri: string, rect: AvatarCropRect): Promise<string> {
+  const context = ImageManipulator.ImageManipulator.manipulate(uri).crop(rect);
+  if (rect.width > AVATAR_SIZE) {
     context.resize({ width: AVATAR_SIZE, height: AVATAR_SIZE });
   }
 
@@ -119,9 +120,11 @@ export function useAvatarActions(options: { hasPhoto: boolean; changeAvailableAt
   const removeAvatar = useRemoveAvatar();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPicking, setIsPicking] = useState(false);
+  const [cropSource, setCropSource] = useState<AvatarCropSource | null>(null);
+  const [isSavingCrop, setIsSavingCrop] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const isBusy = isPicking || updateAvatar.isPending || removeAvatar.isPending;
+  const isBusy = isPicking || isSavingCrop || updateAvatar.isPending || removeAvatar.isPending;
   const isChangeLocked = !!options.changeAvailableAt;
   const lockedMessage = options.changeAvailableAt
     ? `Foto profil bisa diganti lagi pada ${new Date(options.changeAvailableAt).toLocaleDateString('id-ID', {
@@ -140,14 +143,29 @@ export function useAvatarActions(options: { hasPhoto: boolean; changeAvailableAt
     }
     setIsPicking(true);
     try {
-      const uri = await pickAvatarImage();
-      if (uri) {
-        await updateAvatar.mutateAsync(uri);
-      }
+      // Foto belum diunggah: pengguna mengatur posisi & zoom dulu di modal crop.
+      const source = await pickAvatarSource();
+      if (source) setCropSource(source);
     } catch (error) {
       setErrorMessage(avatarErrorMessage(error));
     } finally {
       setIsPicking(false);
+    }
+  };
+
+  /** Simpan dari modal crop: potong → unggah. Batal tidak mengunggah apa pun (batas 7 hari aman). */
+  const confirmCrop = async (rect: AvatarCropRect) => {
+    if (!cropSource) return;
+    setIsSavingCrop(true);
+    try {
+      const uri = await renderAvatar(cropSource.uri, rect);
+      await updateAvatar.mutateAsync(uri);
+      setCropSource(null);
+    } catch (error) {
+      setCropSource(null);
+      setErrorMessage(avatarErrorMessage(error));
+    } finally {
+      setIsSavingCrop(false);
     }
   };
 
@@ -180,5 +198,12 @@ export function useAvatarActions(options: { hasPhoto: boolean; changeAvailableAt
     openActions,
     choosePhoto,
     removePhoto,
+    /** Props untuk <AvatarCropModal />. */
+    crop: {
+      source: cropSource,
+      isSaving: isSavingCrop,
+      onCancel: () => setCropSource(null),
+      onConfirm: confirmCrop,
+    },
   };
 }

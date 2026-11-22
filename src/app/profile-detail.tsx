@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 
+import { AvatarCropModal } from '@/components/profile/AvatarCropModal';
 import { AvatarOptionsSheet } from '@/components/profile/AvatarOptionsSheet';
 import { CameraIcon } from '@/components/profile/CameraIcon';
 import { ThemedText } from '@/components/themed-text';
@@ -199,6 +200,7 @@ export default function ProfileDetailScreen() {
         onRemove={avatar.removePhoto}
         onClose={avatar.closeMenu}
       />
+      <AvatarCropModal {...avatar.crop} />
     </ThemedView>
   );
 }
