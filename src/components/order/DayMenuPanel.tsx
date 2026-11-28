@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
@@ -122,17 +122,14 @@ const MenuItemRow: React.FC<MenuItemRowProps> = ({ menu, qty, isFirst, onUpdateQ
             >
               <ThemedText style={[styles.stepperBtnText, { color: palette.stepperActiveText }]}>−</ThemedText>
             </Pressable>
-            <TextInput
-              style={[styles.qtyInput, { color: palette.dayMenuText }]}
-              keyboardType="numeric"
-              value={String(qty)}
-              // Isi kosong diabaikan agar input tidak langsung hilang saat angka dihapus untuk diganti
-              onChangeText={(val) => {
-                if (val.trim() !== '') onUpdateQty(val);
-              }}
-              selectTextOnFocus
-              accessibilityLabel={`Jumlah porsi ${menu.name}`}
-            />
+            {/* Jumlah porsi hanya diubah lewat tombol − / +, tidak bisa diketik */}
+            <ThemedText
+              style={[styles.qtyText, { color: palette.dayMenuText }]}
+              numberOfLines={1}
+              accessibilityLabel={`Jumlah porsi ${menu.name}: ${qty}`}
+            >
+              {qty}
+            </ThemedText>
             <Pressable
               onPress={() => onUpdateQty(1)}
               style={({ pressed }) => [styles.stepperBtn, { backgroundColor: palette.stepperActiveBg }, pressed && styles.pressed]}
@@ -265,14 +262,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 17,
   },
-  qtyInput: {
+  qtyText: {
     flex: 1,
     minWidth: 0,
-    height: 28,
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '600',
-    padding: 0,
+    lineHeight: 18,
   },
   pressed: {
     opacity: 0.8,
