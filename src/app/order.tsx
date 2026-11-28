@@ -339,6 +339,9 @@ export default function OrderScreen() {
       <MenuDetailModal
         menu={selectedDetailMenu}
         onClose={() => setSelectedDetailMenu(null)}
+        onAdd={(menu) => {
+          if (activeDay) updateItemQty(activeDay.key, menu.id, 1);
+        }}
       />
     </View>
   );
