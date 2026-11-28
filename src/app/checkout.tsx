@@ -197,7 +197,7 @@ export default function CheckoutScreen() {
               {/* Card 1: Fulfillment Method (Pesan Antar vs Ambil Sendiri) */}
               <FulfillmentMethodCard />
 
-              {/* Card 2: Pesananmu Summary (Berdasarkan: Hari / Kategori) */}
+              {/* Card 2: Pesananmu Summary (kelompokkan per Hari / Kategori) */}
               <OrderItemsSummaryCard />
 
               {/* Card 3: Metode Pembayaran (QRIS; Tunai belum tersedia) */}

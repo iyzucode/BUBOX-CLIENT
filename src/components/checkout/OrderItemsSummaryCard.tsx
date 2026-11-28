@@ -126,10 +126,6 @@ export const OrderItemsSummaryCard: React.FC = () => {
         </ThemedText>
 
         <View style={styles.toggleWrapper}>
-          <ThemedText style={[styles.toggleLabel, { color: palette.cardSubtext }]}>
-            Berdasarkan
-          </ThemedText>
-
           <View style={[styles.segmentedBox, { backgroundColor: palette.segmentedBg }]}>
             {/* Hari Button */}
             <Pressable
@@ -307,11 +303,6 @@ const styles = StyleSheet.create({
   },
   toggleWrapper: {
     alignItems: 'center',
-    gap: 2,
-  },
-  toggleLabel: {
-    fontSize: 10,
-    fontWeight: '500',
   },
   segmentedBox: {
     flexDirection: 'row',
