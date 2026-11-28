@@ -21,22 +21,29 @@ const measureY = (node: View | null | undefined) =>
 /**
  * Gulir layar order:
  * - Tab hari menempel di atas layar setelah deretan tanggal di kartu "Tanggal pemesanan" tergulir keluar layar.
- * - Dua posisi henti: konfigurasi terlihat penuh (atas) atau tersembunyi penuh (menu tepat di bawah tab yang
- *   menempel). Bila gulir berhenti di antara keduanya, layar meluncur ke salah satunya sesuai arah gulir terakhir.
- *   Di dalam daftar menu gulir tetap bebas.
+ * - Dua posisi henti: akhir konfigurasi terlihat penuh (bagian bawahnya tepat di atas bar checkout) atau
+ *   konfigurasi tersembunyi penuh (menu tepat di bawah tab yang menempel). Bila gulir berhenti di antara keduanya,
+ *   layar meluncur ke salah satunya sesuai arah gulir terakhir. Di dalam konfigurasi (bila lebih tinggi dari layar,
+ *   mis. kategori terbuka) dan di dalam daftar menu gulir tetap bebas.
  * Posisi diukur saat dibutuhkan (bukan dari onLayout): di web onLayout tidak terpicu saat konten di atasnya berubah.
  *
  * @param pinnedHeight tinggi total tab yang menempel (termasuk safe area atas).
+ * @param bottomInset tinggi area bawah yang tertutup bar checkout.
  */
-export function usePinnedDayTabs(pinnedHeight: number) {
+export function usePinnedDayTabs(pinnedHeight: number, bottomInset: number) {
   const scrollRef = useRef<ScrollView>(null);
   const rootRef = useRef<View>(null);
   /** Deretan tanggal di kartu "Tanggal pemesanan". */
   const chipsRowRef = useRef<View>(null);
   /** Awal daftar menu hari yang dipilih. */
   const menuRef = useRef<View>(null);
+  /** Panel konfigurasi (tanggal & kategori). */
+  const configRef = useRef<View>(null);
   const scrollY = useRef(0);
+  /** Posisi saat rangkaian gulir saat ini dimulai (null = sedang diam). */
+  const scrollStartY = useRef<number | null>(null);
   const maxScrollY = useRef(0);
+  const viewportHeight = useRef(0);
   const direction = useRef<'up' | 'down'>('down');
   const isDragging = useRef(false);
   const lockUntil = useRef(0);
@@ -73,17 +80,33 @@ export function usePinnedDayTabs(pinnedHeight: number) {
     scrollRef.current?.scrollTo({ y, animated: true });
   }, []);
 
-  /** Gulir berhenti di antara posisi atas & posisi menu: luncurkan ke salah satunya sesuai arah gulir. */
+  /** Gulir berhenti di antara akhir konfigurasi & posisi menu: luncurkan ke salah satunya sesuai arah gulir. */
   const snapIfBetween = useCallback(async () => {
+    const startY = scrollStartY.current;
+    scrollStartY.current = null;
     if (isDragging.current || Date.now() < lockUntil.current) return;
-    const offset = await menuOffset();
-    if (offset == null) return;
-    // Menu pendek: posisi menu dibatasi ujung gulir
-    const menuStop = Math.min(offset, maxScrollY.current);
+    const [root, menu, config] = await Promise.all([
+      measureY(rootRef.current),
+      measureY(menuRef.current),
+      measureY(configRef.current),
+    ]);
+    if (!root || !menu || !config) return;
     const y = scrollY.current;
-    if (menuStop <= 8 || y <= 1 || y >= menuStop - 1) return;
-    autoScrollTo(direction.current === 'down' ? menuStop : 0);
-  }, [menuOffset, autoScrollTo]);
+    // Menu pendek: posisi menu dibatasi ujung gulir
+    const menuStop = Math.min(Math.max(0, y + menu.y - root.y - pinnedHeight), maxScrollY.current);
+    // Posisi saat bagian bawah konfigurasi tepat terlihat di atas bar checkout (0 bila konfigurasi muat di layar)
+    const configBottom = y + config.y + config.h - root.y;
+    const configStop = Math.max(0, configBottom - (viewportHeight.current - bottomInset));
+    if (menuStop - configStop <= 8 || y <= configStop + 1 || y >= menuStop - 1) return;
+    if (direction.current === 'up') {
+      autoScrollTo(configStop);
+      return;
+    }
+    // Gulir ke bawah yang dimulai dari dalam konfigurasi berhenti dulu di akhir konfigurasi (bagian bawahnya,
+    // mis. kategori terakhir, bisa terlihat); gulir ke bawah berikutnya dari sana baru meluncur ke menu.
+    const startedInsideConfig = startY != null && startY < configStop - 1;
+    autoScrollTo(startedInsideConfig ? configStop : menuStop);
+  }, [autoScrollTo, pinnedHeight, bottomInset]);
 
   const scheduleSnap = useCallback(() => {
     if (idleTimer.current) clearTimeout(idleTimer.current);
@@ -93,9 +116,11 @@ export function usePinnedDayTabs(pinnedHeight: number) {
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      if (scrollStartY.current == null) scrollStartY.current = scrollY.current;
       const delta = contentOffset.y - scrollY.current;
       if (Math.abs(delta) > 0.5) direction.current = delta > 0 ? 'down' : 'up';
       scrollY.current = contentOffset.y;
+      viewportHeight.current = layoutMeasurement.height;
       maxScrollY.current = Math.max(0, contentSize.height - layoutMeasurement.height);
 
       if (syncTimer.current) clearTimeout(syncTimer.current);
@@ -131,6 +156,7 @@ export function usePinnedDayTabs(pinnedHeight: number) {
     rootRef,
     chipsRowRef,
     menuRef,
+    configRef,
     isPinned,
     handleScroll,
     handleScrollBeginDrag,

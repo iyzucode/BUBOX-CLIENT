@@ -33,6 +33,9 @@ import { confirmAction, showAlert } from '@/utils/alert';
 import { Menu } from '@/types/menu';
 import { useCartStore } from '@/store/useCartStore';
 
+/** Ruang di bawah layar yang tertutup bar checkout yang menempel. */
+const CHECKOUT_BAR_SPACE = 110;
+
 export default function OrderScreen() {
   const router = useRouter();
   const palette = useOrderPalette();
@@ -45,12 +48,13 @@ export default function OrderScreen() {
     rootRef,
     chipsRowRef,
     menuRef,
+    configRef,
     isPinned,
     handleScroll,
     handleScrollBeginDrag,
     handleScrollEndDrag,
     scrollToMenu,
-  } = usePinnedDayTabs(pinnedHeight);
+  } = usePinnedDayTabs(pinnedHeight, CHECKOUT_BAR_SPACE);
 
   // 1. Fetch weekly menu and main categories from API
   const { data: weeklyData, isLoading, isError, refetch } = useGetWeeklyMenu();
@@ -210,7 +214,7 @@ export default function OrderScreen() {
         {/* 2. OVERLAPPING CONTAINER (marginTop: -55px) */}
         <View style={styles.overlapContainer}>
           {/* Configuration Panel: Both components in ONE single div */}
-          <View style={[styles.configPanel, { backgroundColor: palette.panelBg }]}>
+          <View ref={configRef} collapsable={false} style={[styles.configPanel, { backgroundColor: palette.panelBg }]}>
             {/* Card 1: Tanggal Pemesanan */}
             <OrderDateCard
               days={trackedDays}
@@ -347,7 +351,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 110, // Padding for sticky checkout bar
+    paddingBottom: CHECKOUT_BAR_SPACE, // Padding for sticky checkout bar
   },
   overlapContainer: {
     maxWidth: MaxContentWidth,
