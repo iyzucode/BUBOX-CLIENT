@@ -61,23 +61,19 @@ export const PaymentDetailCard: React.FC = () => {
         </ThemedText>
       </View>
 
-      {/* 3b. Biaya layanan & pajak (hanya bila diatur admin) */}
-      {serviceFee > 0 ? (
-        <View style={styles.detailRow}>
-          <ThemedText style={[styles.label, { color: palette.financeLabel }]}>{serviceFeeLabel(serviceFeePercent)}</ThemedText>
-          <ThemedText style={[styles.value, { color: palette.financeValue }]}>
-            Rp {serviceFee.toLocaleString('id-ID')}
-          </ThemedText>
-        </View>
-      ) : null}
-      {taxAmount > 0 ? (
-        <View style={styles.detailRow}>
-          <ThemedText style={[styles.label, { color: palette.financeLabel }]}>Pajak ({formatPercent(taxPercent)})</ThemedText>
-          <ThemedText style={[styles.value, { color: palette.financeValue }]}>
-            Rp {taxAmount.toLocaleString('id-ID')}
-          </ThemedText>
-        </View>
-      ) : null}
+      {/* 3b. Biaya layanan & pajak: selalu tampil, Rp 0 bila tidak diatur admin */}
+      <View style={styles.detailRow}>
+        <ThemedText style={[styles.label, { color: palette.financeLabel }]}>{serviceFeeLabel(serviceFeePercent)}</ThemedText>
+        <ThemedText style={[styles.value, { color: palette.financeValue }]}>
+          Rp {serviceFee.toLocaleString('id-ID')}
+        </ThemedText>
+      </View>
+      <View style={styles.detailRow}>
+        <ThemedText style={[styles.label, { color: palette.financeLabel }]}>Pajak ({formatPercent(taxPercent)})</ThemedText>
+        <ThemedText style={[styles.value, { color: palette.financeValue }]}>
+          Rp {taxAmount.toLocaleString('id-ID')}
+        </ThemedText>
+      </View>
 
       {/* 4. Metode Pembayaran */}
       <View style={styles.detailRow}>

@@ -241,10 +241,8 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
             label={`${isDelivery ? 'Ongkir' : 'Biaya ambil sendiri'}${order.deliveryFeeNote ? ` (${order.deliveryFeeNote})` : ''}`}
             value={order.deliveryFee > 0 ? formatRupiah(order.deliveryFee) : 'Gratis'}
           />
-          {order.serviceFee > 0 ? (
-            <Line label={`Biaya layanan${order.serviceFeePercent != null ? ` (${formatPercent(order.serviceFeePercent)})` : ''}`} value={formatRupiah(order.serviceFee)} />
-          ) : null}
-          {order.taxAmount > 0 ? <Line label={`Pajak (${formatPercent(order.taxPercent)})`} value={formatRupiah(order.taxAmount)} /> : null}
+          <Line label={`Biaya layanan${order.serviceFeePercent != null ? ` (${formatPercent(order.serviceFeePercent)})` : ''}`} value={formatRupiah(order.serviceFee)} />
+          <Line label={`Pajak (${formatPercent(order.taxPercent)})`} value={formatRupiah(order.taxAmount)} />
           <Line label="Total" value={formatRupiah(order.grandTotal)} strongValue />
         </View>
 

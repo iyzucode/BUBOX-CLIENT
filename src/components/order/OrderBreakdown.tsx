@@ -241,12 +241,8 @@ export const OrderBreakdown: React.FC<OrderBreakdownProps> = ({
               label={`${order.fulfillmentType === 'PICKUP' ? 'Biaya ambil sendiri' : 'Ongkos kirim'}${order.deliveryFeeNote ? ` (${order.deliveryFeeNote})` : ''}`}
               value={order.deliveryFee > 0 ? formatRupiah(order.deliveryFee) : 'Gratis'}
             />
-            {order.serviceFee > 0 ? (
-              <Line label={serviceFeeLabel(order.serviceFeePercent, 'Biaya layanan')} value={formatRupiah(order.serviceFee)} />
-            ) : null}
-            {order.taxAmount > 0 ? (
-              <Line label={`Pajak (${formatPercent(order.taxPercent)})`} value={formatRupiah(order.taxAmount)} />
-            ) : null}
+            <Line label={serviceFeeLabel(order.serviceFeePercent, 'Biaya layanan')} value={formatRupiah(order.serviceFee)} />
+            <Line label={`Pajak (${formatPercent(order.taxPercent)})`} value={formatRupiah(order.taxAmount)} />
             {paymentMethod ? <Line label="Metode" value={paymentMethod} /> : null}
             <Line label="Total" value={formatRupiah(order.grandTotal)} strong />
           </View>
