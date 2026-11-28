@@ -332,6 +332,7 @@ export default function OrderScreen() {
         onSaveDates={handleUpdateSelectedDates}
         minDateKey={cutoffInfo?.earliestDeliveryDate}
         maxDateKey={cutoffInfo?.latestDeliveryDate}
+        filledDateKeys={trackedDays.filter((d) => d.portions > 0).map((d) => d.key)}
       />
 
       {/* 7. MODAL: MENU DETAIL / NUTRITION INFO */}

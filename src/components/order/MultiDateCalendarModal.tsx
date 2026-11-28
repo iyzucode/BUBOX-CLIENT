@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
   Easing,
+  GestureResponderEvent,
   Modal,
   PanResponder,
+  PanResponderGestureState,
   Platform,
   Pressable,
   ScrollView,
@@ -32,6 +34,8 @@ interface MultiDateCalendarModalProps {
   minDateKey?: string;
   /** Tanggal kirim paling akhir yang boleh dipilih, format yyyy-MM-dd. */
   maxDateKey?: string;
+  /** Tanggal yang sudah berisi menu: hanya tanggal terpilih yang ada di sini diberi tanda centang. */
+  filledDateKeys?: string[];
 }
 
 const WEEKDAY_HEADERS = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
@@ -43,6 +47,101 @@ interface CalendarCell {
   isCurrentMonth: boolean;
   isPast: boolean;
   isToday: boolean;
+}
+
+/** 42 sel (6 minggu × 7 hari) untuk satu bulan, termasuk sisa hari bulan sebelum & sesudahnya. */
+function buildMonthCells(year: number, month: number, minDate: Date, maxDate: Date | null, today: Date): CalendarCell[] {
+  const cells: CalendarCell[] = [];
+  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = Minggu
+  const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const push = (cellDate: Date, dayNum: number, isCurrentMonth: boolean) => {
+    cellDate.setHours(0, 0, 0, 0);
+    cells.push({
+      date: cellDate,
+      dateKey: toDateKey(cellDate),
+      dayNum,
+      isCurrentMonth,
+      isPast: cellDate.getTime() < minDate.getTime() || (maxDate !== null && cellDate.getTime() > maxDate.getTime()),
+      isToday: cellDate.getTime() === today.getTime(),
+    });
+  };
+
+  for (let i = firstDayOfWeek - 1; i >= 0; i--) push(new Date(year, month - 1, daysInPrevMonth - i), daysInPrevMonth - i, false);
+  for (let dayNum = 1; dayNum <= daysInCurrentMonth; dayNum++) push(new Date(year, month, dayNum), dayNum, true);
+  const remainingCells = 42 - cells.length;
+  for (let dayNum = 1; dayNum <= remainingCells; dayNum++) push(new Date(year, month + 1, dayNum), dayNum, false);
+  return cells;
+}
+
+/** Jarak antarkartu bulan saat digeser. */
+const MONTH_PAGE_GAP = 12;
+
+/**
+ * Geser bulan seperti slider gambar: kartu bulan sebelum & sesudah berada tepat di samping kartu aktif dan ikut
+ * tergeser mengikuti jari. Dilepas melewati batas (atau dikibas) → meluncur ke bulan sebelah, selain itu kembali.
+ * Status gesture disimpan di luar state React agar handler PanResponder selalu membaca nilai terbaru.
+ */
+class MonthCarouselController {
+  readonly dragX = new Animated.Value(0);
+  private pageWidth = 0;
+  private busy = false;
+  private readonly onCommit: (delta: number) => void;
+
+  constructor(onCommit: (delta: number) => void) {
+    this.onCommit = onCommit;
+  }
+
+  setPageWidth(width: number) {
+    this.pageWidth = width;
+  }
+
+  /** Luncurkan ke bulan sebelah (delta -1 / +1), lalu ganti bulan. */
+  go(delta: number) {
+    if (this.busy) return;
+    if (this.pageWidth <= 0) {
+      this.onCommit(delta);
+      return;
+    }
+    this.busy = true;
+    Animated.timing(this.dragX, {
+      toValue: -delta * (this.pageWidth + MONTH_PAGE_GAP),
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      // JS driver: posisi harus bisa dikembalikan ke tengah pada frame yang sama dengan pergantian bulan
+      useNativeDriver: false,
+    }).start(() => this.onCommit(delta));
+  }
+
+  /** Dipanggil setelah bulan berganti (sebelum layar digambar): kartu tengah kini bulan baru. */
+  settle() {
+    this.dragX.setValue(0);
+    this.busy = false;
+  }
+
+  private springBack() {
+    Animated.spring(this.dragX, { toValue: 0, bounciness: 0, speed: 18, useNativeDriver: false }).start();
+  }
+
+  private readonly isHorizontalSwipe = (_: GestureResponderEvent, g: PanResponderGestureState) =>
+    !this.busy && Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2;
+
+  readonly panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onStartShouldSetPanResponderCapture: () => false,
+    onMoveShouldSetPanResponder: this.isHorizontalSwipe,
+    onMoveShouldSetPanResponderCapture: this.isHorizontalSwipe,
+    onPanResponderGrant: () => this.dragX.stopAnimation(),
+    onPanResponderMove: (_, g) => this.dragX.setValue(g.dx),
+    onPanResponderRelease: (_, g) => {
+      const threshold = Math.min(80, this.pageWidth * 0.25);
+      if (g.dx < -threshold || g.vx < -0.3) this.go(1);
+      else if (g.dx > threshold || g.vx > 0.3) this.go(-1);
+      else this.springBack();
+    },
+    onPanResponderTerminate: () => this.springBack(),
+  });
 }
 
 // Color theme tokens supporting light and dark modes
@@ -103,6 +202,7 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
   onSaveDates,
   minDateKey,
   maxDateKey,
+  filledDateKeys,
 }) => {
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeContext();
@@ -191,107 +291,21 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
   const year = currentMonthDate.getFullYear();
   const month = currentMonthDate.getMonth();
 
-  // Horizontal Slide / Swipe Animation states
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const isTransitioningRef = useRef(false);
-
-  const calendarOpacity = useMemo(() => {
-    return slideAnim.interpolate({
-      inputRange: [-150, 0, 150],
-      outputRange: [0.65, 1, 0.65],
-      extrapolate: 'clamp',
-    });
-  }, [slideAnim]);
-
-  // Directional month transition
-  const changeMonth = (delta: number) => {
-    if (isTransitioningRef.current) return;
-    isTransitioningRef.current = true;
-
-    const exitTo = delta > 0 ? -120 : 120;
-    const enterFrom = delta > 0 ? 120 : -120;
-
-    Animated.timing(slideAnim, {
-      toValue: exitTo,
-      duration: 120,
-      easing: Easing.in(Easing.cubic),
-      useNativeDriver: Platform.OS !== 'web',
-    }).start(() => {
-      setCurrentMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
-      slideAnim.setValue(enterFrom);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 150,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: Platform.OS !== 'web',
-      }).start(() => {
-        isTransitioningRef.current = false;
-      });
-    });
-  };
-
-  // Navigation handlers
-  const handlePrevMonth = () => {
-    changeMonth(-1);
-  };
-
-  const handleNextMonth = () => {
-    changeMonth(1);
-  };
-
-  // PanResponder to enable horizontal swipe/slide left and right across the calendar
-  const panResponder = useMemo(
+  // Geser bulan seperti slider: bulan sebelum & sesudah ikut terlihat di samping saat digeser
+  const [pageWidth, setPageWidth] = useState(0);
+  const [carousel] = useState(
     () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onStartShouldSetPanResponderCapture: () => false,
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          return (
-            Math.abs(gestureState.dx) > 10 &&
-            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2
-          );
-        },
-        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-          return (
-            Math.abs(gestureState.dx) > 10 &&
-            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2
-          );
-        },
-        onPanResponderGrant: () => {
-          slideAnim.stopAnimation();
-        },
-        onPanResponderMove: (_, gestureState) => {
-          slideAnim.setValue(gestureState.dx);
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          const threshold = 35;
-          const velocity = gestureState.vx;
-
-          if (gestureState.dx < -threshold || velocity < -0.2) {
-            // Swiped left -> Next month
-            changeMonth(1);
-          } else if (gestureState.dx > threshold || velocity > 0.2) {
-            // Swiped right -> Previous month
-            changeMonth(-1);
-          } else {
-            // Did not cross threshold: spring back to 0
-            Animated.spring(slideAnim, {
-              toValue: 0,
-              bounciness: 4,
-              useNativeDriver: Platform.OS !== 'web',
-            }).start();
-          }
-        },
-        onPanResponderTerminate: () => {
-          Animated.spring(slideAnim, {
-            toValue: 0,
-            bounciness: 4,
-            useNativeDriver: Platform.OS !== 'web',
-          }).start();
-        },
-      }),
-    [slideAnim]
+      new MonthCarouselController((delta) =>
+        setCurrentMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1))
+      )
   );
+  // Setelah bulan berganti, kembalikan posisi geser ke tengah sebelum layar digambar (tanpa kedip)
+  useLayoutEffect(() => {
+    carousel.settle();
+  }, [carousel, currentMonthDate]);
+
+  const handlePrevMonth = () => carousel.go(-1);
+  const handleNextMonth = () => carousel.go(1);
 
   // Toggle selection for a specific date
   const handleToggleDate = (key: string) => {
@@ -327,66 +341,129 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
     handleClose();
   };
 
-  // Generate 42 cells (6 rows x 7 days) with trailing and leading days
-  const calendarCells = useMemo<CalendarCell[]>(() => {
-    const cells: CalendarCell[] = [];
+  /** Satu kartu bulan (judul hari + 42 sel tanggal). */
+  const renderMonth = (cells: CalendarCell[]) => (
+      <View
+        style={[
+          styles.calendarCard,
+          {
+            backgroundColor: colors.calendarCardBg,
+            borderColor: colors.calendarCardBorder,
+          },
+        ]}
+      >
+      {/* Weekday Row (M, S, S, R, K, J, S) */}
+      <View style={styles.weekdayRow}>
+        {WEEKDAY_HEADERS.map((h, i) => (
+          <View key={`header-${i}`} style={styles.weekdayCell}>
+            <ThemedText
+              style={[styles.weekdayText, { color: colors.weekdayText }]}
+            >
+              {h}
+            </ThemedText>
+          </View>
+        ))}
+      </View>
 
-    const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 is Sunday
-    const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
-    const daysInPrevMonth = new Date(year, month, 0).getDate();
+      {/* 42 Calendar Cells (6 rows x 7 columns) */}
+      <View style={styles.grid}>
+        {cells.map((cell) => {
+          const isSelected = tempKeys.includes(cell.dateKey);
+          const isSelectable = !cell.isPast;
 
-    // 1. Trailing days from previous month
-    for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-      const dayNum = daysInPrevMonth - i;
-      const cellDate = new Date(year, month - 1, dayNum);
-      cellDate.setHours(0, 0, 0, 0);
-      const isPast = cellDate.getTime() < minDate.getTime() || (maxDate !== null && cellDate.getTime() > maxDate.getTime());
-      const isToday = cellDate.getTime() === today.getTime();
-      cells.push({
-        date: cellDate,
-        dateKey: toDateKey(cellDate),
-        dayNum,
-        isCurrentMonth: false,
-        isPast,
-        isToday,
-      });
-    }
+          return (
+            <View key={cell.dateKey} style={styles.dateCell}>
+              <Pressable
+                onPress={() => isSelectable && handleToggleDate(cell.dateKey)}
+                disabled={!isSelectable}
+                style={({ pressed }) => [
+                  styles.dateTile,
+                  isSelected && [
+                    styles.dateTileSelected,
+                    { backgroundColor: colors.selectedTileBg },
+                  ],
+                  cell.isToday &&
+                    !isSelected && [
+                      styles.dateTileToday,
+                      {
+                        backgroundColor: colors.todayBg,
+                        borderColor: colors.todayRingBorder,
+                      },
+                    ],
+                  pressed && isSelectable && styles.pressed,
+                ]}
+              >
+                <ThemedText
+                  style={[
+                    styles.dateNumText,
+                    { color: colors.dateTextNormal },
+                    isSelected && {
+                      color: colors.selectedTileText,
+                      fontWeight: '500',
+                    },
+                    cell.isToday &&
+                      !isSelected && {
+                        color: colors.todayText,
+                        fontWeight: '500',
+                      },
+                    cell.isPast && {
+                      color: colors.dateTextPast,
+                      fontWeight: '400',
+                    },
+                    !cell.isCurrentMonth &&
+                      !isSelected &&
+                      !cell.isPast && {
+                        color: colors.dateTextOtherMonth,
+                        fontWeight: '400',
+                      },
+                  ]}
+                >
+                  {cell.dayNum}
+                </ThemedText>
 
-    // 2. Days in current month
-    for (let dayNum = 1; dayNum <= daysInCurrentMonth; dayNum++) {
-      const cellDate = new Date(year, month, dayNum);
-      cellDate.setHours(0, 0, 0, 0);
-      const isPast = cellDate.getTime() < minDate.getTime() || (maxDate !== null && cellDate.getTime() > maxDate.getTime());
-      const isToday = cellDate.getTime() === today.getTime();
-      cells.push({
-        date: cellDate,
-        dateKey: toDateKey(cellDate),
-        dayNum,
-        isCurrentMonth: true,
-        isPast,
-        isToday,
-      });
-    }
-
-    // 3. Leading days from next month (fill up to 42 cells = 6 weeks)
-    const remainingCells = 42 - cells.length;
-    for (let dayNum = 1; dayNum <= remainingCells; dayNum++) {
-      const cellDate = new Date(year, month + 1, dayNum);
-      cellDate.setHours(0, 0, 0, 0);
-      const isPast = cellDate.getTime() < minDate.getTime() || (maxDate !== null && cellDate.getTime() > maxDate.getTime());
-      const isToday = cellDate.getTime() === today.getTime();
-      cells.push({
-        date: cellDate,
-        dateKey: toDateKey(cellDate),
-        dayNum,
-        isCurrentMonth: false,
-        isPast,
-        isToday,
-      });
-    }
-
-    return cells;
-  }, [year, month, today, minDate, maxDate]);
+                {/* Lencana centang di kanan atas: hanya tanggal terpilih yang sudah berisi pesanan */}
+                {isSelected && filledDateKeys?.includes(cell.dateKey) && (
+                  <View
+                    style={[
+                      styles.checkBadge,
+                      {
+                        backgroundColor: colors.checkBadgeBg,
+                        borderColor: colors.checkBadgeBorder,
+                      },
+                    ]}
+                  >
+                    {Platform.OS === 'web' ? (
+                      <svg
+                        width="8"
+                        height="8"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={colors.checkBadgeIcon}
+                        strokeWidth="3.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <ThemedText
+                        style={[
+                          styles.checkBadgeText,
+                          { color: colors.checkBadgeIcon },
+                        ]}
+                      >
+                        ✓
+                      </ThemedText>
+                    )}
+                  </View>
+                )}
+              </Pressable>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
 
   const hasSelections = tempKeys.length > 0;
 
@@ -525,138 +602,42 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
               </Pressable>
             </View>
 
-            {/* 2. Swipeable Calendar Grid Card Container */}
-            <Animated.View
-              {...panResponder.panHandlers}
-              style={[
-                styles.calendarSwipeWrapper,
-                {
-                  transform: [{ translateX: slideAnim }],
-                  opacity: calendarOpacity,
-                },
-              ]}
+            {/* 2. Kalender bulan: digeser seperti slider, bulan sebelum & sesudah ikut terlihat di samping */}
+            <View
+              style={styles.calendarViewport}
+              onLayout={(e) => {
+                const width = e.nativeEvent.layout.width;
+                carousel.setPageWidth(width);
+                setPageWidth(width);
+              }}
+              {...carousel.panResponder.panHandlers}
             >
-              <View
-                style={[
-                  styles.calendarCard,
-                  {
-                    backgroundColor: colors.calendarCardBg,
-                    borderColor: colors.calendarCardBorder,
-                  },
-                ]}
-              >
-              {/* Weekday Row (M, S, S, R, K, J, S) */}
-              <View style={styles.weekdayRow}>
-                {WEEKDAY_HEADERS.map((h, i) => (
-                  <View key={`header-${i}`} style={styles.weekdayCell}>
-                    <ThemedText
-                      style={[styles.weekdayText, { color: colors.weekdayText }]}
+              {pageWidth > 0 ? (
+                <Animated.View
+                  style={[
+                    styles.calendarStrip,
+                    {
+                      width: pageWidth * 3 + MONTH_PAGE_GAP * 2,
+                      transform: [{ translateX: -(pageWidth + MONTH_PAGE_GAP) }, { translateX: carousel.dragX }],
+                    },
+                  ]}
+                >
+                  {[-1, 0, 1].map((offset) => (
+                    <View
+                      key={offset}
+                      style={{ width: pageWidth }}
+                      pointerEvents={offset === 0 ? 'auto' : 'none'}
+                      accessibilityElementsHidden={offset !== 0}
+                      importantForAccessibility={offset === 0 ? 'auto' : 'no-hide-descendants'}
                     >
-                      {h}
-                    </ThemedText>
-                  </View>
-                ))}
-              </View>
-
-              {/* 42 Calendar Cells (6 rows x 7 columns) */}
-              <View style={styles.grid}>
-                {calendarCells.map((cell) => {
-                  const isSelected = tempKeys.includes(cell.dateKey);
-                  const isSelectable = !cell.isPast;
-
-                  return (
-                    <View key={cell.dateKey} style={styles.dateCell}>
-                      <Pressable
-                        onPress={() => isSelectable && handleToggleDate(cell.dateKey)}
-                        disabled={!isSelectable}
-                        style={({ pressed }) => [
-                          styles.dateTile,
-                          isSelected && [
-                            styles.dateTileSelected,
-                            { backgroundColor: colors.selectedTileBg },
-                          ],
-                          cell.isToday &&
-                            !isSelected && [
-                              styles.dateTileToday,
-                              {
-                                backgroundColor: colors.todayBg,
-                                borderColor: colors.todayRingBorder,
-                              },
-                            ],
-                          pressed && isSelectable && styles.pressed,
-                        ]}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.dateNumText,
-                            { color: colors.dateTextNormal },
-                            isSelected && {
-                              color: colors.selectedTileText,
-                              fontWeight: '500',
-                            },
-                            cell.isToday &&
-                              !isSelected && {
-                                color: colors.todayText,
-                                fontWeight: '500',
-                              },
-                            cell.isPast && {
-                              color: colors.dateTextPast,
-                              fontWeight: '400',
-                            },
-                            !cell.isCurrentMonth &&
-                              !isSelected &&
-                              !cell.isPast && {
-                                color: colors.dateTextOtherMonth,
-                                fontWeight: '400',
-                              },
-                          ]}
-                        >
-                          {cell.dayNum}
-                        </ThemedText>
-
-                        {/* Top-Right Amber Badge with Checkmark */}
-                        {isSelected && (
-                          <View
-                            style={[
-                              styles.checkBadge,
-                              {
-                                backgroundColor: colors.checkBadgeBg,
-                                borderColor: colors.checkBadgeBorder,
-                              },
-                            ]}
-                          >
-                            {Platform.OS === 'web' ? (
-                              <svg
-                                width="8"
-                                height="8"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke={colors.checkBadgeIcon}
-                                strokeWidth="3.6"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            ) : (
-                              <ThemedText
-                                style={[
-                                  styles.checkBadgeText,
-                                  { color: colors.checkBadgeIcon },
-                                ]}
-                              >
-                                ✓
-                              </ThemedText>
-                            )}
-                          </View>
-                        )}
-                      </Pressable>
+                      {renderMonth(buildMonthCells(year, month + offset, minDate, maxDate, today))}
                     </View>
-                  );
-                })}
-              </View>
+                  ))}
+                </Animated.View>
+              ) : (
+                renderMonth(buildMonthCells(year, month, minDate, maxDate, today))
+              )}
             </View>
-          </Animated.View>
 
             {/* 3. Quick Select Section */}
             <View style={styles.quickSelectSection}>
@@ -909,8 +890,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: -0.2,
   },
-  calendarSwipeWrapper: {
+  // Jendela slider: hanya kartu bulan aktif yang terlihat, kartu di sampingnya muncul saat digeser
+  calendarViewport: {
     width: '100%',
+    overflow: 'hidden',
+  },
+  calendarStrip: {
+    flexDirection: 'row',
+    gap: MONTH_PAGE_GAP,
   },
   calendarCard: {
     borderRadius: 22,
