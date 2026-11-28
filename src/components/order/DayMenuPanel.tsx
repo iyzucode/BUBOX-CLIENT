@@ -82,6 +82,8 @@ const MenuItemRow: React.FC<MenuItemRowProps> = ({ menu, qty, isFirst, onUpdateQ
 
   return (
     <View style={[styles.item, !isFirst && [styles.itemSeparator, { borderTopColor: palette.dashedDivider }]]}>
+      {/* Penanda menu yang sudah dipesan: garis oranye di tepi kiri kartu */}
+      {qty > 0 ? <View style={[styles.selectedMarker, { backgroundColor: palette.buttonActiveBg }]} /> : null}
       <Pressable
         onPress={onOpenDetail}
         style={styles.itemInfo}
@@ -190,6 +192,14 @@ const styles = StyleSheet.create({
   itemSeparator: {
     borderTopWidth: 1,
     borderStyle: 'dashed',
+  },
+  // Menempel di tepi kiri kartu (body punya padding 16), setinggi baris menu
+  selectedMarker: {
+    position: 'absolute',
+    left: -16,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   itemInfo: {
     flex: 1,
