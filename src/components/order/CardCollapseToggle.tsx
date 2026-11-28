@@ -4,7 +4,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useOrderPalette } from './orderPalette';
 
-/** Tombol bulat ▲ penanda buka/tutup kartu (sama dengan DayMenuCard). Area klik ada di header kartu. */
+/** Tombol bulat ▲ penanda buka/tutup kartu. Area klik ada di header kartu. */
 export const CardCollapseToggle: React.FC<{ isOpen: boolean }> = ({ isOpen }) => {
   const palette = useOrderPalette();
   return (

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -11,8 +11,10 @@ import { useIsFocused, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { DayMenuCard } from '@/components/order/DayMenuCard';
-import { DATE_CHIP_HEIGHT, DateChipsRow, TrackedDay } from '@/components/order/DateChipsRow';
+import { DayMenuPanel } from '@/components/order/DayMenuPanel';
+import type { TrackedDay } from '@/components/order/DateChipsRow';
+import { DayListPanel } from '@/components/order/DayListPanel';
+import { DAY_TABS_HEIGHT, DayTabsRow } from '@/components/order/DayTabsRow';
 import { MenuDetailModal } from '@/components/order/MenuDetailModal';
 import { MultiDateCalendarModal } from '@/components/order/MultiDateCalendarModal';
 import { OrderCategoryCard } from '@/components/order/OrderCategoryCard';
@@ -25,14 +27,11 @@ import { useOrderPalette } from '@/components/order/orderPalette';
 import { MaxContentWidth } from '@/constants/theme';
 import { useGetMainCategories, useGetMenuCategories, useGetWeeklyMenu } from '@/features/menu/useMenu';
 import { useOrderCart } from '@/features/order/useOrderCart';
-import { useDayTracker } from '@/features/order/useDayTracker';
+import { usePinnedDayTabs } from '@/features/order/usePinnedDayTabs';
 import { useOrderCutoffInfo } from '@/features/order/useOrders';
 import { confirmAction, showAlert } from '@/utils/alert';
 import { Menu } from '@/types/menu';
 import { useCartStore } from '@/store/useCartStore';
-
-// Jarak atas & bawah deretan tanggal saat menempel di atas layar
-const PINNED_ROW_PADDING = 8;
 
 export default function OrderScreen() {
   const router = useRouter();
@@ -40,8 +39,18 @@ export default function OrderScreen() {
   const insets = useSafeAreaInsets();
   const { isScrolling, onScroll } = useScrollActivity();
   const stickyTop = insets.top > 0 ? insets.top : 0;
-  const pinnedHeight = stickyTop + DATE_CHIP_HEIGHT + PINNED_ROW_PADDING * 2;
-  const { scrollRef, rootRef, chipsRowRef, activeKey, isPinned, registerDay, handleScroll, jumpTo } = useDayTracker(pinnedHeight);
+  const pinnedHeight = stickyTop + DAY_TABS_HEIGHT;
+  const {
+    scrollRef,
+    rootRef,
+    chipsRowRef,
+    menuRef,
+    isPinned,
+    handleScroll,
+    handleScrollBeginDrag,
+    handleScrollEndDrag,
+    scrollToMenu,
+  } = usePinnedDayTabs(pinnedHeight);
 
   // 1. Fetch weekly menu and main categories from API
   const { data: weeklyData, isLoading, isError, refetch } = useGetWeeklyMenu();
@@ -73,18 +82,16 @@ export default function OrderScreen() {
   const isFocused = useIsFocused();
   useLeavePageWarning(isFocused && (selectedDateKeys.length > 0 || totalItemsCount > 0));
 
-  // 3. UI States: Expanded Accordion, Calendar Modal, Menu Detail Modal
-  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
+  // 3. UI States: hari yang ditampilkan, Calendar Modal, Menu Detail Modal
+  const [chosenDayKey, setChosenDayKey] = useState<string | null>(null);
+  // Daftar semua tanggal yang dibuka dari "N hari" pada tab yang menempel
+  const [isDayListOpen, setIsDayListOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedDetailMenu, setSelectedDetailMenu] = useState<Menu | null>(null);
 
-  // Accordion toggle handler
-  const handleToggleExpand = (key: string) => {
-    setExpandedDays((prev) => ({
-      ...prev,
-      [key]: prev[key] === undefined ? false : !prev[key], // default was true
-    }));
-  };
+  // Hari aktif: pilihan pengguna selama tanggalnya masih ada; selain itu hari pertama
+  const activeIndex = Math.max(0, orderDates.findIndex((d) => d.key === chosenDayKey));
+  const activeDay = orderDates[activeIndex] ?? null;
 
   const setOrderData = useCartStore((s) => s.setOrderData);
 
@@ -100,10 +107,11 @@ export default function OrderScreen() {
   }));
   const emptyDays = trackedDays.filter((d) => d.portions === 0);
 
-  // Buka kartu hari lalu gulir ke sana
+  // Tampilkan menu hari itu lalu gulir ke awal daftar menunya (tepat di bawah tab yang menempel)
   const openDay = (key: string) => {
-    setExpandedDays((prev) => ({ ...prev, [key]: true }));
-    jumpTo(key);
+    setChosenDayKey(key);
+    setIsDayListOpen(false);
+    scrollToMenu();
   };
 
   // Checkout submission handler
@@ -189,7 +197,11 @@ export default function OrderScreen() {
         onScroll={(event) => {
           onScroll();
           handleScroll(event);
+          // Daftar tanggal ditutup begitu halaman digulir
+          if (isDayListOpen) setIsDayListOpen(false);
         }}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        onScrollEndDrag={handleScrollEndDrag}
         scrollEventThrottle={16}
       >
         {/* 1. HERO HEADER IMAGE (~200px) WITH CLOSE 'X' & 'PESAN MENU LUANNA' */}
@@ -215,7 +227,7 @@ export default function OrderScreen() {
             />
           </View>
 
-          {/* 3. PER-DAY MENU ACCORDION CARDS SECTION */}
+          {/* 3. MENU SATU HARI YANG DIPILIH (pilih hari lewat deretan tanggal / tab yang menempel) */}
           <View style={styles.menuSection}>
             {isLoading ? (
               <View style={styles.loadingWrapper}>
@@ -245,51 +257,55 @@ export default function OrderScreen() {
                   </ThemedText>
                 </Pressable>
               </View>
-            ) : orderDates.length === 0 ? null : (
-              orderDates.map((entry) => {
-                const isExpanded = expandedDays[entry.key] !== false; // Default true
-                const availableMenus = getDisplayedMenusForDay(entry.dayOfWeek);
-                const dayCart = cart[entry.key] || {};
-                const subtotal = calculateDaySubtotal(entry.key);
-
-                return (
-                  <View
-                    key={entry.key}
-                    collapsable={false}
-                    ref={(node) => {
-                      registerDay(entry.key, node);
-                    }}
-                  >
-                    <DayMenuCard
-                      dateEntry={entry}
-                      isExpanded={isExpanded}
-                      onToggleExpand={() => handleToggleExpand(entry.key)}
-                      onRemoveDay={() => handleRemoveDate(entry.key)}
-                      availableMenus={availableMenus}
-                      dayCart={dayCart}
-                      subtotal={subtotal}
-                      onUpdateQty={(menuId, delta) => updateItemQty(entry.key, menuId, delta)}
-                      onOpenDetailModal={(menu) => setSelectedDetailMenu(menu)}
-                      categories={allCategories}
-                    />
-                  </View>
-                );
-              })
+            ) : !activeDay ? null : (
+              <View ref={menuRef} collapsable={false} style={[styles.dayCard, { backgroundColor: palette.cardBg }]}>
+                <DayMenuPanel
+                  key={activeDay.key}
+                  availableMenus={getDisplayedMenusForDay(activeDay.dayOfWeek)}
+                  dayCart={cart[activeDay.key] || {}}
+                  categories={allCategories}
+                  onUpdateQty={(menuId, delta) => updateItemQty(activeDay.key, menuId, delta)}
+                  onOpenDetailModal={(menu) => setSelectedDetailMenu(menu)}
+                />
+              </View>
             )}
           </View>
         </View>
       </ScrollView>
 
-      {/* 4. DERETAN TANGGAL MENEMPEL DI ATAS: muncul setelah deretan aslinya tergulir keluar layar */}
-      {isPinned && orderDates.length > 0 ? (
+      {/* 4. TAB HARI MENEMPEL DI ATAS: muncul setelah deretan tanggal di kartu tanggal tergulir keluar layar.
+          "N hari" membuka daftar semua tanggal beserta subtotalnya. */}
+      {isPinned && activeDay && isDayListOpen ? (
+        <Pressable
+          style={[StyleSheet.absoluteFill, styles.dayListBackdrop]}
+          onPress={() => setIsDayListOpen(false)}
+          accessibilityLabel="Tutup daftar tanggal"
+        />
+      ) : null}
+      {isPinned && activeDay ? (
         <View
           style={[
             styles.pinnedRow,
-            { backgroundColor: palette.cardBg, height: pinnedHeight, paddingTop: stickyTop + PINNED_ROW_PADDING },
+            { backgroundColor: palette.cardBg, height: isDayListOpen ? undefined : pinnedHeight, paddingTop: stickyTop },
           ]}
         >
           <View style={styles.pinnedRowInner}>
-            <DateChipsRow days={trackedDays} onSelectDay={openDay} followKey={activeKey ?? orderDates[0].key} />
+            {isDayListOpen ? (
+              <DayListPanel
+                days={trackedDays}
+                subtotals={Object.fromEntries(orderDates.map((d) => [d.key, calculateDaySubtotal(d.key)]))}
+                activeKey={activeDay.key}
+                onSelectDay={openDay}
+                onClose={() => setIsDayListOpen(false)}
+              />
+            ) : (
+              <DayTabsRow
+                days={trackedDays}
+                activeKey={activeDay.key}
+                onSelectDay={openDay}
+                onPressSummary={() => setIsDayListOpen(true)}
+              />
+            )}
           </View>
         </View>
       ) : null}
@@ -364,6 +380,11 @@ const styles = StyleSheet.create({
     marginTop: 18,
     gap: 14,
   },
+  // Penuh selebar kolom konten (menembus padding overlapContainer), tanpa sudut membulat
+  dayCard: {
+    marginHorizontal: -16,
+    overflow: 'hidden',
+  },
   pinnedRow: {
     position: 'absolute',
     top: 0,
@@ -385,12 +406,15 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  dayListBackdrop: {
+    zIndex: 19,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
   pinnedRowInner: {
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
-    // Ditambah jarak bawaan label "N hari" (8), teksnya sejajar dengan tepi kartu di bawahnya (16)
-    paddingLeft: 8,
+    // Kartu hari penuh selebar kolom, jadi tab yang menempel juga tanpa jarak samping
   },
   loadingWrapper: {
     paddingVertical: 40,
