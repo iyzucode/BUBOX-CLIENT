@@ -30,8 +30,8 @@ export const DayListPanel: React.FC<DayListPanelProps> = ({ days, subtotals, act
         accessibilityRole="button"
         accessibilityLabel="Tutup daftar tanggal"
       >
-        <DayListIcon open color={palette.summaryChipText} />
         <ThemedText style={[styles.headerText, { color: palette.summaryChipText }]}>{days.length} hari</ThemedText>
+        <DayListIcon open color={palette.summaryChipText} />
       </Pressable>
 
       <ScrollView style={styles.list} bounces={false}>
@@ -45,15 +45,16 @@ export const DayListPanel: React.FC<DayListPanelProps> = ({ days, subtotals, act
               style={({ pressed }) => [
                 styles.row,
                 { borderBottomColor: palette.dashedDivider },
-                active && { backgroundColor: palette.dateChipBg },
                 pressed && styles.pressed,
               ]}
               accessibilityRole="button"
               aria-selected={active}
               accessibilityLabel={`${day.fullLabel}, ${filled ? formatRupiah(subtotals[day.key] ?? 0) : 'belum ada pesanan'}`}
             >
+              {/* Penanda hari yang sudah ada pesanannya: garis oranye di tepi kiri, sama seperti di daftar menu */}
+              {filled ? <View style={[styles.filledMarker, { backgroundColor: palette.buttonActiveBg }]} /> : null}
               <ThemedText
-                style={[styles.dateText, { color: palette.dayMenuText }, active && styles.dateTextActive]}
+                style={[styles.dateText, { color: palette.dayMenuText }]}
                 numberOfLines={1}
               >
                 {day.fullLabel}
@@ -103,22 +104,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
+    borderStyle: 'dashed',
     ...WEB_POINTER,
+  },
+  filledMarker: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   dateText: {
     flexShrink: 0,
     fontSize: 12.5,
     fontWeight: '500',
   },
-  dateTextActive: {
-    fontWeight: '700',
-  },
   subtotal: {
     flex: 1,
     textAlign: 'right',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyText: {
     flex: 1,

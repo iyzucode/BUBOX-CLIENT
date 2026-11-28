@@ -46,8 +46,8 @@ export const DayTabsRow: React.FC<DayTabsRowProps> = ({ days, activeKey, onSelec
         accessibilityRole="button"
         accessibilityLabel={`${days.length} hari dipilih, buka daftar tanggal`}
       >
-        <DayListIcon open={false} color={palette.summaryChipText} />
         <ThemedText style={[styles.summaryText, { color: palette.summaryChipText }]}>{days.length} hari</ThemedText>
+        <DayListIcon open={false} color={palette.summaryChipText} />
       </Pressable>
 
       <ScrollView

@@ -4,12 +4,12 @@ import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 /**
- * Ikon buka/tutup daftar tanggal: tiga garis dengan segitiga kecil ke bawah. Saat daftar terbuka ikon yang sama
- * diputar 180° (berputar saat daftar dibuka), sehingga panahnya menunjuk ke atas = ketuk untuk menutup.
- * Segitiga digambar dengan border (bukan karakter teks) agar tinggi ikon pas dan tampak tepat di tengah.
+ * Ikon buka/tutup daftar tanggal: chevron ke bawah (ketuk untuk membuka). Saat daftar terbuka chevron yang sama
+ * diputar 180° (berputar saat daftar dibuka), sehingga menunjuk ke atas = ketuk untuk menutup.
+ * Chevron digambar dengan border (bukan karakter teks) agar ukurannya pas dan tampak tepat di tengah.
  */
 export const DayListIcon: React.FC<{ open: boolean; color: string }> = ({ open, color }) => {
-  // 0 = tertutup (panah ke bawah), 1 = terbuka (diputar 180°)
+  // 0 = tertutup (chevron ke bawah), 1 = terbuka (diputar 180°)
   const [turn] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
@@ -29,32 +29,25 @@ export const DayListIcon: React.FC<{ open: boolean; color: string }> = ({ open, 
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <View style={[styles.bar, { backgroundColor: color }]} />
-      <View style={[styles.bar, { backgroundColor: color }]} />
-      <View style={[styles.bar, { backgroundColor: color }]} />
-      <View style={[styles.caret, { borderTopColor: color }]} />
+      <View style={[styles.chevron, { borderColor: color }]} />
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   icon: {
-    width: 11,
+    width: 14,
+    height: 14,
     alignItems: 'center',
-    gap: 1.5,
+    justifyContent: 'center',
   },
-  bar: {
-    width: 10,
-    height: 1.5,
-    borderRadius: 1,
-  },
-  caret: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 3,
-    borderRightWidth: 3,
-    borderTopWidth: 3.5,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
+  // Sudut kanan-bawah sebuah persegi yang diputar 45° = chevron ke bawah; digeser naik agar titik beratnya di tengah
+  chevron: {
+    width: 8,
+    height: 8,
+    marginTop: -4,
+    borderRightWidth: 1.5,
+    borderBottomWidth: 1.5,
+    transform: [{ rotate: '45deg' }],
   },
 });
