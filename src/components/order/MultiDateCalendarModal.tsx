@@ -460,8 +460,8 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
               >
                 {Platform.OS === 'web' ? (
                   <svg
-                    width="18"
-                    height="18"
+                    width="14"
+                    height="14"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke={colors.navChevron}
@@ -506,8 +506,8 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
               >
                 {Platform.OS === 'web' ? (
                   <svg
-                    width="18"
-                    height="18"
+                    width="14"
+                    height="14"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke={colors.navChevron}
@@ -717,8 +717,8 @@ export const MultiDateCalendarModal: React.FC<MultiDateCalendarModalProps> = ({
                 >
                   {Platform.OS === 'web' ? (
                     <svg
-                      width="20"
-                      height="20"
+                      width="16"
+                      height="16"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke={colors.clearBtnText}
@@ -844,16 +844,16 @@ const styles = StyleSheet.create({
   dragHandleContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 12,
-    paddingBottom: 6,
+    paddingTop: 8,
+    paddingBottom: 4,
     ...Platform.select({
       web: { cursor: 'pointer' } as any,
     }),
   },
   dragHandle: {
-    width: 52,
-    height: 5,
-    borderRadius: 2.5,
+    width: 40,
+    height: 4,
+    borderRadius: 2,
   },
   cardContent: {
     paddingHorizontal: 20,
@@ -863,12 +863,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   navCircleBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -889,9 +889,9 @@ const styles = StyleSheet.create({
     }),
   },
   navChevron: {
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: '400',
-    lineHeight: 24,
+    lineHeight: 19,
   },
   headerTitleBox: {
     alignItems: 'center',
@@ -899,13 +899,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   headerSubtitle: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '500',
-    letterSpacing: 1.2,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   headerMainTitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '500',
     letterSpacing: -0.2,
   },
@@ -1015,9 +1015,9 @@ const styles = StyleSheet.create({
   },
   quickPillBtn: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    height: 30,
+    borderRadius: 10,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -1025,12 +1025,13 @@ const styles = StyleSheet.create({
     }),
   },
   quickPillBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   clearBtn: {
-    width: 52,
-    borderRadius: 14,
+    width: 40,
+    height: 30,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -1038,8 +1039,8 @@ const styles = StyleSheet.create({
     }),
   },
   clearBtnIconText: {
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 18,
   },
   footerSection: {
     marginTop: 18,
